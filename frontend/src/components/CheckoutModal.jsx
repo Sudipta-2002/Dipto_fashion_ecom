@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MapPin, Plus, CheckCircle2, X, ArrowLeft } from 'lucide-react';
 import CheckoutProgressTracker from './CheckoutProgressTracker';
+import { API_URL } from '../api';
 
 const COUNTRY_CODES = [
   { code: '+91', country: 'India 🇮🇳' },
@@ -36,7 +37,7 @@ const CheckoutModal = ({ isOpen, onClose, onBackToCart, user, onProceedToPayment
   const fetchSavedAddresses = async () => {
     try {
       const token = localStorage.getItem('df_token');
-      const res = await fetch('/api/user/addresses', {
+      const res = await fetch(`${API_URL}/api/user/addresses`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit, Layers, X } from 'lucide-react';
+import { Plus, Trash2, Edit, X } from 'lucide-react';
+import { API_URL } from '../../api';
 
 const AdminCategories = () => {
   const [categories, setCategories] = useState([]);
@@ -18,7 +19,7 @@ const AdminCategories = () => {
 
   const fetchCategories = async () => {
     try {
-      const res = await fetch('/api/categories');
+      const res = await fetch(`${API_URL}/api/categories`);
       const data = await res.json();
       setCategories(data);
     } catch (e) {
@@ -31,7 +32,7 @@ const AdminCategories = () => {
     if (!name.trim()) return;
     setLoading(true);
     try {
-      const res = await fetch('/api/categories', {
+      const res = await fetch(`${API_URL}/api/categories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), description })
@@ -58,7 +59,7 @@ const AdminCategories = () => {
     e.preventDefault();
     if (!editName.trim() || !editingCategory) return;
     try {
-      const res = await fetch(`/api/categories/${editingCategory._id}`, {
+      const res = await fetch(`${API_URL}/api/categories/${editingCategory._id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: editName.trim(), description: editDescription })
@@ -75,7 +76,7 @@ const AdminCategories = () => {
   const handleDeleteCategory = async (id) => {
     if (!window.confirm('Delete category?')) return;
     try {
-      await fetch(`/api/categories/${id}`, { method: 'DELETE' });
+      await fetch(`${API_URL}/api/categories/${id}`, { method: 'DELETE' });
       fetchCategories();
     } catch (e) {
       alert('Error deleting category');

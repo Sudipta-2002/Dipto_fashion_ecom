@@ -37,7 +37,7 @@ const AdminBilling = () => {
   const fetchBillingLedger = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/billing');
+      const res = await fetch(`${API_URL}/api/admin/billing`);
       const data = await res.json();
       setLedgerData(data.ledger || []);
     } catch (e) {

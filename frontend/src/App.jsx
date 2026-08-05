@@ -10,6 +10,7 @@ import CheckoutModal from './components/CheckoutModal';
 import PaymentModal from './components/PaymentModal';
 import UserProfileModal from './components/UserProfileModal';
 import AdminPanel from './components/Admin/AdminPanel';
+import { API_URL } from './api';
 import './App.css';
 
 function App() {
@@ -125,7 +126,7 @@ function App() {
 
   const fetchCategories = async () => {
     try {
-      const res = await fetch('/api/categories');
+      const res = await fetch(`${API_URL}/api/categories`);
       const data = await res.json();
       setCategories(data);
     } catch (e) {
@@ -135,7 +136,7 @@ function App() {
 
   const fetchAllProducts = async () => {
     try {
-      const res = await fetch('/api/products');
+      const res = await fetch(`${API_URL}/api/products`);
       const data = await res.json();
       setAllProducts(data);
     } catch (e) {
@@ -146,7 +147,7 @@ function App() {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      let url = `/api/products?category=${encodeURIComponent(selectedCategory)}`;
+      let url = `${API_URL}/api/products?category=${encodeURIComponent(selectedCategory)}`;
       if (searchTerm.trim()) {
         url += `&search=${encodeURIComponent(searchTerm.trim())}`;
       }

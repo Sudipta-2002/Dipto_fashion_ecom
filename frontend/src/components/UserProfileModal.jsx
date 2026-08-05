@@ -29,6 +29,7 @@ import ProductRatingModal from './ProductRatingModal';
 import ProductReturnModal from './ProductReturnModal';
 import OrderCancelModal from './OrderCancelModal';
 import ProductCard from './ProductCard';
+import { API_URL } from '../api';
 
 const UserProfileModal = ({
   isOpen,
@@ -81,7 +82,7 @@ const UserProfileModal = ({
     try {
       const token = localStorage.getItem('df_token');
       if (!token) return;
-      const res = await fetch('/api/user/my-orders', {
+      const res = await fetch(`${API_URL}/api/user/my-orders`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {
@@ -104,7 +105,7 @@ const UserProfileModal = ({
     setAddrLoading(true);
     try {
       const token = localStorage.getItem('df_token');
-      const res = await fetch('/api/user/address', {
+      const res = await fetch(`${API_URL}/api/user/address`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

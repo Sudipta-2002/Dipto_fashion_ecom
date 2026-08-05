@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, Send, Bot, User, Sparkles, Package, RotateCcw, Mail, HelpCircle } from 'lucide-react';
+import { API_URL } from '../api';
 
 const QUICK_QUESTIONS = [
   'What is my last order?',
@@ -30,7 +31,7 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
     try {
       const token = localStorage.getItem('df_token');
       if (!token) return;
-      const res = await fetch('/api/user/my-orders', {
+      const res = await fetch(`${API_URL}/api/user/my-orders`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.ok) {

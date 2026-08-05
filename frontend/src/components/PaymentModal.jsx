@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { CheckCircle, AlertTriangle, X, Clock, RefreshCw, Copy, Check, ShieldCheck, ArrowLeft } from 'lucide-react';
 import CheckoutProgressTracker from './CheckoutProgressTracker';
+import { API_URL } from '../api';
 
 const PaymentModal = ({
   isOpen,
@@ -142,7 +143,7 @@ const PaymentModal = ({
 
     try {
       const token = localStorage.getItem('df_token');
-      const res = await fetch('/api/orders', {
+      const res = await fetch(`${API_URL}/api/orders`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, RotateCcw, Truck, CheckCircle2, ShieldCheck, AlertCircle } from 'lucide-react';
+import { API_URL } from '../api';
 
 const RETURN_REASONS = [
   'Size or fitting issue',
@@ -32,7 +33,7 @@ const ProductReturnModal = ({ isOpen, onClose, order, onReturnSuccess }) => {
     setLoading(true);
 
     try {
-      const res = await fetch(`/api/orders/${order._id || order.orderId}/return`, {
+      const res = await fetch(`${API_URL}/api/orders/${order._id || order.orderId}/return`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

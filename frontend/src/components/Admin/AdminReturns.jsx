@@ -49,7 +49,7 @@ const AdminReturns = () => {
   const fetchReturns = async () => {
     setLoading(true);
     try {
-      const res = await fetch('/api/admin/returns');
+      const res = await fetch(`${API_URL}/api/admin/returns`);
       if (res.ok) {
         const data = await res.json();
         setReturnOrders(data);
@@ -63,7 +63,7 @@ const AdminReturns = () => {
 
   const handleUpdateStatus = async (orderId, newStatus) => {
     try {
-      const res = await fetch(`/api/orders/${orderId}/status`, {
+      const res = await fetch(`${API_URL}/api/orders/${orderId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus })

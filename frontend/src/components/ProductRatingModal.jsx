@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Star, CheckCircle } from 'lucide-react';
+import { API_URL } from '../api';
 
 const ProductRatingModal = ({ isOpen, onClose, product, userName, onRatingSuccess }) => {
   const [rating, setRating] = useState(5);
@@ -16,7 +17,7 @@ const ProductRatingModal = ({ isOpen, onClose, product, userName, onRatingSucces
 
     try {
       const productId = product.product || product._id;
-      const res = await fetch(`/api/products/${productId}/review`, {
+      const res = await fetch(`${API_URL}/api/products/${productId}/review`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

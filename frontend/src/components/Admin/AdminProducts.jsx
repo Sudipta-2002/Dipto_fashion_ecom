@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit, Upload, X, Image as ImageIcon } from 'lucide-react';
+import { API_URL } from '../../api';
 
 const AdminProducts = () => {
   const [products, setProducts] = useState([]);
@@ -29,7 +30,7 @@ const AdminProducts = () => {
 
   const fetchProducts = async () => {
     try {
-      const res = await fetch('/api/products');
+      const res = await fetch(`${API_URL}/api/products`);
       const data = await res.json();
       setProducts(data);
     } catch (e) {
@@ -39,7 +40,7 @@ const AdminProducts = () => {
 
   const fetchCategories = async () => {
     try {
-      const res = await fetch('/api/categories');
+      const res = await fetch(`${API_URL}/api/categories`);
       const data = await res.json();
       setCategories(data);
       if (data.length > 0 && !formData.category) {
@@ -164,7 +165,7 @@ const AdminProducts = () => {
     };
 
     try {
-      const endpoint = editingProduct ? `/api/products/${editingProduct._id}` : '/api/products';
+      const endpoint = editingProduct ? `${API_URL}/api/products/${editingProduct._id}` : `${API_URL}/api/products`;
       const method = editingProduct ? 'PUT' : 'POST';
 
       const res = await fetch(endpoint, {
@@ -191,7 +192,7 @@ const AdminProducts = () => {
   const handleDeleteProduct = async (id) => {
     if (!window.confirm('Are you sure you want to delete this product?')) return;
     try {
-      const res = await fetch(`/api/products/${id}`, {
+      const res = await fetch(`${API_URL}/api/products/${id}`, {
         method: 'DELETE'
       });
       if (res.ok) {

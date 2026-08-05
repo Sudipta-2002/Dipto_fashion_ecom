@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, AlertCircle, CheckCircle2, Ban } from 'lucide-react';
+import { API_URL } from '../api';
 
 const CANCELLATION_REASONS = [
   "Changed my mind / Don't need it anymore",
@@ -25,7 +26,7 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
     setError('');
 
     try {
-      const res = await fetch(`/api/orders/${order._id}/cancel`, {
+      const res = await fetch(`${API_URL}/api/orders/${order._id}/cancel`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { DollarSign, Calendar, TrendingUp, ShoppingBag, Filter, Bell, ArrowRight, RotateCcw, AlertTriangle } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from 'recharts';
+import { API_URL } from '../../api';
 
 const AdminDashboard = ({ onNavigateToOrders, onNavigateToReturns }) => {
   const [stats, setStats] = useState({
@@ -25,7 +26,7 @@ const AdminDashboard = ({ onNavigateToOrders, onNavigateToReturns }) => {
   const fetchAnalytics = async () => {
     setLoading(true);
     try {
-      let url = '/api/admin/analytics';
+      let url = `${API_URL}/api/admin/analytics`;
       if (startDate && endDate) {
         url += `?startDate=${startDate}&endDate=${endDate}`;
       }

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { User, Lock, Mail, Phone, X, Globe, Eye, EyeOff } from 'lucide-react';
+import { API_URL } from '../api';
 
 const COUNTRY_CODES = [
   { code: '+91', country: 'India 🇮🇳' },
@@ -72,7 +73,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
       phone: !isLogin && formData.phone ? `${countryCode} ${formData.phone.trim()}` : ''
     };
 
-    const endpoint = isLogin ? '/api/auth/login' : '/api/auth/register';
+    const endpoint = isLogin ? `${API_URL}/api/auth/login` : `${API_URL}/api/auth/register`;
 
     try {
       const res = await fetch(endpoint, {
