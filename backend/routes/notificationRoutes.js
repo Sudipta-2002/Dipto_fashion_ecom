@@ -18,8 +18,9 @@ let memoryNotifications = [
 
 const isMongoConnected = () => mongoose.connection.readyState === 1;
 
-// GET /api/notifications - Fetch notification history
+// GET /api/notifications - Fetch notification history (Public Unrestricted Access)
 router.get('/', async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
   try {
     if (isMongoConnected()) {
       const list = await Notification.find().sort({ createdAt: -1 });
@@ -34,6 +35,8 @@ router.get('/', async (req, res) => {
 
 // POST /api/notifications - Admin broadcast notification
 router.post('/', async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  console.log('>>> [notificationRoutes POST /] Payload received:', req.body);
   try {
     const { title, message, type = 'Announcement', target = 'ALL' } = req.body;
     if (!title || !message) {
@@ -43,13 +46,20 @@ router.post('/', async (req, res) => {
     let notificationObj = null;
 
     if (isMongoConnected()) {
-      notificationObj = await Notification.create({
-        title: title.trim(),
-        message: message.trim(),
-        type,
-        target,
-        readBy: []
-      });
+      try {
+        notificationObj = await Notification.create({
+          title: title.trim(),
+          message: message.trim(),
+          type,
+          target,
+          readBy: []
+        });
+        console.log('>>> Mongoose notification successfully saved to MongoDB:', notificationObj._id);
+        return res.status(201).json({ success: true, message: 'Saved to MongoDB', notification: notificationObj, data: notificationObj });
+      } catch (dbErr) {
+        console.error('>>> Mongoose Notification create error:', dbErr);
+        return res.status(500).json({ success: false, error: dbErr.message, message: dbErr.message });
+      }
     } else {
       notificationObj = {
         _id: 'notif_' + Date.now(),
@@ -61,11 +71,11 @@ router.post('/', async (req, res) => {
         createdAt: new Date().toISOString()
       };
       memoryNotifications.unshift(notificationObj);
+      return res.status(201).json({ success: true, message: 'Saved to memory (DB offline)', notification: notificationObj, data: notificationObj });
     }
-
-    return res.json({ success: true, notification: notificationObj });
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message || 'Failed to broadcast notification' });
+    console.error('>>> Notification route error:', err);
+    return res.status(500).json({ success: false, error: err.message, message: err.message || 'Failed to broadcast notification' });
   }
 });
 

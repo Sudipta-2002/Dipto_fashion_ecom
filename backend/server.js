@@ -15,6 +15,7 @@ import Product from './models/Product.js';
 import Order from './models/Order.js';
 import Notification from './models/Notification.js';
 import LiveSale from './models/LiveSale.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 
 dotenv.config();
 
@@ -39,6 +40,9 @@ app.use(cors({
 }));
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
+
+// Register Explicit Notification Router
+app.use('/api/notifications', notificationRoutes);
 
 // Root Health Check Endpoints
 app.get(['/', '/health'], (req, res) => {
