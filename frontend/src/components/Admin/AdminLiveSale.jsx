@@ -111,14 +111,18 @@ const AdminLiveSale = () => {
       });
 
       const data = await parseResponseSafely(res);
+      console.log('>>> [AdminLiveSale] Backend Response:', data);
 
-      if (res.ok && data.success) {
-        setStatusMsg('⚡ Live Sale campaign updated and active on storefront!');
+      if (res.ok && data && (data.success || data.liveSale || data.data)) {
+        setStatusMsg(`⚡ ${data.message || 'Live Sale campaign saved directly to MongoDB!'}`);
       } else {
-        setStatusMsg('⚡ Live Sale configuration saved locally and live on storefront!');
+        const errDetail = data?.error || data?.message || `Server Error ${res.status}`;
+        console.error('>>> [AdminLiveSale] Backend Error Response:', errDetail);
+        setErrorMsg(`⚠️ ${errDetail} (Saved locally in fallback mode)`);
       }
     } catch (err) {
-      setStatusMsg('⚡ Live Sale configuration saved locally and live on storefront!');
+      console.error('>>> [AdminLiveSale] Network Exception:', err);
+      setErrorMsg(`⚠️ Network Error: ${err.message} (Saved locally in offline mode)`);
     } finally {
       setSaving(false);
     }

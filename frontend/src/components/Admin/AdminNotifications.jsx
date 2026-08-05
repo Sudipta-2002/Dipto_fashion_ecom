@@ -95,29 +95,31 @@ const AdminNotifications = () => {
         body: JSON.stringify({
           title: title.trim(),
           message: message.trim(),
-          category
+          type: category
         })
       });
 
       const data = await parseResponseSafely(res);
+      console.log('>>> [AdminNotifications] Backend Response:', data);
 
-      if (res.ok && (data.success || data.notification)) {
-        setStatusMsg('📢 Announcement broadcasted successfully to all users!');
+      if (res.ok && data && (data.success || data.notification || data.data)) {
+        const savedDoc = data.notification || data.data || newNotifObj;
+        setStatusMsg(`📢 ${data.message || 'Announcement broadcasted successfully to MongoDB!'}`);
         setTitle('');
         setMessage('');
         fetchNotifications();
       } else {
-        // Graceful Fallback if backend returns 404 HTML response
-        console.warn('Backend notification API returned 404/Error. Saving locally in state fallback.');
+        const errDetail = data?.error || data?.message || `Server Error ${res.status}`;
+        console.error('>>> [AdminNotifications] Backend Error Response:', errDetail);
         saveNotificationLocally(newNotifObj);
-        setStatusMsg('📢 Announcement created & saved locally (Server fallback mode active)');
+        setStatusMsg(`⚠️ ${errDetail} (Saved locally in fallback mode)`);
         setTitle('');
         setMessage('');
       }
     } catch (err) {
-      console.warn('Network error posting notification. Saving locally in state fallback.', err);
+      console.error('>>> [AdminNotifications] Network Exception:', err);
       saveNotificationLocally(newNotifObj);
-      setStatusMsg('📢 Announcement created & saved locally (Offline mode active)');
+      setStatusMsg(`⚠️ Network Error: ${err.message} (Saved locally in offline mode)`);
       setTitle('');
       setMessage('');
     } finally {

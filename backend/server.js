@@ -13,6 +13,8 @@ import User from './models/User.js';
 import Category from './models/Category.js';
 import Product from './models/Product.js';
 import Order from './models/Order.js';
+import Notification from './models/Notification.js';
+import LiveSale from './models/LiveSale.js';
 
 dotenv.config();
 
@@ -600,17 +602,36 @@ app.get(['/api/notifications', '/notifications'], async (req, res) => {
 
 // POST BROADCAST ANNOUNCEMENT (ADMIN)
 app.post(['/api/notifications', '/api/admin/notifications', '/notifications', '/admin/notifications'], async (req, res) => {
+  console.log('>>> [POST /api/notifications] Request body received:', req.body);
   try {
     const { title, message, type = 'Announcement', target = 'ALL' } = req.body;
     if (!title || !message) {
       return res.status(400).json({ success: false, message: 'Notification title and message body are required' });
     }
 
+    const isConnected = mongoose.connection.readyState === 1;
+    console.log(`>>> MongoDB connection readyState: ${mongoose.connection.readyState} (Connected: ${isConnected})`);
+
     let notificationObj = null;
 
-    if (isMongoConnected()) {
-      notificationObj = await Notification.create({ title: title.trim(), message: message.trim(), type, target, readBy: [] });
+    if (isConnected) {
+      try {
+        notificationObj = await Notification.create({
+          title: title.trim(),
+          message: message.trim(),
+          type,
+          target,
+          readBy: []
+        });
+        console.log('>>> MongoDB Notification successfully created:', notificationObj._id);
+        broadcastNotificationToUsers(notificationObj);
+        return res.status(201).json({ success: true, message: 'Saved to MongoDB', data: notificationObj, notification: notificationObj });
+      } catch (dbErr) {
+        console.error('>>> ERROR: Mongoose Notification.create failed:', dbErr);
+        return res.status(500).json({ success: false, error: dbErr.message, message: dbErr.message });
+      }
     } else {
+      console.warn('>>> MongoDB not connected (readyState !== 1). Saving to memory array.');
       notificationObj = {
         _id: 'notif_' + Date.now(),
         title: title.trim(),
@@ -621,12 +642,12 @@ app.post(['/api/notifications', '/api/admin/notifications', '/notifications', '/
         createdAt: new Date().toISOString()
       };
       memoryNotifications.unshift(notificationObj);
+      broadcastNotificationToUsers(notificationObj);
+      return res.status(201).json({ success: true, message: 'Saved to memory array (DB offline)', data: notificationObj, notification: notificationObj });
     }
-
-    broadcastNotificationToUsers(notificationObj);
-    return res.json({ success: true, notification: notificationObj });
   } catch (err) {
-    res.status(500).json({ success: false, message: err.message || 'Failed to send notification' });
+    console.error('>>> ERROR in POST /api/notifications:', err);
+    res.status(500).json({ success: false, error: err.message, message: err.message || 'Failed to send notification' });
   }
 });
 
@@ -637,7 +658,7 @@ app.post(['/api/notifications/:id/read', '/notifications/:id/read'], async (req,
     const { userId } = req.body;
     if (!userId) return res.status(400).json({ success: false, message: 'userId is required' });
 
-    if (isMongoConnected()) {
+    if (mongoose.connection.readyState === 1) {
       const updated = await Notification.findByIdAndUpdate(id, { $addToSet: { readBy: userId } }, { new: true });
       return res.json({ success: true, notification: updated });
     } else {
@@ -657,7 +678,7 @@ app.post(['/api/notifications/:id/read', '/notifications/:id/read'], async (req,
 app.delete(['/api/notifications/:id', '/api/admin/notifications/:id', '/notifications/:id', '/admin/notifications/:id'], async (req, res) => {
   try {
     const { id } = req.params;
-    if (isMongoConnected()) {
+    if (mongoose.connection.readyState === 1) {
       await Notification.findByIdAndDelete(id);
     } else {
       memoryNotifications = memoryNotifications.filter(n => n._id !== id);
@@ -669,15 +690,6 @@ app.delete(['/api/notifications/:id', '/api/admin/notifications/:id', '/notifica
 });
 
 // --- LIVE SALE NOTIFICATION BANNER ROUTE ---
-const liveSaleSchema = new mongoose.Schema({
-  isActive: { type: Boolean, default: true },
-  title: { type: String, default: '🔥 MEGA FESTIVE SALE IS LIVE!' },
-  offerDetails: { type: String, default: 'Up to 50% OFF on Banarasi Sarees & Royal Kurtas' },
-  targetCategory: { type: String, default: 'All' },
-  endTime: { type: Date, default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) }
-}, { timestamps: true });
-const LiveSale = mongoose.models.LiveSale || mongoose.model('LiveSale', liveSaleSchema);
-
 let memoryLiveSale = {
   isActive: true,
   title: '🔥 MEGA FESTIVE SALE IS LIVE!',
@@ -690,7 +702,7 @@ let memoryLiveSale = {
 app.get(['/api/live-sale', '/live-sale', '/api/live-sale/active', '/live-sale/active'], async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   try {
-    if (isMongoConnected()) {
+    if (mongoose.connection.readyState === 1) {
       let sale = await LiveSale.findOne().sort({ updatedAt: -1 });
       if (!sale) {
         sale = await LiveSale.create(memoryLiveSale);
@@ -706,6 +718,7 @@ app.get(['/api/live-sale', '/live-sale', '/api/live-sale/active', '/live-sale/ac
 
 // ADMIN POST UPDATE LIVE SALE CONFIG
 app.post(['/api/admin/live-sale', '/admin/live-sale', '/api/live-sale', '/live-sale'], async (req, res) => {
+  console.log('>>> [POST /api/admin/live-sale] Request body received:', req.body);
   try {
     const { isActive, title, offerDetails, targetCategory, endTime } = req.body;
 
@@ -717,28 +730,29 @@ app.post(['/api/admin/live-sale', '/admin/live-sale', '/api/live-sale', '/live-s
       endTime: endTime ? new Date(endTime) : new Date(Date.now() + 24 * 60 * 60 * 1000)
     };
 
-    if (isMongoConnected()) {
-      let sale = await LiveSale.findOne();
-      if (sale) {
-        sale.isActive = updatedData.isActive;
-        sale.title = updatedData.title;
-        sale.offerDetails = updatedData.offerDetails;
-        sale.targetCategory = updatedData.targetCategory;
-        sale.endTime = updatedData.endTime;
-        await sale.save();
-      } else {
-        sale = await LiveSale.create(updatedData);
+    const isConnected = mongoose.connection.readyState === 1;
+    console.log(`>>> MongoDB connection readyState for LiveSale: ${mongoose.connection.readyState} (Connected: ${isConnected})`);
+
+    if (isConnected) {
+      try {
+        const sale = await LiveSale.findOneAndUpdate({}, updatedData, { upsert: true, new: true, runValidators: true });
+        console.log('>>> MongoDB LiveSale updated successfully:', sale._id);
+        return res.status(200).json({ success: true, message: 'Saved to MongoDB', data: sale, liveSale: sale });
+      } catch (dbErr) {
+        console.error('>>> ERROR: Mongoose LiveSale upsert failed:', dbErr);
+        return res.status(500).json({ success: false, error: dbErr.message, message: dbErr.message });
       }
-      return res.json({ success: true, liveSale: sale });
     } else {
+      console.warn('>>> MongoDB not connected (readyState !== 1). Saving LiveSale to memory.');
       memoryLiveSale = {
         ...updatedData,
         endTime: new Date(updatedData.endTime).toISOString()
       };
-      return res.json({ success: true, liveSale: memoryLiveSale });
+      return res.status(200).json({ success: true, message: 'Saved to memory (DB offline)', data: memoryLiveSale, liveSale: memoryLiveSale });
     }
   } catch (err) {
-    return res.status(500).json({ success: false, message: err.message || 'Failed to update live sale config' });
+    console.error('>>> ERROR in POST /api/admin/live-sale:', err);
+    return res.status(500).json({ success: false, error: err.message, message: err.message || 'Failed to update live sale config' });
   }
 });
 
