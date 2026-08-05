@@ -23,6 +23,15 @@ app.use(cors());
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Root Health Check Endpoints
+app.get(['/', '/health'], (req, res) => {
+  res.json({ message: 'Dipto Fashion API Backend is Live!', status: 'OK', store: 'Dipto Fashion' });
+});
+
+app.get('/api', (req, res) => {
+  res.json({ message: 'Dipto Fashion API Service', status: 'OK' });
+});
+
 // Connect DB
 connectDB();
 
@@ -239,7 +248,7 @@ app.post('/api/user/addresses', async (req, res) => {
 
 // --- CATEGORY ROUTES ---
 
-app.get('/api/categories', async (req, res) => {
+app.get(['/api/categories', '/categories'], async (req, res) => {
   try {
     if (isMongoConnected()) {
       let categories = await Category.find();
@@ -255,7 +264,7 @@ app.get('/api/categories', async (req, res) => {
   }
 });
 
-app.post('/api/categories', async (req, res) => {
+app.post(['/api/categories', '/categories'], async (req, res) => {
   try {
     const { name, description } = req.body;
     if (!name) return res.status(400).json({ message: 'Category name is required' });
@@ -273,7 +282,7 @@ app.post('/api/categories', async (req, res) => {
   }
 });
 
-app.put('/api/categories/:id', async (req, res) => {
+app.put(['/api/categories/:id', '/categories/:id'], async (req, res) => {
   try {
     const { id } = req.params;
     const { name, description } = req.body;
@@ -296,7 +305,7 @@ app.put('/api/categories/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/categories/:id', async (req, res) => {
+app.delete(['/api/categories/:id', '/categories/:id'], async (req, res) => {
   try {
     const { id } = req.params;
     if (isMongoConnected()) {
@@ -312,7 +321,7 @@ app.delete('/api/categories/:id', async (req, res) => {
 
 // --- PRODUCT ROUTES ---
 
-app.get('/api/products', async (req, res) => {
+app.get(['/api/products', '/products'], async (req, res) => {
   const { category, search } = req.query;
   try {
     if (isMongoConnected()) {
@@ -359,7 +368,7 @@ app.get('/api/products', async (req, res) => {
   }
 });
 
-app.post('/api/products', async (req, res) => {
+app.post(['/api/products', '/products'], async (req, res) => {
   try {
     const { name, category, mrp, price, quantity, images, description, rating, reviewsCount } = req.body;
     if (!name || !category || !mrp || !price || !images || images.length === 0) {
@@ -402,7 +411,7 @@ app.post('/api/products', async (req, res) => {
   }
 });
 
-app.put('/api/products/:id', async (req, res) => {
+app.put(['/api/products/:id', '/products/:id'], async (req, res) => {
   try {
     const { id } = req.params;
     const { name, category, mrp, price, quantity, images, description, rating, reviewsCount } = req.body;
@@ -450,7 +459,7 @@ app.put('/api/products/:id', async (req, res) => {
   }
 });
 
-app.delete('/api/products/:id', async (req, res) => {
+app.delete(['/api/products/:id', '/products/:id'], async (req, res) => {
   try {
     const { id } = req.params;
     if (isMongoConnected()) {
