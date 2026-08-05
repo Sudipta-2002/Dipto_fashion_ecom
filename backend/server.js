@@ -491,6 +491,11 @@ app.delete(['/api/products/:id', '/products/:id'], async (req, res) => {
       memoryProducts = memoryProducts.filter(p => p._id !== id);
     }
     res.json({ message: 'Product deleted successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // --- REAL-TIME SSE (SERVER-SENT EVENTS) ORDER STREAM ---
 let sseAdminClients = [];
 
@@ -531,20 +536,7 @@ const broadcastNewOrder = (orderData) => {
   });
 };
 
-// --- NOTIFICATION SCHEMA & REAL-TIME STREAM ---
-const notificationSchema = new mongoose.Schema({
-  type: {
-    type: String,
-    enum: ['Sale Alert', 'Special Offer', 'Flash Deal', 'Announcement'],
-    default: 'Announcement'
-  },
-  title: { type: String, required: true },
-  message: { type: String, required: true },
-  readBy: [{ type: String }],
-  target: { type: String, default: 'ALL' }
-}, { timestamps: true });
-const Notification = mongoose.models.Notification || mongoose.model('Notification', notificationSchema);
-
+// --- NOTIFICATION REAL-TIME STREAM ---
 let sseUserClients = [];
 let memoryNotifications = [
   {
