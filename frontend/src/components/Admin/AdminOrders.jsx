@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, CheckCircle, XCircle, FileText, Download, Calendar, Clock, Package } from 'lucide-react';
 import ShippingLabel from './ShippingLabel';
+import { API_URL } from '../../api';
 
 const groupOrdersByDate = (ordersList) => {
   const now = new Date();

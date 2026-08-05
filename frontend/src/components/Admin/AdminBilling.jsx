@@ -22,6 +22,7 @@ import {
   Legend,
   ResponsiveContainer
 } from 'recharts';
+import { API_URL } from '../../api';
 
 const AdminBilling = () => {
   const [ledgerData, setLedgerData] = useState([]);
