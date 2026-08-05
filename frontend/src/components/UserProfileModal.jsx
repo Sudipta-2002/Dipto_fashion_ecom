@@ -1,0 +1,852 @@
+import React, { useState, useEffect } from 'react';
+import {
+  X,
+  User,
+  ShoppingBag,
+  MapPin,
+  HelpCircle,
+  ShieldCheck,
+  LogOut,
+  ChevronRight,
+  Package,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Truck,
+  Phone,
+  Bot,
+  Star,
+  RotateCcw,
+  Plus,
+  Sparkles,
+  Crown,
+  Ban,
+  Heart
+} from 'lucide-react';
+import TermsPrivacyModal from './TermsPrivacyModal';
+import AiChatbotModal from './AiChatbotModal';
+import ProductRatingModal from './ProductRatingModal';
+import ProductReturnModal from './ProductReturnModal';
+import OrderCancelModal from './OrderCancelModal';
+import ProductCard from './ProductCard';
+
+const UserProfileModal = ({
+  isOpen,
+  onClose,
+  user,
+  onLogout,
+  wishlist = [],
+  onToggleWishlist,
+  onSelectProduct,
+  onAddToCart,
+  cartItems = [],
+  onOpenCart
+}) => {
+  const [activeTab, setActiveTab] = useState('menu'); // 'menu', 'orders', 'addresses', 'support'
+  const [userOrders, setUserOrders] = useState([]);
+  const [userAddresses, setUserAddresses] = useState(user?.addresses || []);
+  const [loadingOrders, setLoadingOrders] = useState(false);
+
+  // Modals inside Profile
+  const [isPolicyOpen, setIsPolicyOpen] = useState(false);
+  const [policyTab, setPolicyTab] = useState('privacy');
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  
+  // Rating, Return & Cancel Modals
+  const [ratingProduct, setRatingProduct] = useState(null);
+  const [returnOrder, setReturnOrder] = useState(null);
+  const [cancelOrder, setCancelOrder] = useState(null);
+
+  // New Address Form State
+  const [showAddAddrForm, setShowAddAddrForm] = useState(false);
+  const [newAddr, setNewAddr] = useState({
+    userName: user?.name || '',
+    mobileNumber: user?.phone || '',
+    address: '',
+    landmark: '',
+    pincode: ''
+  });
+  const [addrLoading, setAddrLoading] = useState(false);
+
+  useEffect(() => {
+    if (isOpen && user) {
+      fetchUserOrders();
+      setUserAddresses(user.addresses || []);
+      setActiveTab('menu');
+    }
+  }, [isOpen, user]);
+
+  const fetchUserOrders = async () => {
+    setLoadingOrders(true);
+    try {
+      const token = localStorage.getItem('df_token');
+      if (!token) return;
+      const res = await fetch('/api/user/my-orders', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUserOrders(data);
+      }
+    } catch (e) {
+      console.error('Error fetching user orders:', e);
+    } finally {
+      setLoadingOrders(false);
+    }
+  };
+
+  const handleAddAddress = async (e) => {
+    e.preventDefault();
+    if (!newAddr.userName || !newAddr.mobileNumber || !newAddr.address || !newAddr.pincode) {
+      alert('Please fill in all required fields');
+      return;
+    }
+    setAddrLoading(true);
+    try {
+      const token = localStorage.getItem('df_token');
+      const res = await fetch('/api/user/address', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify(newAddr)
+      });
+      if (res.ok) {
+        const updatedAddrs = await res.json();
+        setUserAddresses(updatedAddrs);
+        setShowAddAddrForm(false);
+        setNewAddr({ userName: user?.name || '', mobileNumber: user?.phone || '', address: '', landmark: '', pincode: '' });
+      }
+    } catch (e) {
+      alert('Failed to save address');
+    } finally {
+      setAddrLoading(false);
+    }
+  };
+
+  if (!isOpen || !user) return null;
+
+  const getUserInitial = () => {
+    return user.name ? user.name.charAt(0).toUpperCase() : 'U';
+  };
+
+  // FLIPKART-STYLE STEP TRACKING RENDERER
+  const renderFlipkartOrderTracker = (status, createdAt) => {
+    const steps = [
+      { id: 'placed', label: 'Order Placed' },
+      { id: 'confirmed', label: 'Order Confirmed' },
+      { id: 'shipped', label: 'Shipped' },
+      { id: 'out', label: 'Out for Delivery' },
+      { id: 'delivered', label: 'Delivered' }
+    ];
+
+    let currentStepIndex = 0;
+    if (status === 'Accepted') currentStepIndex = 1;
+    else if (status === 'Shipped') currentStepIndex = 2;
+    else if (status === 'Out for Delivery') currentStepIndex = 3;
+    else if (status === 'Delivered') currentStepIndex = 4;
+    else if (status === 'Rejected') {
+      return (
+        <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', padding: '0.65rem 0.85rem', borderRadius: '8px', color: '#b91c1c', fontSize: '0.82rem', fontWeight: '700', margin: '0.5rem 0' }}>
+          ❌ Order Rejected by Store Management
+        </div>
+      );
+    } else if (status === 'Return Requested') {
+      return (
+        <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', padding: '0.65rem 0.85rem', borderRadius: '8px', color: '#c2410c', fontSize: '0.82rem', fontWeight: '700', margin: '0.5rem 0' }}>
+          🔄 Return Requested — Pickup scheduled within 3 Days
+        </div>
+      );
+    }
+
+    return (
+      <div style={{ margin: '0.85rem 0', background: '#f8fafc', padding: '0.85rem 0.65rem', borderRadius: '10px', border: '1.5px solid #cbd5e1' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', position: 'relative' }}>
+          {/* Connector Line */}
+          <div style={{ position: 'absolute', top: '12px', left: '15px', right: '15px', height: '3px', background: '#e2e8f0', zIndex: 1 }} />
+          <div style={{ position: 'absolute', top: '12px', left: '15px', width: `${(currentStepIndex / 4) * 100}%`, height: '3px', background: '#16a34a', zIndex: 2, transition: 'width 0.4s ease' }} />
+
+          {steps.map((step, idx) => {
+            const isDone = idx <= currentStepIndex;
+            const isCurrent = idx === currentStepIndex;
+
+            return (
+              <div key={step.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', zIndex: 3, flex: 1 }}>
+                <div
+                  style={{
+                    width: '24px',
+                    height: '24px',
+                    borderRadius: '50%',
+                    background: isDone ? '#16a34a' : 'white',
+                    border: isDone ? '2px solid #16a34a' : '2px solid #cbd5e1',
+                    color: isDone ? 'white' : '#94a3b8',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: '0.7rem',
+                    fontWeight: '900',
+                    boxShadow: isCurrent ? '0 0 0 4px rgba(22, 163, 74, 0.2)' : 'none'
+                  }}
+                >
+                  {isDone ? '✓' : idx + 1}
+                </div>
+                <span style={{ fontSize: '0.68rem', fontWeight: isCurrent ? '800' : '600', color: isDone ? '#0f172a' : '#94a3b8', marginTop: '0.35rem', textAlign: 'center', lineHeight: '1.1' }}>
+                  {step.label}
+                </span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  // Check if order is within 7-day return window
+  const isWithin7Days = (dateStr) => {
+    if (!dateStr) return true;
+    const orderDate = new Date(dateStr).getTime();
+    const now = Date.now();
+    const diffDays = (now - orderDate) / (1000 * 3600 * 24);
+    return diffDays <= 7;
+  };
+
+  return (
+    <div className="modal-overlay" style={{ zIndex: 300 }}>
+      <div
+        className="modal-card"
+        style={{
+          maxWidth: '480px',
+          width: '100%',
+          height: '100vh',
+          borderRadius: '0',
+          position: 'fixed',
+          right: '0',
+          top: '0',
+          bottom: '0',
+          display: 'flex',
+          flexDirection: 'column',
+          background: '#f8fafc'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* COMPACT BLINKIT STYLE TOP HEADER */}
+        <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)', padding: '0.85rem 1.25rem', color: 'white', position: 'relative' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
+            {activeTab !== 'menu' ? (
+              <button
+                onClick={() => setActiveTab('menu')}
+                style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', padding: '4px 10px', borderRadius: '16px', fontSize: '0.78rem', fontWeight: '700', cursor: 'pointer' }}
+              >
+                ← Back
+              </button>
+            ) : (
+              <div style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.9 }}>
+                My Account
+              </div>
+            )}
+            <button className="close-btn" onClick={onClose} style={{ color: 'white' }}>
+              <X size={20} />
+            </button>
+          </div>
+
+          {/* Compact User Banner */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+            <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #c026d3 0%, #e879f9 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', fontWeight: '900', color: 'white', border: '2px solid rgba(255,255,255,0.4)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
+              {getUserInitial()}
+            </div>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: '800', margin: 0 }}>{user.name}</h3>
+                <Crown size={16} color="#facc15" fill="#facc15" />
+              </div>
+              <p style={{ fontSize: '0.75rem', opacity: 0.9, margin: 0 }}>{user.email || user.phone || 'Dipto Fashion VIP Customer'}</p>
+            </div>
+          </div>
+        </div>
+
+        {/* METRICS CARDS WITH HIGHLIGHTED BORDERS */}
+        <div style={{ padding: '0.85rem 1.25rem', background: 'white', borderBottom: '1.5px solid #cbd5e1', display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr', gap: '0.5rem' }}>
+          <div
+            onClick={() => setActiveTab('orders')}
+            style={{ background: '#fdf4ff', border: '1.5px solid #f0abfc', borderRadius: '12px', padding: '0.6rem 0.3rem', textAlign: 'center', cursor: 'pointer' }}
+          >
+            <div style={{ fontSize: '1.1rem', fontWeight: '900', color: '#c026d3' }}>{userOrders.length}</div>
+            <div style={{ fontSize: '0.7rem', fontWeight: '700', color: '#701a75' }}>My Orders</div>
+          </div>
+
+          <div
+            onClick={() => setActiveTab('wishlist')}
+            style={{ background: '#fff1f2', border: '1.5px solid #fecdd3', borderRadius: '12px', padding: '0.6rem 0.3rem', textAlign: 'center', cursor: 'pointer' }}
+          >
+            <div style={{ fontSize: '1.1rem', fontWeight: '900', color: '#e11d48' }}>{wishlist.length}</div>
+            <div style={{ fontSize: '0.7rem', fontWeight: '700', color: '#be123c' }}>Wishlist</div>
+          </div>
+
+          <div
+            onClick={() => setActiveTab('addresses')}
+            style={{ background: '#f0fdf4', border: '1.5px solid #86efac', borderRadius: '12px', padding: '0.6rem 0.3rem', textAlign: 'center', cursor: 'pointer' }}
+          >
+            <div style={{ fontSize: '1.1rem', fontWeight: '900', color: '#16a34a' }}>
+              {userAddresses.length}
+            </div>
+            <div style={{ fontSize: '0.7rem', fontWeight: '700', color: '#15803d' }}>Addresses</div>
+          </div>
+
+          <div
+            onClick={() => setIsAiChatOpen(true)}
+            style={{ background: '#eff6ff', border: '1.5px solid #93c5fd', borderRadius: '12px', padding: '0.6rem 0.3rem', textAlign: 'center', cursor: 'pointer' }}
+          >
+            <div style={{ fontSize: '1.1rem', fontWeight: '900', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '2px' }}>
+              <Bot size={18} color="#2563eb" /> AI
+            </div>
+            <div style={{ fontSize: '0.7rem', fontWeight: '700', color: '#1d4ed8' }}>AI Help</div>
+          </div>
+        </div>
+
+        {/* BODY CONTAINER */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '1.1rem' }}>
+          {activeTab === 'menu' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+              <div style={{ fontSize: '0.75rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                Account Settings
+              </div>
+
+              {/* My Orders Option */}
+              <div
+                onClick={() => setActiveTab('orders')}
+                style={{ background: 'white', border: '1.5px solid #cbd5e1', borderRadius: '12px', padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#fdf4ff', border: '1px solid #f5d0fe', color: '#c026d3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Package size={20} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.92rem', fontWeight: '800', color: '#0f172a' }}>My Orders & Order History</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Flipkart-style live tracking, ratings & returns</div>
+                  </div>
+                </div>
+                <ChevronRight size={18} color="#94a3b8" />
+              </div>
+
+              {/* My Wishlist Option */}
+              <div
+                onClick={() => setActiveTab('wishlist')}
+                style={{ background: 'white', border: '1.5px solid #cbd5e1', borderRadius: '12px', padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#fff1f2', border: '1px solid #fecdd3', color: '#e11d48', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Heart size={20} fill="#e11d48" />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.92rem', fontWeight: '800', color: '#0f172a' }}>My Wishlist ({wishlist.length})</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Saved favorite apparel & sarees</div>
+                  </div>
+                </div>
+                <ChevronRight size={18} color="#94a3b8" />
+              </div>
+
+              {/* Saved Addresses Option */}
+              <div
+                onClick={() => setActiveTab('addresses')}
+                style={{ background: 'white', border: '1.5px solid #cbd5e1', borderRadius: '12px', padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#f0fdf4', border: '1px solid #bbf7d0', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <MapPin size={20} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.92rem', fontWeight: '800', color: '#0f172a' }}>Saved Delivery Addresses</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Manage & add new shipping addresses</div>
+                  </div>
+                </div>
+                <ChevronRight size={18} color="#94a3b8" />
+              </div>
+
+              {/* AI Chatbot Option */}
+              <div
+                onClick={() => setIsAiChatOpen(true)}
+                style={{ background: '#eff6ff', border: '1.5px solid #93c5fd', borderRadius: '12px', padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#dbeafe', color: '#2563eb', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Bot size={20} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.92rem', fontWeight: '800', color: '#1e40af' }}>Dipto AI Shopping Assistant</div>
+                    <div style={{ fontSize: '0.75rem', color: '#3b82f6' }}>Instant 24/7 AI help for orders & sizing</div>
+                  </div>
+                </div>
+                <Sparkles size={18} color="#2563eb" />
+              </div>
+
+              {/* Terms & Privacy Option */}
+              <div
+                onClick={() => {
+                  setPolicyTab('privacy');
+                  setIsPolicyOpen(true);
+                }}
+                style={{ background: 'white', border: '1.5px solid #cbd5e1', borderRadius: '12px', padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#faf5ff', border: '1px solid #e9d5ff', color: '#9333ea', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <ShieldCheck size={20} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.92rem', fontWeight: '800', color: '#0f172a' }}>Privacy Policy & Terms</div>
+                    <div style={{ fontSize: '0.75rem', color: '#64748b' }}>Dipto Fashion security & legal policies</div>
+                  </div>
+                </div>
+                <ChevronRight size={18} color="#94a3b8" />
+              </div>
+
+              {/* Logout Option */}
+              <div style={{ marginTop: '0.75rem' }}>
+                <button
+                  className="btn-outline"
+                  onClick={() => {
+                    onLogout();
+                    onClose();
+                  }}
+                  style={{ width: '100%', justifyContent: 'center', padding: '0.85rem', color: '#ef4444', borderColor: '#fca5a5', fontWeight: '700', borderRadius: '12px' }}
+                >
+                  <LogOut size={18} />
+                  <span>Log Out of Dipto Fashion</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {activeTab === 'orders' && (
+            <div>
+              <h4 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#0f172a', marginBottom: '1rem' }}>
+                My Orders & History ({userOrders.length})
+              </h4>
+
+              {loadingOrders ? (
+                <div style={{ textAlign: 'center', padding: '2rem', color: '#94a3b8' }}>
+                  Loading your order history...
+                </div>
+              ) : userOrders.length === 0 ? (
+                <div style={{ background: 'white', borderRadius: '12px', border: '1.5px solid #cbd5e1', padding: '2rem 1rem', textAlign: 'center' }}>
+                  <Package size={40} color="#cbd5e1" style={{ margin: '0 auto 0.75rem' }} />
+                  <p style={{ fontWeight: '700', fontSize: '0.95rem', color: '#334155' }}>No orders placed yet</p>
+                  <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
+                    Explore our Sarees & Punjabi suits collection to place your first order!
+                  </p>
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+                  {userOrders.map((order) => {
+                    const estDeliveryDateStr = new Date(new Date(order.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+                    const isDelivered = order.status === 'Delivered';
+                    const isCancelled = order.status === 'Cancelled';
+                    const isReturnRequested = order.status === 'Return Requested' || order.status === 'Return Approved';
+                    const isReturnCompleted = order.status === 'Refund Completed' || order.status === 'Returned Successfully';
+                    const canReturn = isDelivered && isWithin7Days(order.updatedAt || order.createdAt);
+                    const canCancel = ['Pending Verification', 'Accepted'].includes(order.status);
+
+                    const deliveredDateStr = new Date(order.updatedAt || order.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+                    const returnCompletedDateStr = new Date(order.updatedAt || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+                    const cancelledDateStr = new Date(order.cancellationDetails?.cancelledAt || order.updatedAt || Date.now()).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+
+                    return (
+                      <div key={order._id || order.orderId} style={{ background: 'white', border: '1.5px solid #cbd5e1', borderRadius: '14px', padding: '1rem', boxShadow: '0 2px 8px rgba(0,0,0,0.04)' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem', borderBottom: '1px solid #f1f5f9', pb: '0.5rem' }}>
+                          <div>
+                            <span style={{ fontSize: '0.72rem', color: '#64748b', fontWeight: '700' }}>ORDER ID: </span>
+                            <strong style={{ fontSize: '0.95rem', color: '#c026d3' }}>{order.orderId}</strong>
+                          </div>
+                          {isCancelled ? (
+                            <span style={{ fontSize: '0.78rem', color: '#b91c1c', fontWeight: '800', background: '#fee2e2', padding: '2px 8px', borderRadius: '10px' }}>
+                              Cancelled
+                            </span>
+                          ) : isReturnCompleted ? (
+                            <span style={{ fontSize: '0.78rem', color: '#15803d', fontWeight: '800', background: '#dcfce7', padding: '2px 8px', borderRadius: '10px' }}>
+                              Return Successful
+                            </span>
+                          ) : isReturnRequested ? (
+                            <span style={{ fontSize: '0.78rem', color: '#c2410c', fontWeight: '800', background: '#fff7ed', padding: '2px 8px', borderRadius: '10px' }}>
+                              Return In Progress
+                            </span>
+                          ) : isDelivered ? (
+                            <span style={{ fontSize: '0.78rem', color: '#15803d', fontWeight: '800', background: '#dcfce7', padding: '2px 8px', borderRadius: '10px' }}>
+                              Delivered
+                            </span>
+                          ) : (
+                            <span style={{ fontSize: '0.78rem', color: '#15803d', fontWeight: '700' }}>
+                              Est. Delivery: {estDeliveryDateStr}
+                            </span>
+                          )}
+                        </div>
+
+                        {/* CONDITIONAL TRACKER OR FINAL STATUS DISPLAY */}
+                        {isCancelled ? (
+                          /* CANCELLED STATUS - ONLY DISPLAYS CANCELLED DATE AND REASON */
+                          <div style={{ background: '#fff1f2', border: '1.5px solid #fecdd3', padding: '0.75rem 0.85rem', borderRadius: '10px', color: '#b91c1c', fontSize: '0.88rem', fontWeight: '800', margin: '0.65rem 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <Ban size={20} color="#dc2626" />
+                            <div>
+                              <div>Cancelled</div>
+                              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#dc2626' }}>
+                                Cancelled on {cancelledDateStr}
+                                {order.cancellationDetails?.reason ? ` • ${order.cancellationDetails.reason}` : ''}
+                              </div>
+                            </div>
+                          </div>
+                        ) : isReturnCompleted ? (
+                          /* RETURN COMPLETED STATUS */
+                          <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', padding: '0.75rem 0.85rem', borderRadius: '10px', color: '#15803d', fontSize: '0.88rem', fontWeight: '800', margin: '0.65rem 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <CheckCircle2 size={20} color="#16a34a" />
+                            <div>
+                              <div>Returned Successfully</div>
+                              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#16a34a' }}>Completed on {returnCompletedDateStr} • Refund Processed</div>
+                            </div>
+                          </div>
+                        ) : isReturnRequested ? (
+                          /* RETURN REQUESTED / IN PROGRESS */
+                          <div style={{ background: '#fff7ed', border: '1.5px solid #fed7aa', padding: '0.75rem 0.85rem', borderRadius: '10px', color: '#c2410c', fontSize: '0.85rem', fontWeight: '800', margin: '0.65rem 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <RotateCcw size={20} color="#ea580c" />
+                            <div>
+                              <div>Return Requested — Pickup Scheduled</div>
+                              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#ea580c' }}>Pickup by {order.returnDetails?.pickupDate || 'within 3 Days'}</div>
+                            </div>
+                          </div>
+                        ) : isDelivered ? (
+                          /* DELIVERED STATUS */
+                          <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', padding: '0.75rem 0.85rem', borderRadius: '10px', color: '#15803d', fontSize: '0.88rem', fontWeight: '800', margin: '0.65rem 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                            <CheckCircle2 size={20} color="#16a34a" />
+                            <div>
+                              <div>Delivered</div>
+                              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#16a34a' }}>Delivered on {deliveredDateStr}</div>
+                            </div>
+                          </div>
+                        ) : (
+                          /* IN PROGRESS ACTIVE ORDERS (Flipkart Step-by-Step Tracker) */
+                          renderFlipkartOrderTracker(order.status, order.createdAt)
+                        )}
+
+                        {/* Items */}
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.65rem', marginBottom: '0.85rem' }}>
+                          {order.items?.map((item, idx) => (
+                            <div key={idx} style={{ display: 'flex', gap: '0.75rem', alignItems: 'center', background: '#fafafa', border: '1px solid #e2e8f0', borderRadius: '8px', padding: '0.6rem' }}>
+                              <img src={item.image} alt={item.name} style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px' }} />
+                              <div style={{ flex: 1 }}>
+                                <div style={{ fontSize: '0.88rem', fontWeight: '800', color: '#0f172a' }}>{item.name}</div>
+                                <div style={{ fontSize: '0.78rem', color: '#64748b' }}>Qty: {item.quantity} × ₹{item.price.toLocaleString('en-IN')}</div>
+                              </div>
+
+                              {/* RATING BUTTON AFTER PRODUCT IS DELIVERED */}
+                              {isDelivered && !isReturnCompleted && (
+                                <button
+                                  type="button"
+                                  onClick={() => setRatingProduct(item)}
+                                  style={{ background: '#fef3c7', border: '1px solid #fde047', color: '#b45309', padding: '4px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                                >
+                                  <Star size={13} fill="#b45309" /> Rate & Review
+                                </button>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+
+                        {/* Bottom Row with Details & Actions */}
+                        <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.65rem 0.85rem', borderRadius: '8px', fontSize: '0.78rem', color: '#475569', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div>
+                            <div>UTR Ref: <strong>{order.utrNumber}</strong></div>
+                            <div>Address: <strong>{order.shippingAddress?.userName}, {order.shippingAddress?.pincode}</strong></div>
+                          </div>
+                          <div style={{ textAlign: 'right' }}>
+                            <div style={{ fontSize: '1.05rem', fontWeight: '900', color: isCancelled ? '#dc2626' : '#16a34a' }}>
+                              ₹{order.totalAmount?.toLocaleString('en-IN')}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* PRE-SHIPMENT CANCEL BUTTON (Only visible UNTIL Order becomes 'Shipped') */}
+                        {canCancel && !isCancelled && !isDelivered && (
+                          <div style={{ marginTop: '0.75rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.65rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>
+                              Pre-Shipment Order Cancellation
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setCancelOrder(order)}
+                              style={{ background: '#fff1f2', border: '1px solid #fecdd3', color: '#dc2626', padding: '5px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+                            >
+                              <Ban size={14} /> Cancel Order
+                            </button>
+                          </div>
+                        )}
+
+                        {/* RETURN BUTTON FOR DELIVERED ITEMS (Active up to 7 Days Post Delivery) */}
+                        {isDelivered && canReturn && !isReturnRequested && !isReturnCompleted && !isCancelled && (
+                          <div style={{ marginTop: '0.75rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.65rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontSize: '0.75rem', color: '#dc2626', fontWeight: '700' }}>
+                              7-Day Return Window Active
+                            </span>
+                            <button
+                              type="button"
+                              onClick={() => setReturnOrder(order)}
+                              style={{ background: '#fff1f2', border: '1px solid #fecdd3', color: '#e11d48', padding: '5px 12px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '800', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '5px' }}
+                            >
+                              <RotateCcw size={14} /> Request Return
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'wishlist' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h4 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+                  <Heart size={20} color="#ef4444" fill="#ef4444" /> My Wishlist ({wishlist.length})
+                </h4>
+              </div>
+
+              {wishlist.length === 0 ? (
+                <div style={{ background: 'white', border: '1.5px solid #cbd5e1', borderRadius: '14px', padding: '2.5rem 1rem', textAlign: 'center' }}>
+                  <Heart size={44} color="#fca5a5" style={{ margin: '0 auto 0.75rem' }} />
+                  <h4 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#334155' }}>Your Wishlist is Empty</h4>
+                  <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '0.35rem' }}>
+                    Tap the heart icon on any product to save it to your wishlist!
+                  </p>
+                </div>
+              ) : (
+                <div className="products-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
+                  {wishlist.map((prod) => (
+                    <ProductCard
+                      key={prod._id || prod.id}
+                      product={prod}
+                      onAddToCart={onAddToCart}
+                      onClickProductTitle={(p) => {
+                        onClose();
+                        onSelectProduct(p);
+                      }}
+                      onClickProductImage={(p) => {
+                        onClose();
+                        onSelectProduct(p);
+                      }}
+                      isWishlisted={true}
+                      onToggleWishlist={onToggleWishlist}
+                      cartItems={cartItems}
+                      onOpenCart={() => {
+                        onClose();
+                        if (onOpenCart) onOpenCart();
+                      }}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'addresses' && (
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h4 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#0f172a', margin: 0 }}>
+                  Saved Delivery Addresses ({userAddresses.length})
+                </h4>
+                <button
+                  type="button"
+                  onClick={() => setShowAddAddrForm(!showAddAddrForm)}
+                  style={{ background: '#fdf4ff', border: '1px solid #f5d0fe', color: '#c026d3', padding: '5px 10px', borderRadius: '6px', fontSize: '0.8rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <Plus size={15} /> {showAddAddrForm ? 'Cancel' : 'Add New Address'}
+                </button>
+              </div>
+
+              {/* Add New Address Form */}
+              {showAddAddrForm && (
+                <form onSubmit={handleAddAddress} style={{ background: 'white', border: '1.5px solid #c026d3', borderRadius: '12px', padding: '1rem', marginBottom: '1rem' }}>
+                  <h5 style={{ fontSize: '0.9rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.75rem' }}>Enter New Shipping Address</h5>
+                  
+                  <div className="form-group" style={{ marginBottom: '0.65rem' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: '700' }}>Receiver Name *</label>
+                    <input
+                      type="text"
+                      placeholder="Full Name"
+                      value={newAddr.userName}
+                      onChange={(e) => setNewAddr({ ...newAddr, userName: e.target.value })}
+                      required
+                      style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: '0.65rem' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: '700' }}>Mobile Number *</label>
+                    <input
+                      type="text"
+                      placeholder="10-digit mobile number"
+                      value={newAddr.mobileNumber}
+                      onChange={(e) => setNewAddr({ ...newAddr, mobileNumber: e.target.value })}
+                      required
+                      style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }}
+                    />
+                  </div>
+
+                  <div className="form-group" style={{ marginBottom: '0.65rem' }}>
+                    <label style={{ fontSize: '0.78rem', fontWeight: '700' }}>Full Address *</label>
+                    <textarea
+                      rows="2"
+                      placeholder="Flat, House No., Building, Street, Area"
+                      value={newAddr.address}
+                      onChange={(e) => setNewAddr({ ...newAddr, address: e.target.value })}
+                      required
+                      style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }}
+                    />
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem', marginBottom: '0.85rem' }}>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: '700' }}>Landmark (Optional)</label>
+                      <input
+                        type="text"
+                        placeholder="Near temple/park"
+                        value={newAddr.landmark}
+                        onChange={(e) => setNewAddr({ ...newAddr, landmark: e.target.value })}
+                        style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem' }}
+                      />
+                    </div>
+                    <div className="form-group" style={{ marginBottom: 0 }}>
+                      <label style={{ fontSize: '0.75rem', fontWeight: '700' }}>Pincode *</label>
+                      <input
+                        type="text"
+                        placeholder="6-digit Pincode"
+                        value={newAddr.pincode}
+                        onChange={(e) => setNewAddr({ ...newAddr, pincode: e.target.value })}
+                        required
+                        style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem' }}
+                      />
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="btn-primary"
+                    style={{ width: '100%', justifyContent: 'center', padding: '0.65rem' }}
+                    disabled={addrLoading}
+                  >
+                    {addrLoading ? 'Saving Address...' : 'Save Address'}
+                  </button>
+                </form>
+              )}
+
+              {userAddresses.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                  {userAddresses.map((addr, idx) => (
+                    <div key={idx} style={{ background: 'white', border: '1.5px solid #cbd5e1', borderRadius: '12px', padding: '1rem', boxShadow: '0 2px 4px rgba(0,0,0,0.03)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
+                        <span style={{ fontWeight: '800', fontSize: '0.95rem', color: '#0f172a' }}>{addr.userName}</span>
+                        <span style={{ fontSize: '0.8rem', background: '#e2e8f0', padding: '2px 8px', borderRadius: '10px', fontWeight: '700' }}>{addr.mobileNumber}</span>
+                      </div>
+                      <p style={{ fontSize: '0.85rem', color: '#334155', margin: 0, lineHeight: '1.4' }}>
+                        {addr.address}{addr.landmark ? `, Landmark: ${addr.landmark}` : ''}, Pincode: <strong>{addr.pincode}</strong>
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div style={{ background: 'white', borderRadius: '12px', border: '1.5px solid #cbd5e1', padding: '2rem 1rem', textAlign: 'center' }}>
+                  <MapPin size={40} color="#cbd5e1" style={{ margin: '0 auto 0.75rem' }} />
+                  <p style={{ fontWeight: '700', fontSize: '0.95rem', color: '#334155' }}>No saved addresses</p>
+                  <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
+                    Click "+ Add New Address" to save your shipping location!
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+
+          {activeTab === 'support' && (
+            <div>
+              <h4 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#0f172a', marginBottom: '1rem' }}>
+                Help & Customer Support
+              </h4>
+
+              <div style={{ background: 'white', border: '1.5px solid #cbd5e1', borderRadius: '12px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                  <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Phone size={22} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a' }}>24/7 Customer Support</div>
+                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Fast assistance for orders & delivery queries</div>
+                  </div>
+                </div>
+
+                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '0.85rem', fontSize: '0.85rem', color: '#334155' }}>
+                  <p style={{ marginBottom: '0.5rem' }}>
+                    <strong>Email Support:</strong> support@diptofashion.com
+                  </p>
+                  <p style={{ marginBottom: '0.5rem' }}>
+                    <strong>WhatsApp Helpline:</strong> +91 98765 43210
+                  </p>
+                  <p>
+                    <strong>Working Hours:</strong> Mon - Sun (9:00 AM - 10:00 PM)
+                  </p>
+                </div>
+
+                <button
+                  type="button"
+                  className="btn-primary"
+                  onClick={() => setIsAiChatOpen(true)}
+                  style={{ width: '100%', justifyContent: 'center', padding: '0.75rem', marginTop: '0.5rem' }}
+                >
+                  <Bot size={18} /> Open Dipto AI Chatbot
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Terms & Privacy Modal */}
+      <TermsPrivacyModal
+        isOpen={isPolicyOpen}
+        onClose={() => setIsPolicyOpen(false)}
+        initialTab={policyTab}
+      />
+
+      {/* AI Chatbot Assistant Modal */}
+      <AiChatbotModal
+        isOpen={isAiChatOpen}
+        onClose={() => setIsAiChatOpen(false)}
+        userName={user.name}
+        userOrders={userOrders}
+      />
+
+      {/* Product Rating & Review Modal */}
+      <ProductRatingModal
+        isOpen={!!ratingProduct}
+        onClose={() => setRatingProduct(null)}
+        product={ratingProduct}
+        userName={user.name}
+        onRatingSuccess={() => fetchUserOrders()}
+      />
+
+      {/* 7-Day Product Return Request Modal */}
+      <ProductReturnModal
+        isOpen={!!returnOrder}
+        onClose={() => setReturnOrder(null)}
+        order={returnOrder}
+        onReturnSuccess={() => fetchUserOrders()}
+      />
+
+      {/* Pre-Shipment Order Cancellation Modal */}
+      <OrderCancelModal
+        isOpen={!!cancelOrder}
+        onClose={() => setCancelOrder(null)}
+        order={cancelOrder}
+        onCancelSuccess={() => fetchUserOrders()}
+      />
+    </div>
+  );
+};
+
+export default UserProfileModal;
