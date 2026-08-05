@@ -294,11 +294,11 @@ const CheckoutModal = ({ isOpen, onClose, onBackToCart, user, onProceedToPayment
               </button>
             )}
             <button
-              className="btn-primary"
-              style={{ flex: 1, justifyContent: 'center', padding: '0.85rem' }}
+              className="btn-primary blink-green"
+              style={{ flex: 1, justifyContent: 'center', padding: '0.85rem', fontWeight: '800' }}
               onClick={handleContinue}
             >
-              Proceed to Payment & QR Code
+              Continue
             </button>
           </div>
         </div>

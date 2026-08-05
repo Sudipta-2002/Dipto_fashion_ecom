@@ -13,7 +13,8 @@ import {
   Receipt,
   Eye,
   EyeOff,
-  Bell
+  Bell,
+  Zap
 } from 'lucide-react';
 import { API_URL } from '../../api';
 import { clearCache } from '../../utils/cache';
@@ -24,11 +25,13 @@ import AdminCategories from './AdminCategories';
 import AdminOrders from './AdminOrders';
 import AdminReturns from './AdminReturns';
 import AdminBilling from './AdminBilling';
+import AdminNotifications from './AdminNotifications';
+import AdminLiveSale from './AdminLiveSale';
 
 const AdminPanel = ({ onExitAdmin }) => {
   const getInitialAdminTab = () => {
     const hash = window.location.hash.replace('#admin-', '').replace('#', '').trim();
-    const validTabs = ['dashboard', 'products', 'categories', 'orders', 'returns', 'billing'];
+    const validTabs = ['dashboard', 'products', 'categories', 'orders', 'returns', 'billing', 'notifications', 'live-sale'];
     if (validTabs.includes(hash)) return hash;
     const saved = localStorage.getItem('df_admin_tab');
     if (saved && validTabs.includes(saved)) return saved;
@@ -99,8 +102,14 @@ const AdminPanel = ({ onExitAdmin }) => {
           }
         } catch (err) {}
       };
+
+      eventSource.onerror = (err) => {
+        if (eventSource) {
+          eventSource.close();
+        }
+      };
     } catch (err) {
-      console.error('SSE Connection Error:', err);
+      console.warn('SSE Connection Warning:', err.message);
     }
 
     return () => {
@@ -397,91 +406,111 @@ const AdminPanel = ({ onExitAdmin }) => {
         </div>
       </div>
 
-      {/* Navigation Sub-Tabs Bar */}
-      <div style={{ display: 'flex', gap: '0.5rem', marginBottom: '1.5rem', borderBottom: '2px solid #e2e8f0', paddingBottom: '0.65rem', overflowX: 'auto' }}>
+      {/* Navigation Sub-Tabs Bar: Strict 5 Columns Layout per Row */}
+      <div className="admin-action-grid grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3.5 w-full">
         <button
-          className={`btn-outline ${activeTab === 'dashboard' ? 'active' : ''}`}
+          className={`admin-nav-btn btn-outline w-full min-h-[64px] flex items-center justify-center gap-2.5 text-center p-3.5 ${activeTab === 'dashboard' ? 'active' : ''}`}
           onClick={() => setActiveTab('dashboard')}
           style={{
-            background: activeTab === 'dashboard' ? '#fdf4ff' : 'white',
+            background: activeTab === 'dashboard' ? '#fdf4ff' : '#ffffff',
             borderColor: activeTab === 'dashboard' ? '#c026d3' : '#cbd5e1',
             color: activeTab === 'dashboard' ? '#c026d3' : '#475569',
-            fontWeight: activeTab === 'dashboard' ? '800' : '600',
-            borderRadius: '10px',
-            padding: '0.55rem 1rem'
+            fontWeight: activeTab === 'dashboard' ? '800' : '600'
           }}
         >
-          <LayoutDashboard size={18} /> Dashboard
+          <LayoutDashboard size={18} style={{ flexShrink: 0 }} />
+          <span>Dashboard</span>
         </button>
         <button
-          className={`btn-outline ${activeTab === 'products' ? 'active' : ''}`}
+          className={`admin-nav-btn btn-outline w-full min-h-[64px] flex items-center justify-center gap-2.5 text-center p-3.5 ${activeTab === 'products' ? 'active' : ''}`}
           onClick={() => setActiveTab('products')}
           style={{
-            background: activeTab === 'products' ? '#fdf4ff' : 'white',
+            background: activeTab === 'products' ? '#fdf4ff' : '#ffffff',
             borderColor: activeTab === 'products' ? '#c026d3' : '#cbd5e1',
             color: activeTab === 'products' ? '#c026d3' : '#475569',
-            fontWeight: activeTab === 'products' ? '800' : '600',
-            borderRadius: '10px',
-            padding: '0.55rem 1rem'
+            fontWeight: activeTab === 'products' ? '800' : '600'
           }}
         >
-          <ShoppingBag size={18} /> Product Management
+          <ShoppingBag size={18} style={{ flexShrink: 0 }} />
+          <span>Product Management</span>
         </button>
         <button
-          className={`btn-outline ${activeTab === 'categories' ? 'active' : ''}`}
+          className={`admin-nav-btn btn-outline w-full min-h-[64px] flex items-center justify-center gap-2.5 text-center p-3.5 ${activeTab === 'categories' ? 'active' : ''}`}
           onClick={() => setActiveTab('categories')}
           style={{
-            background: activeTab === 'categories' ? '#fdf4ff' : 'white',
+            background: activeTab === 'categories' ? '#fdf4ff' : '#ffffff',
             borderColor: activeTab === 'categories' ? '#c026d3' : '#cbd5e1',
             color: activeTab === 'categories' ? '#c026d3' : '#475569',
-            fontWeight: activeTab === 'categories' ? '800' : '600',
-            borderRadius: '10px',
-            padding: '0.55rem 1rem'
+            fontWeight: activeTab === 'categories' ? '800' : '600'
           }}
         >
-          <Layers size={18} /> Categories
+          <Layers size={18} style={{ flexShrink: 0 }} />
+          <span>Categories</span>
         </button>
         <button
-          className={`btn-outline ${activeTab === 'orders' ? 'active' : ''}`}
+          className={`admin-nav-btn btn-outline w-full min-h-[64px] flex items-center justify-center gap-2.5 text-center p-3.5 ${activeTab === 'orders' ? 'active' : ''}`}
           onClick={() => setActiveTab('orders')}
           style={{
-            background: activeTab === 'orders' ? '#fdf4ff' : 'white',
+            background: activeTab === 'orders' ? '#fdf4ff' : '#ffffff',
             borderColor: activeTab === 'orders' ? '#c026d3' : '#cbd5e1',
             color: activeTab === 'orders' ? '#c026d3' : '#475569',
-            fontWeight: activeTab === 'orders' ? '800' : '600',
-            borderRadius: '10px',
-            padding: '0.55rem 1rem'
+            fontWeight: activeTab === 'orders' ? '800' : '600'
           }}
         >
-          <ClipboardList size={18} /> Orders
+          <ClipboardList size={18} style={{ flexShrink: 0 }} />
+          <span>Orders</span>
         </button>
         <button
-          className={`btn-outline ${activeTab === 'returns' ? 'active' : ''}`}
+          className={`admin-nav-btn btn-outline w-full min-h-[64px] flex items-center justify-center gap-2.5 text-center p-3.5 ${activeTab === 'returns' ? 'active' : ''}`}
           onClick={() => setActiveTab('returns')}
           style={{
-            background: activeTab === 'returns' ? '#fdf4ff' : 'white',
+            background: activeTab === 'returns' ? '#fdf4ff' : '#ffffff',
             borderColor: activeTab === 'returns' ? '#c026d3' : '#cbd5e1',
             color: activeTab === 'returns' ? '#c026d3' : '#475569',
-            fontWeight: activeTab === 'returns' ? '800' : '600',
-            borderRadius: '10px',
-            padding: '0.55rem 1rem'
+            fontWeight: activeTab === 'returns' ? '800' : '600'
           }}
         >
-          <RotateCcw size={18} /> Returns & Refunds
+          <RotateCcw size={18} style={{ flexShrink: 0 }} />
+          <span>Returns & Refunds</span>
         </button>
         <button
-          className={`btn-outline ${activeTab === 'billing' ? 'active' : ''}`}
+          className={`admin-nav-btn btn-outline w-full min-h-[64px] flex items-center justify-center gap-2.5 text-center p-3.5 ${activeTab === 'billing' ? 'active' : ''}`}
           onClick={() => setActiveTab('billing')}
           style={{
-            background: activeTab === 'billing' ? '#fdf4ff' : 'white',
+            background: activeTab === 'billing' ? '#fdf4ff' : '#ffffff',
             borderColor: activeTab === 'billing' ? '#c026d3' : '#cbd5e1',
             color: activeTab === 'billing' ? '#c026d3' : '#475569',
-            fontWeight: activeTab === 'billing' ? '800' : '600',
-            borderRadius: '10px',
-            padding: '0.55rem 1rem'
+            fontWeight: activeTab === 'billing' ? '800' : '600'
           }}
         >
-          <Receipt size={18} /> Billing History
+          <Receipt size={18} style={{ flexShrink: 0 }} />
+          <span>Billing History</span>
+        </button>
+        <button
+          className={`admin-nav-btn btn-outline w-full min-h-[64px] flex items-center justify-center gap-2.5 text-center p-3.5 ${activeTab === 'notifications' ? 'active' : ''}`}
+          onClick={() => setActiveTab('notifications')}
+          style={{
+            background: activeTab === 'notifications' ? '#fdf4ff' : '#ffffff',
+            borderColor: activeTab === 'notifications' ? '#c026d3' : '#cbd5e1',
+            color: activeTab === 'notifications' ? '#c026d3' : '#475569',
+            fontWeight: activeTab === 'notifications' ? '800' : '600'
+          }}
+        >
+          <Bell size={18} style={{ flexShrink: 0 }} />
+          <span>Send Notification</span>
+        </button>
+        <button
+          className={`admin-nav-btn btn-outline w-full min-h-[64px] flex items-center justify-center gap-2.5 text-center p-3.5 ${activeTab === 'live-sale' ? 'active' : ''}`}
+          onClick={() => setActiveTab('live-sale')}
+          style={{
+            background: activeTab === 'live-sale' ? '#fff7ed' : '#ffffff',
+            borderColor: activeTab === 'live-sale' ? '#ea580c' : '#cbd5e1',
+            color: activeTab === 'live-sale' ? '#ea580c' : '#475569',
+            fontWeight: activeTab === 'live-sale' ? '800' : '600'
+          }}
+        >
+          <Zap size={18} style={{ flexShrink: 0 }} />
+          <span>Live Sale Banner</span>
         </button>
       </div>
 
@@ -501,6 +530,8 @@ const AdminPanel = ({ onExitAdmin }) => {
       {activeTab === 'orders' && <AdminOrders realtimeOrderUpdate={realtimeOrderUpdate} />}
       {activeTab === 'returns' && <AdminReturns />}
       {activeTab === 'billing' && <AdminBilling />}
+      {activeTab === 'notifications' && <AdminNotifications />}
+      {activeTab === 'live-sale' && <AdminLiveSale />}
     </div>
   );
 };

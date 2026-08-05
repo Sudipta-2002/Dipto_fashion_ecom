@@ -9,10 +9,12 @@ import CartDrawer from './components/CartDrawer';
 import CheckoutModal from './components/CheckoutModal';
 import PaymentModal from './components/PaymentModal';
 import UserProfileModal from './components/UserProfileModal';
+import NotificationModal from './components/NotificationModal';
+import LiveSaleBanner from './components/LiveSaleBanner';
 import AdminPanel from './components/Admin/AdminPanel';
 import ProductGridSkeleton from './components/Skeletons/ProductGridSkeleton';
 import { fetchWithCache } from './utils/cache';
-import { API_URL } from './api';
+import { API_URL, apiFetch, parseResponseSafely } from './api';
 import './App.css';
 
 function App() {
@@ -47,6 +49,165 @@ function App() {
     const saved = localStorage.getItem('df_user');
     return saved ? JSON.parse(saved) : null;
   });
+
+  // Store Notifications & Real-Time SSE Listener
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [readNotificationIds, setReadNotificationIds] = useState(() => {
+    const saved = localStorage.getItem('df_read_notifications');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [showNotificationBubble, setShowNotificationBubble] = useState(false);
+  const [latestNotificationTitle, setLatestNotificationTitle] = useState('');
+
+  useEffect(() => {
+    fetchNotifications();
+  }, []);
+
+  const fetchNotifications = async () => {
+    try {
+      const res = await apiFetch('/api/notifications');
+      const data = await parseResponseSafely(res);
+      if (res.ok && Array.isArray(data)) {
+        setNotifications(data);
+      } else {
+        const saved = localStorage.getItem('df_local_notifications');
+        if (saved) setNotifications(JSON.parse(saved));
+      }
+    } catch (e) {
+      const saved = localStorage.getItem('df_local_notifications');
+      if (saved) setNotifications(JSON.parse(saved));
+    }
+  };
+
+  // LOCAL ANNOUNCEMENT EVENT LISTENER FALLBACK
+  useEffect(() => {
+    const handleLocalNotif = (e) => {
+      if (e.detail) {
+        const newNotif = e.detail;
+        setNotifications((prev) => [newNotif, ...prev.filter(n => n._id !== newNotif._id)]);
+        setLatestNotificationTitle(newNotif.title);
+        setShowNotificationBubble(true);
+      }
+    };
+    window.addEventListener('df_new_notification', handleLocalNotif);
+    return () => window.removeEventListener('df_new_notification', handleLocalNotif);
+  }, []);
+
+  // REAL-TIME SSE LISTENER FOR STORE ANNOUNCEMENTS
+  useEffect(() => {
+    let eventSource = null;
+    let sseErrorCount = 0;
+    try {
+      eventSource = new EventSource(`${API_URL}/api/notifications/stream`);
+
+      eventSource.onmessage = (e) => {
+        try {
+          const data = JSON.parse(e.data);
+          if (data.type === 'new_notification' && data.notification) {
+            const newNotif = data.notification;
+            setNotifications((prev) => [newNotif, ...prev.filter(n => n._id !== newNotif._id)]);
+            setLatestNotificationTitle(newNotif.title);
+            setShowNotificationBubble(true);
+
+            // Chime audio alert for new announcement
+            try {
+              const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+              const osc = audioCtx.createOscillator();
+              const gain = audioCtx.createGain();
+              osc.type = 'sine';
+              osc.frequency.setValueAtTime(523.25, audioCtx.currentTime);
+              osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.15);
+              gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+              osc.connect(gain);
+              gain.connect(audioCtx.destination);
+              osc.start();
+              osc.stop(audioCtx.currentTime + 0.3);
+            } catch (err) {}
+          }
+        } catch (err) {}
+      };
+
+      eventSource.onerror = (err) => {
+        sseErrorCount++;
+        if (sseErrorCount > 2) {
+          console.warn('Storefront notification stream offline. Closing SSE connection gracefully.');
+          if (eventSource) eventSource.close();
+        }
+      };
+    } catch (e) {}
+
+    return () => {
+      if (eventSource) eventSource.close();
+    };
+  }, []);
+
+  // Persistent User / Guest ID for Notification readBy Tracking
+  const currentUserId = user?._id || user?.id || (() => {
+    try {
+      let saved = localStorage.getItem('df_guest_id');
+      if (!saved) {
+        saved = 'guest_' + Math.random().toString(36).substring(2, 9);
+        localStorage.setItem('df_guest_id', saved);
+      }
+      return saved;
+    } catch (e) {
+      return 'guest_user_1';
+    }
+  })();
+
+  const unreadNotificationCount = notifications.filter(
+    (n) => !readNotificationIds.includes(n._id) && (!Array.isArray(n.readBy) || !n.readBy.includes(currentUserId))
+  ).length;
+
+  const handleOpenNotifications = () => {
+    setIsNotificationsOpen(true);
+    setShowNotificationBubble(false);
+    // Automatically mark current notifications as viewed
+    const allIds = notifications.map(n => n._id);
+    const updatedRead = Array.from(new Set([...readNotificationIds, ...allIds]));
+    setReadNotificationIds(updatedRead);
+    try {
+      localStorage.setItem('df_read_notifications', JSON.stringify(updatedRead));
+    } catch (e) {}
+  };
+
+  const handleMarkAllAsRead = async () => {
+    const allIds = notifications.map(n => n._id);
+    setReadNotificationIds(allIds);
+    setShowNotificationBubble(false);
+    try {
+      localStorage.setItem('df_read_notifications', JSON.stringify(allIds));
+    } catch (e) {}
+
+    notifications.forEach(async (n) => {
+      try {
+        await apiFetch(`/api/notifications/${n._id}/read`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: currentUserId })
+        });
+      } catch (e) {}
+    });
+  };
+
+  const handleMarkSingleAsRead = async (id) => {
+    if (!readNotificationIds.includes(id)) {
+      const updated = [...readNotificationIds, id];
+      setReadNotificationIds(updated);
+      try {
+        localStorage.setItem('df_read_notifications', JSON.stringify(updated));
+      } catch (e) {}
+    }
+
+    try {
+      await apiFetch(`/api/notifications/${id}/read`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: currentUserId })
+      });
+    } catch (e) {}
+  };
 
   // Data States
   const [categories, setCategories] = useState([]);
@@ -350,6 +511,12 @@ function App() {
 
   const handleOrderSuccess = () => {
     setCartItems([]);
+    setIsCartOpen(false);
+    setIsCheckoutOpen(false);
+    try {
+      sessionStorage.removeItem('df_cart');
+      localStorage.removeItem('df_cart');
+    } catch (e) {}
   };
 
   // Keyboard Escape & Browser Back Button (popstate) Handler for active modals
@@ -418,6 +585,11 @@ function App() {
 
   return (
     <div className="app-container">
+      {/* Sticky Meesho-Style Live Sale Banner */}
+      {currentView === 'shop' && (
+        <LiveSaleBanner onSelectCategory={(cat) => setSelectedCategory(cat)} />
+      )}
+
       {/* Header / Navbar (User details isolated & hidden in admin mode) */}
       <Navbar
         searchTerm={searchTerm}
@@ -433,6 +605,10 @@ function App() {
         categories={categories}
         allProducts={allProducts.length > 0 ? allProducts : products}
         onSelectProduct={handleOpenProductDetail}
+        unreadNotificationCount={unreadNotificationCount}
+        showNotificationBubble={showNotificationBubble}
+        latestNotificationTitle={latestNotificationTitle}
+        onOpenNotifications={handleOpenNotifications}
       />
 
       {/* Main View Switch */}
@@ -569,6 +745,18 @@ function App() {
         cartItems={cartItems}
         deliveryAddress={deliveryAddress}
         onOrderSuccess={handleOrderSuccess}
+      />
+
+      {/* Store Front Notification Drawer & Detail Modal */}
+      <NotificationModal
+        isOpen={isNotificationsOpen}
+        onClose={() => setIsNotificationsOpen(false)}
+        notifications={notifications}
+        readNotificationIds={readNotificationIds}
+        currentUserId={currentUserId}
+        onMarkAllAsRead={handleMarkAllAsRead}
+        onMarkSingleAsRead={handleMarkSingleAsRead}
+        onNavigateToShop={() => setView('shop')}
       />
     </div>
   );
