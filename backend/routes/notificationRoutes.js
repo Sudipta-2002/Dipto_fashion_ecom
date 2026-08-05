@@ -19,7 +19,7 @@ let memoryNotifications = [
 const isMongoConnected = () => mongoose.connection.readyState === 1;
 
 // GET /api/notifications - Fetch notification history (Public Unrestricted Access)
-router.get('/', async (req, res) => {
+router.get(['/', '/notifications', '/api/notifications'], async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   try {
     if (isMongoConnected()) {
@@ -34,9 +34,9 @@ router.get('/', async (req, res) => {
 });
 
 // POST /api/notifications - Admin broadcast notification
-router.post('/', async (req, res) => {
+router.post(['/', '/notifications', '/api/notifications', '/admin/notifications', '/api/admin/notifications'], async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  console.log('>>> [notificationRoutes POST /] Payload received:', req.body);
+  console.log('>>> [notificationRoutes POST] Payload received:', req.body);
   try {
     const { title, message, type = 'Announcement', target = 'ALL' } = req.body;
     if (!title || !message) {
@@ -80,7 +80,7 @@ router.post('/', async (req, res) => {
 });
 
 // POST /api/notifications/:id/read - Mark notification as read by User ID
-router.post('/:id/read', async (req, res) => {
+router.post(['/:id/read', '/notifications/:id/read', '/api/notifications/:id/read'], async (req, res) => {
   try {
     const { id } = req.params;
     const { userId } = req.body;
@@ -112,7 +112,7 @@ router.post('/:id/read', async (req, res) => {
 });
 
 // DELETE /api/notifications/:id - Admin delete notification
-router.delete('/:id', async (req, res) => {
+router.delete(['/:id', '/notifications/:id', '/api/notifications/:id'], async (req, res) => {
   try {
     const { id } = req.params;
     if (isMongoConnected()) {

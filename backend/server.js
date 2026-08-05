@@ -32,7 +32,7 @@ const razorpayInstance = new Razorpay({
   key_secret: RAZORPAY_KEY_SECRET
 });
 
-// Middleware
+// Top-Level Middlewares (Placed at VERY TOP)
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -41,8 +41,10 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Register Explicit Notification Router
+// Register Notification API Router (Top Priority BEFORE Health or Fallbacks)
 app.use('/api/notifications', notificationRoutes);
+app.use('/notifications', notificationRoutes);
+app.use('/api/admin/notifications', notificationRoutes);
 
 // Root Health Check Endpoints
 app.get(['/', '/health'], (req, res) => {
@@ -588,110 +590,6 @@ const broadcastNotificationToUsers = (notificationData) => {
     } catch (e) {}
   });
 };
-
-// GET ALL BROADCAST NOTIFICATIONS FOR STOREFRONT (PUBLIC ACCESSIBLE MULTI-DEVICE)
-app.get(['/api/notifications', '/notifications'], async (req, res) => {
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  try {
-    if (isMongoConnected()) {
-      const list = await Notification.find().sort({ createdAt: -1 });
-      return res.json(list);
-    } else {
-      return res.json(memoryNotifications);
-    }
-  } catch (err) {
-    return res.json(memoryNotifications);
-  }
-});
-
-// POST BROADCAST ANNOUNCEMENT (ADMIN)
-app.post(['/api/notifications', '/api/admin/notifications', '/notifications', '/admin/notifications'], async (req, res) => {
-  console.log('>>> [POST /api/notifications] Request body received:', req.body);
-  try {
-    const { title, message, type = 'Announcement', target = 'ALL' } = req.body;
-    if (!title || !message) {
-      return res.status(400).json({ success: false, message: 'Notification title and message body are required' });
-    }
-
-    const isConnected = mongoose.connection.readyState === 1;
-    console.log(`>>> MongoDB connection readyState: ${mongoose.connection.readyState} (Connected: ${isConnected})`);
-
-    let notificationObj = null;
-
-    if (isConnected) {
-      try {
-        notificationObj = await Notification.create({
-          title: title.trim(),
-          message: message.trim(),
-          type,
-          target,
-          readBy: []
-        });
-        console.log('>>> MongoDB Notification successfully created:', notificationObj._id);
-        broadcastNotificationToUsers(notificationObj);
-        return res.status(201).json({ success: true, message: 'Saved to MongoDB', data: notificationObj, notification: notificationObj });
-      } catch (dbErr) {
-        console.error('>>> ERROR: Mongoose Notification.create failed:', dbErr);
-        return res.status(500).json({ success: false, error: dbErr.message, message: dbErr.message });
-      }
-    } else {
-      console.warn('>>> MongoDB not connected (readyState !== 1). Saving to memory array.');
-      notificationObj = {
-        _id: 'notif_' + Date.now(),
-        title: title.trim(),
-        message: message.trim(),
-        type,
-        target,
-        readBy: [],
-        createdAt: new Date().toISOString()
-      };
-      memoryNotifications.unshift(notificationObj);
-      broadcastNotificationToUsers(notificationObj);
-      return res.status(201).json({ success: true, message: 'Saved to memory array (DB offline)', data: notificationObj, notification: notificationObj });
-    }
-  } catch (err) {
-    console.error('>>> ERROR in POST /api/notifications:', err);
-    res.status(500).json({ success: false, error: err.message, message: err.message || 'Failed to send notification' });
-  }
-});
-
-// POST MARK NOTIFICATION AS READ BY USER ID
-app.post(['/api/notifications/:id/read', '/notifications/:id/read'], async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { userId } = req.body;
-    if (!userId) return res.status(400).json({ success: false, message: 'userId is required' });
-
-    if (mongoose.connection.readyState === 1) {
-      const updated = await Notification.findByIdAndUpdate(id, { $addToSet: { readBy: userId } }, { new: true });
-      return res.json({ success: true, notification: updated });
-    } else {
-      const item = memoryNotifications.find((n) => n._id === id);
-      if (item) {
-        if (!item.readBy.includes(userId)) item.readBy.push(userId);
-        return res.json({ success: true, notification: item });
-      }
-      return res.status(404).json({ success: false, message: 'Notification not found' });
-    }
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
-
-// ADMIN DELETE ANNOUNCEMENT
-app.delete(['/api/notifications/:id', '/api/admin/notifications/:id', '/notifications/:id', '/admin/notifications/:id'], async (req, res) => {
-  try {
-    const { id } = req.params;
-    if (mongoose.connection.readyState === 1) {
-      await Notification.findByIdAndDelete(id);
-    } else {
-      memoryNotifications = memoryNotifications.filter(n => n._id !== id);
-    }
-    return res.json({ success: true, message: 'Notification deleted successfully' });
-  } catch (err) {
-    res.status(500).json({ success: false, message: err.message });
-  }
-});
 
 // --- LIVE SALE NOTIFICATION BANNER ROUTE ---
 let memoryLiveSale = {
