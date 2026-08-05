@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { Eye, CheckCircle, XCircle, FileText, Download, Calendar, Clock, Package } from 'lucide-react';
 import ShippingLabel from './ShippingLabel';
+import TableSkeleton from '../Skeletons/TableSkeleton';
 import { API_URL } from '../../api';
+import { fetchWithCache } from '../../utils/cache';
 
 const groupOrdersByDate = (ordersList) => {
   const now = new Date();
@@ -39,28 +41,47 @@ const groupOrdersByDate = (ordersList) => {
   return { today, yesterday: yesterdayOrders, olderGroups: olderMap };
 };
 
-const AdminOrders = () => {
+const AdminOrders = ({ realtimeOrderUpdate }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedUtrModal, setSelectedUtrModal] = useState(null);
   const [shippingDocketOrder, setShippingDocketOrder] = useState(null);
 
+  const fetchOrders = async (forceRefresh = false) => {
+    const { data: cachedData } = await fetchWithCache(
+      'admin_orders',
+      async () => {
+        const res = await fetch(`${API_URL}/api/orders`);
+        return await res.json();
+      },
+      { forceRefresh }
+    );
+
+    if (cachedData) {
+      setOrders(cachedData);
+      setLoading(false);
+    } else {
+      setLoading(true);
+    }
+  };
+
   useEffect(() => {
     fetchOrders();
   }, []);
 
-  const fetchOrders = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/orders`);
-      const data = await res.json();
-      setOrders(data);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
+  // REAL-TIME ORDER PREPENDING
+  useEffect(() => {
+    if (realtimeOrderUpdate) {
+      setOrders((prevOrders) => {
+        // Prevent duplicate prepend
+        const exists = prevOrders.some(
+          (o) => (o._id || o.orderId) === (realtimeOrderUpdate._id || realtimeOrderUpdate.orderId)
+        );
+        if (exists) return prevOrders;
+        return [realtimeOrderUpdate, ...prevOrders];
+      });
     }
-  };
+  }, [realtimeOrderUpdate]);
 
   const updateOrderStatus = async (orderId, newStatus, reason = '') => {
     try {
@@ -250,9 +271,7 @@ const AdminOrders = () => {
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
-          Loading customer orders...
-        </div>
+        <TableSkeleton rows={5} cols={5} />
       ) : orders.length === 0 ? (
         <div style={{ background: 'white', borderRadius: '12px', padding: '3rem', textAlign: 'center', color: '#94a3b8', border: '1px solid #e2e8f0' }}>
           <Package size={48} color="#cbd5e1" style={{ margin: '0 auto 1rem' }} />

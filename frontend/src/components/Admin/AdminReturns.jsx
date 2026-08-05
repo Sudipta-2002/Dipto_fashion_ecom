@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { RotateCcw, CheckCircle2, Clock, Truck, Landmark, RefreshCw, Eye, Calendar, AlertCircle } from 'lucide-react';
+import TableSkeleton from '../Skeletons/TableSkeleton';
 import { API_URL } from '../../api';
+import { fetchWithCache } from '../../utils/cache';
 
 const groupReturnsByDate = (returnsList) => {
   const now = new Date();
@@ -47,18 +49,22 @@ const AdminReturns = () => {
     fetchReturns();
   }, []);
 
-  const fetchReturns = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/admin/returns`);
-      if (res.ok) {
-        const data = await res.json();
-        setReturnOrders(data);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
+  const fetchReturns = async (forceRefresh = false) => {
+    const { data: cachedData } = await fetchWithCache(
+      'admin_returns',
+      async () => {
+        const res = await fetch(`${API_URL}/api/admin/returns`);
+        if (res.ok) return await res.json();
+        return [];
+      },
+      { forceRefresh }
+    );
+
+    if (cachedData) {
+      setReturnOrders(cachedData);
       setLoading(false);
+    } else {
+      setLoading(true);
     }
   };
 
@@ -190,9 +196,7 @@ const AdminReturns = () => {
       </div>
 
       {loading ? (
-        <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8' }}>
-          Loading customer return requests...
-        </div>
+        <TableSkeleton rows={4} cols={4} />
       ) : returnOrders.length === 0 ? (
         <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', padding: '3rem 1.5rem', textAlign: 'center' }}>
           <RotateCcw size={48} color="#cbd5e1" style={{ margin: '0 auto 1rem' }} />

@@ -54,41 +54,44 @@ const CartDrawer = ({
     <div className="modal-overlay">
       <div
         className="modal-card"
-        style={{ maxWidth: '480px', height: '100vh', borderRadius: '0', position: 'fixed', right: '0', top: '0', bottom: '0', padding: 0, display: 'flex', flexDirection: 'column' }}
+        style={{ width: '100%', maxWidth: '400px', height: '100vh', borderRadius: '0', position: 'fixed', right: '0', top: '0', bottom: '0', padding: 0, display: 'flex', flexDirection: 'column' }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Requirement 1: NAVBAR WITH BRAND LOGO & CART BADGE */}
+        {/* Royal Gradient Header with Brand Logo & Cart Badge */}
         <div
           style={{
-            padding: '0.85rem 1.15rem',
-            borderBottom: '1px solid #e2e8f0',
-            background: '#ffffff',
+            padding: '0.95rem 1.15rem',
+            background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)',
+            color: 'white',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            gap: '0.5rem'
+            gap: '0.5rem',
+            boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
           }}
         >
-          {/* BRAND LOGO & BRAND NAME */}
+          {/* BRAND LOGO & NAME */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             <img
               src="/logo.jpg"
               alt="Dipto Fashion Logo"
               onError={(e) => { e.target.style.display = 'none'; }}
-              style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover' }}
+              style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover', border: '1.5px solid rgba(255,255,255,0.4)' }}
             />
-            <span style={{ fontWeight: '800', fontSize: '1.1rem', color: '#c026d3', letterSpacing: '-0.3px' }}>
-              Dipto Fashion
-            </span>
+            <div>
+              <span style={{ fontWeight: '800', fontSize: '1.05rem', color: 'white', letterSpacing: '-0.2px', display: 'block' }}>
+                Shopping Cart
+              </span>
+              <span style={{ fontSize: '0.72rem', color: '#f5d0fe', opacity: 0.9 }}>
+                {totalItemsCount} {totalItemsCount === 1 ? 'item' : 'items'} in your bag
+              </span>
+            </div>
           </div>
 
-          {/* TITLE "Shopping Cart" WITH CART ICON & RED NOTIFICATION BADGE */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
-            <span style={{ fontWeight: '800', fontSize: '1.05rem', color: '#0f172a' }}>
-              Shopping Cart
-            </span>
-            <div style={{ position: 'relative', display: 'flex', alignItems: 'center', margin: '0 4px' }}>
-              <ShoppingCart size={22} color="#0f172a" />
+          {/* CART BADGE & CLOSE BUTTON */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+            <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+              <ShoppingCart size={22} color="white" />
               {totalItemsCount > 0 && (
                 <span
                   style={{
@@ -112,11 +115,15 @@ const CartDrawer = ({
                 </span>
               )}
             </div>
-          </div>
 
-          <button className="close-btn" onClick={onClose} style={{ background: '#f1f5f9', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }}>
-            <X size={18} color="#475569" />
-          </button>
+            <button
+              className="close-btn"
+              onClick={onClose}
+              style={{ background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: '32px', height: '32px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: 'white' }}
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
         {/* Requirement 2 & 3: 3-STEP PROGRESS TRACKER SYSTEM AT THE TOP OF THE PAGE */}

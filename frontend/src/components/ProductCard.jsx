@@ -118,7 +118,7 @@ const ProductCard = ({
             onClick={() => onAddToCart(product)}
           >
             <Plus size={15} />
-            <span>Add Product</span>
+            <span>Add to Cart</span>
           </button>
         ) : (
           <button

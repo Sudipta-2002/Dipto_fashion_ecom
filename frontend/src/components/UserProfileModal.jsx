@@ -217,7 +217,7 @@ const UserProfileModal = ({
       <div
         className="modal-card"
         style={{
-          maxWidth: '480px',
+          maxWidth: '400px',
           width: '100%',
           height: '100vh',
           borderRadius: '0',

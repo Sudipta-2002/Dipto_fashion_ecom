@@ -185,8 +185,12 @@ const PaymentModal = ({
   return (
     <div className="modal-overlay">
       <div
-        className="modal-card"
-        style={{ maxWidth: '520px', width: '92%', borderRadius: '16px', overflowY: 'auto', maxHeight: '92vh' }}
+        className={`modal-card ${step === 'success' ? 'order-success-card' : ''}`}
+        style={
+          step === 'success'
+            ? { width: '92%', maxWidth: '460px', borderRadius: '16px', margin: 'auto', position: 'relative', height: 'auto', maxHeight: '92vh', overflowY: 'auto' }
+            : { width: '100%', maxWidth: '400px', height: '100vh', borderRadius: '0', position: 'fixed', right: '0', top: '0', bottom: '0', padding: 0, display: 'flex', flexDirection: 'column' }
+        }
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header with Dipto Fashion Logo & Brand Name */}
@@ -210,11 +214,9 @@ const PaymentModal = ({
               </p>
             </div>
           </div>
-          {step !== 'success' && (
-            <button className="close-btn" onClick={handleCancelPayment} style={{ color: 'white' }} title="Close Modal">
-              <X size={20} />
-            </button>
-          )}
+          <button className="close-btn" onClick={onClose} style={{ color: 'white', background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }} title="Close Modal">
+            <X size={18} />
+          </button>
         </div>
 
         {/* Requirement 2 & 3: 3-STEP PROGRESS TRACKER SYSTEM */}
@@ -491,49 +493,70 @@ const PaymentModal = ({
         )}
 
         {step === 'success' && orderConfirmed && (
-          /* ORDER SUCCESSFULLY PLACED PAGE (QR Code Automatically Closed!) */
-          <div className="modal-body" style={{ textAlign: 'center', padding: '2rem 1.5rem' }}>
-            <div style={{ width: '68px', height: '68px', background: '#dcfce7', color: '#16a34a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-              <CheckCircle size={40} />
-            </div>
+          /* ORDER SUCCESSFULLY PLACED PAGE */
+          <div
+            className="modal-body"
+            style={{
+              textAlign: 'center',
+              padding: '1.15rem 1.25rem 1.35rem 1.25rem',
+              display: 'flex',
+              flexDirection: 'column',
+              justifyContent: 'space-between',
+              boxSizing: 'border-box'
+            }}
+          >
+            <div>
+              <div style={{ width: '48px', height: '48px', background: '#dcfce7', color: '#16a34a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.4rem' }}>
+                <CheckCircle size={30} />
+              </div>
 
-            <h2 style={{ fontSize: '1.5rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.4rem' }}>
-              Order Successfully Placed!
-            </h2>
-            <p style={{ color: '#64748b', fontSize: '0.9rem', marginBottom: '1.25rem' }}>
-              Thank you for shopping with <strong>Dipto Fashion</strong>. Your order is registered under pending verification.
-            </p>
+              <h2 style={{ fontSize: '1.25rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.2rem' }}>
+                Order Successfully Placed!
+              </h2>
+              <p style={{ color: '#64748b', fontSize: '0.78rem', marginBottom: '0.65rem', lineHeight: '1.3' }}>
+                Thank you for shopping with <strong>Dipto Fashion</strong>. Your order is registered under pending verification.
+              </p>
 
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '1.1rem', textAlign: 'left', marginBottom: '1.25rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                <span style={{ color: '#64748b', fontSize: '0.85rem' }}>Order ID:</span>
-                <span style={{ fontWeight: '800', color: '#c026d3' }}>{orderConfirmed.orderId}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                <span style={{ color: '#64748b', fontSize: '0.85rem' }}>Submitted UTR:</span>
-                <span style={{ fontWeight: '700' }}>{orderConfirmed.utrNumber}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                <span style={{ color: '#64748b', fontSize: '0.85rem' }}>Amount Paid:</span>
-                <span style={{ fontWeight: '800', color: '#16a34a' }}>₹{orderConfirmed.totalAmount.toLocaleString('en-IN')}</span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                <span style={{ color: '#64748b', fontSize: '0.85rem' }}>Estimated Delivery:</span>
-                <span style={{ fontWeight: '800', color: '#15803d' }}>
-                  {new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-                </span>
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <span style={{ color: '#64748b', fontSize: '0.85rem' }}>Deliver To:</span>
-                <span style={{ fontWeight: '600', textAlign: 'right' }}>
-                  {orderConfirmed.shippingAddress.userName}, Pincode: {orderConfirmed.shippingAddress.pincode}
-                </span>
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '10px', padding: '0.75rem 0.85rem', textAlign: 'left', marginBottom: '0.75rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                  <span style={{ color: '#64748b', fontSize: '0.78rem' }}>Order ID:</span>
+                  <span style={{ fontWeight: '800', color: '#c026d3', fontSize: '0.82rem' }}>{orderConfirmed.orderId}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                  <span style={{ color: '#64748b', fontSize: '0.78rem' }}>Submitted UTR:</span>
+                  <span style={{ fontWeight: '700', fontSize: '0.78rem' }}>{orderConfirmed.utrNumber}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                  <span style={{ color: '#64748b', fontSize: '0.78rem' }}>Amount Paid:</span>
+                  <span style={{ fontWeight: '800', color: '#16a34a', fontSize: '0.85rem' }}>₹{orderConfirmed.totalAmount.toLocaleString('en-IN')}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.25rem' }}>
+                  <span style={{ color: '#64748b', fontSize: '0.78rem' }}>Estimated Delivery:</span>
+                  <span style={{ fontWeight: '800', color: '#15803d', fontSize: '0.78rem' }}>
+                    {new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: '#64748b', fontSize: '0.78rem' }}>Deliver To:</span>
+                  <span style={{ fontWeight: '600', textAlign: 'right', fontSize: '0.78rem' }}>
+                    {orderConfirmed.shippingAddress.userName}, Pincode: {orderConfirmed.shippingAddress.pincode}
+                  </span>
+                </div>
               </div>
             </div>
 
             <button
-              className="btn-primary"
-              style={{ width: '100%', justifyContent: 'center', padding: '0.75rem' }}
+              className="btn-primary blink-green"
+              style={{
+                width: '100%',
+                justify: 'center',
+                padding: '0.8rem 1rem',
+                fontSize: '0.95rem',
+                fontWeight: '800',
+                borderRadius: '10px',
+                marginTop: '0.5rem',
+                cursor: 'pointer'
+              }}
               onClick={onClose}
             >
               Continue Shopping

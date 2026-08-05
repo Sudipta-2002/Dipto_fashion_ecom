@@ -23,6 +23,8 @@ import {
   ResponsiveContainer
 } from 'recharts';
 import { API_URL } from '../../api';
+import { fetchWithCache } from '../../utils/cache';
+import TableSkeleton from '../Skeletons/TableSkeleton';
 
 const AdminBilling = () => {
   const [ledgerData, setLedgerData] = useState([]);
@@ -35,16 +37,22 @@ const AdminBilling = () => {
     fetchBillingLedger();
   }, []);
 
-  const fetchBillingLedger = async () => {
-    setLoading(true);
-    try {
-      const res = await fetch(`${API_URL}/api/admin/billing`);
-      const data = await res.json();
-      setLedgerData(data.ledger || []);
-    } catch (e) {
-      console.error('Error fetching billing ledger:', e);
-    } finally {
+  const fetchBillingLedger = async (forceRefresh = false) => {
+    const { data: cachedData } = await fetchWithCache(
+      'admin_billing',
+      async () => {
+        const res = await fetch(`${API_URL}/api/admin/billing`);
+        const data = await res.json();
+        return data.ledger || [];
+      },
+      { forceRefresh }
+    );
+
+    if (cachedData) {
+      setLedgerData(cachedData);
       setLoading(false);
+    } else {
+      setLoading(true);
     }
   };
 
@@ -210,12 +218,16 @@ const AdminBilling = () => {
         </button>
       </div>
 
-      {/* FILTER CONTROL BAR: ALL, WEEKLY, MONTHLY, YEARLY, DATE-TO-DATE */}
-      <div style={{ background: 'white', padding: '1rem 1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', marginRight: '0.5rem' }}>
-            <Filter size={16} color="#c026d3" /> Duration Filter:
-          </span>
+      {loading ? (
+        <TableSkeleton rows={5} cols={5} />
+      ) : (
+        <>
+          {/* FILTER CONTROL BAR: ALL, WEEKLY, MONTHLY, YEARLY, DATE-TO-DATE */}
+          <div style={{ background: 'white', padding: '1rem 1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', marginRight: '0.5rem' }}>
+                <Filter size={16} color="#c026d3" /> Duration Filter:
+              </span>
 
           {[
             { id: 'all', label: 'All History' },
@@ -432,6 +444,8 @@ const AdminBilling = () => {
           </div>
         )}
       </div>
+        </>
+      )}
     </div>
   );
 };

@@ -510,7 +510,7 @@ const ProductDetailModal = ({
                     onClick={handleAddToCart}
                   >
                     <Plus size={20} />
-                    <span>Add Product {selectedSize ? `(Size: ${selectedSize})` : ''}</span>
+                    <span>Add to Cart {selectedSize ? `(Size: ${selectedSize})` : ''}</span>
                   </button>
                 );
               } else {

@@ -111,22 +111,38 @@ const CheckoutModal = ({ isOpen, onClose, onBackToCart, user, onProceedToPayment
 
   return (
     <div className="modal-overlay">
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
+      <div
+        className="modal-card"
+        style={{ width: '100%', maxWidth: '400px', height: '100vh', borderRadius: '0', position: 'fixed', right: '0', top: '0', bottom: '0', padding: 0, display: 'flex', flexDirection: 'column' }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Sleek Royal Gradient Top Header */}
+        <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)', padding: '0.95rem 1.15rem', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             {onBackToCart && (
               <button
                 type="button"
                 onClick={onBackToCart}
-                style={{ background: '#f1f5f9', border: 'none', color: '#475569', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
                 title="Back to Cart"
               >
                 <ArrowLeft size={18} />
               </button>
             )}
-            <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: '700' }}>Select Delivery Address</h3>
+            <img
+              src="/logo.jpg"
+              alt="Dipto Fashion"
+              style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover', border: '1.5px solid rgba(255,255,255,0.4)' }}
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+            <div>
+              <h3 style={{ margin: 0, fontSize: '1.05rem', fontWeight: '800', letterSpacing: '-0.2px' }}>
+                Delivery Address
+              </h3>
+              <p style={{ fontSize: '0.72rem', opacity: 0.85, margin: 0 }}>Step 2 of 3 • Place Order</p>
+            </div>
           </div>
-          <button className="close-btn" onClick={onClose} title="Close Modal">
+          <button className="close-btn" onClick={onClose} style={{ color: 'white' }} title="Close Modal">
             <X size={20} />
           </button>
         </div>
@@ -134,7 +150,7 @@ const CheckoutModal = ({ isOpen, onClose, onBackToCart, user, onProceedToPayment
         {/* Progress Tracker System: Step 2 Place Order */}
         <CheckoutProgressTracker currentStep="checkout" />
 
-        <div className="modal-body">
+        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflowY: 'auto', padding: '1.15rem' }}>
           {savedAddresses.length > 0 && !showNewAddressForm && (
             <div>
               <p style={{ fontSize: '0.85rem', color: '#64748b', marginBottom: '1rem', fontWeight: '600' }}>

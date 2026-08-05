@@ -468,14 +468,49 @@ app.delete(['/api/products/:id', '/products/:id'], async (req, res) => {
       memoryProducts = memoryProducts.filter(p => p._id !== id);
     }
     res.json({ message: 'Product deleted successfully' });
-  } catch (err) {
-    res.status(500).json({ message: err.message });
-  }
+// --- REAL-TIME SSE (SERVER-SENT EVENTS) ORDER STREAM ---
+let sseAdminClients = [];
+
+app.get(['/api/admin/order-stream', '/admin/order-stream'], (req, res) => {
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.flushHeaders();
+
+  res.write(`data: ${JSON.stringify({ type: 'connected', timestamp: new Date() })}\n\n`);
+
+  const clientId = Date.now();
+  const newClient = { id: clientId, res };
+  sseAdminClients.push(newClient);
+
+  req.on('close', () => {
+    sseAdminClients = sseAdminClients.filter(c => c.id !== clientId);
+  });
 });
+
+const broadcastNewOrder = (orderData) => {
+  const payload = JSON.stringify({
+    type: 'new_order',
+    order: orderData,
+    orderId: orderData.orderId,
+    totalAmount: orderData.totalAmount,
+    customerName: orderData.shippingAddress?.userName || orderData.userName || 'Customer',
+    timestamp: new Date()
+  });
+
+  sseAdminClients.forEach((client) => {
+    try {
+      client.res.write(`data: ${payload}\n\n`);
+    } catch (e) {
+      // Ignore dropped connections
+    }
+  });
+};
 
 // --- ORDER ROUTES ---
 
-app.post('/api/orders', async (req, res) => {
+app.post(['/api/orders', '/orders'], async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
     if (!authHeader) return res.status(401).json({ message: 'Sign-in mandatory to place order' });
@@ -493,16 +528,10 @@ app.post('/api/orders', async (req, res) => {
       const user = await User.findById(decoded.userId);
 
       if (user) {
-        const exists = user.addresses.some(a => a.address === shippingAddress.address && a.pincode === shippingAddress.pincode);
+        if (!user.addresses) user.addresses = [];
+        const exists = user.addresses.some((a) => a.address === shippingAddress.address);
         if (!exists) {
-          user.addresses.push({
-            userName: shippingAddress.userName,
-            mobileNumber: shippingAddress.mobileNumber,
-            address: shippingAddress.address,
-            landmark: shippingAddress.landmark || '',
-            pincode: shippingAddress.pincode,
-            isDefault: true
-          });
+          user.addresses.push(shippingAddress);
           await user.save();
         }
       }
@@ -510,20 +539,21 @@ app.post('/api/orders', async (req, res) => {
       const order = await Order.create({
         orderId,
         user: decoded.userId,
-        userName: shippingAddress.userName || user?.name || 'Customer',
-        userEmail: user?.email || '',
-        shippingAddress,
         items,
-        totalAmount,
+        totalAmount: Number(totalAmount),
+        shippingAddress,
+        paymentMethod: 'UPI_QR',
         utrNumber,
         status: 'Pending Verification'
       });
+
+      broadcastNewOrder(order);
       return res.json(order);
     } else {
-      const user = memoryUsers.find(u => u._id === decoded.userId);
+      const user = memoryUsers.find((u) => u._id === decoded.userId);
       if (user) {
         if (!user.addresses) user.addresses = [];
-        const exists = user.addresses.some(a => a.address === shippingAddress.address);
+        const exists = user.addresses.some((a) => a.address === shippingAddress.address);
         if (!exists) {
           user.addresses.push({ _id: 'addr_' + Date.now(), ...shippingAddress });
         }
@@ -543,6 +573,8 @@ app.post('/api/orders', async (req, res) => {
         createdAt: new Date().toISOString()
       };
       memoryOrders.unshift(newOrder);
+
+      broadcastNewOrder(newOrder);
       return res.json(newOrder);
     }
   } catch (err) {

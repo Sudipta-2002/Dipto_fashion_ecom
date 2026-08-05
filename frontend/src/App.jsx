@@ -10,6 +10,8 @@ import CheckoutModal from './components/CheckoutModal';
 import PaymentModal from './components/PaymentModal';
 import UserProfileModal from './components/UserProfileModal';
 import AdminPanel from './components/Admin/AdminPanel';
+import ProductGridSkeleton from './components/Skeletons/ProductGridSkeleton';
+import { fetchWithCache } from './utils/cache';
 import { API_URL } from './api';
 import './App.css';
 
@@ -126,9 +128,11 @@ function App() {
 
   const fetchCategories = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/categories`);
-      const data = await res.json();
-      setCategories(data);
+      const { data } = await fetchWithCache('categories', async () => {
+        const res = await fetch(`${API_URL}/api/categories`);
+        return await res.json();
+      });
+      if (data) setCategories(data);
     } catch (e) {
       console.error('Error loading categories:', e);
     }
@@ -136,46 +140,85 @@ function App() {
 
   const fetchAllProducts = async () => {
     try {
-      const res = await fetch(`${API_URL}/api/products`);
-      const data = await res.json();
-      setAllProducts(data);
+      const { data } = await fetchWithCache('all_products', async () => {
+        const res = await fetch(`${API_URL}/api/products`);
+        return await res.json();
+      });
+      if (data) setAllProducts(data);
     } catch (e) {
       console.error('Error loading all products:', e);
     }
   };
 
-  const fetchProducts = async () => {
-    setLoading(true);
-    try {
-      let url = `${API_URL}/api/products?category=${encodeURIComponent(selectedCategory)}`;
-      if (searchTerm.trim()) {
-        url += `&search=${encodeURIComponent(searchTerm.trim())}`;
-      }
-      const res = await fetch(url);
-      const data = await res.json();
-      setProducts(data);
-      if (selectedCategory === 'All' && !searchTerm.trim()) {
-        setAllProducts(data);
-      }
-    } catch (e) {
-      console.error('Error loading products:', e);
-    } finally {
+  const fetchProducts = async (forceRefresh = false) => {
+    const cacheKey = `products_${selectedCategory}_${searchTerm.trim()}`;
+    
+    // Check if we have cached data to prevent flash loading spinner
+    const { data: cachedData, isCached } = await fetchWithCache(
+      cacheKey,
+      async () => {
+        let url = `${API_URL}/api/products?category=${encodeURIComponent(selectedCategory)}`;
+        if (searchTerm.trim()) {
+          url += `&search=${encodeURIComponent(searchTerm.trim())}`;
+        }
+        const res = await fetch(url);
+        return await res.json();
+      },
+      { forceRefresh }
+    );
+
+    if (cachedData) {
+      setProducts(cachedData);
       setLoading(false);
+      if (selectedCategory === 'All' && !searchTerm.trim()) {
+        setAllProducts(cachedData);
+      }
+    } else {
+      setLoading(true);
     }
   };
 
+  // Restore opened Product Detail Page if page was refreshed
+  useEffect(() => {
+    const hash = window.location.hash;
+    const match = hash.match(/#product=([^&]+)/);
+    const savedProdId = match ? match[1] : sessionStorage.getItem('df_opened_product_id');
+
+    if (savedProdId && (allProducts.length > 0 || products.length > 0)) {
+      const pool = allProducts.length > 0 ? allProducts : products;
+      const found = pool.find((p) => String(p._id || p.id) === String(savedProdId));
+      if (found) {
+        setSelectedProduct(found);
+        updateProductHistory([found]);
+        setIsDetailOpen(true);
+      }
+    }
+  }, [allProducts, products]);
+
   // Click Title or Catalogue Picture -> Open Full Product Details Modal
   const handleOpenProductDetail = (product) => {
+    if (!product) return;
+    const prodId = product._id || product.id;
     setSelectedProduct(product);
     updateProductHistory([product]);
     setIsDetailOpen(true);
+    sessionStorage.setItem('df_opened_product_id', prodId);
+    try {
+      window.history.replaceState(null, '', `#product=${prodId}`);
+    } catch (e) {}
   };
 
   // Related product click inside ProductDetailModal
   const handleSelectRelatedProduct = (product) => {
+    if (!product) return;
+    const prodId = product._id || product.id;
     setSelectedProduct(product);
     updateProductHistory([...productHistoryRef.current, product]);
     setIsDetailOpen(true);
+    sessionStorage.setItem('df_opened_product_id', prodId);
+    try {
+      window.history.replaceState(null, '', `#product=${prodId}`);
+    } catch (e) {}
   };
 
   // Requirement 3: Step-by-Step Back Navigation Handler
@@ -184,11 +227,20 @@ function App() {
       const nextHistory = [...productHistoryRef.current];
       nextHistory.pop();
       const prevProduct = nextHistory[nextHistory.length - 1];
+      const prodId = prevProduct._id || prevProduct.id;
       updateProductHistory(nextHistory);
       setSelectedProduct(prevProduct);
+      sessionStorage.setItem('df_opened_product_id', prodId);
+      try {
+        window.history.replaceState(null, '', `#product=${prodId}`);
+      } catch (e) {}
     } else {
       updateProductHistory([]);
       setIsDetailOpen(false);
+      sessionStorage.removeItem('df_opened_product_id');
+      try {
+        window.history.replaceState(null, '', window.location.pathname.replace(/#.*$/, ''));
+      } catch (e) {}
     }
   };
 
@@ -196,6 +248,10 @@ function App() {
   const handleCloseProductDetail = () => {
     updateProductHistory([]);
     setIsDetailOpen(false);
+    sessionStorage.removeItem('df_opened_product_id');
+    try {
+      window.history.replaceState(null, '', window.location.pathname.replace(/#.*$/, ''));
+    } catch (e) {}
   };
 
   const handleOpenImageLightbox = (product) => {
@@ -401,9 +457,7 @@ function App() {
             </h2>
 
             {loading ? (
-              <div style={{ textAlign: 'center', padding: '4rem 0', color: '#94a3b8' }}>
-                Loading Dipto Fashion Collection...
-              </div>
+              <ProductGridSkeleton count={8} />
             ) : products.length === 0 ? (
               <div style={{ background: 'white', padding: '3rem', textAlign: 'center', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
                 <h3>No products found</h3>

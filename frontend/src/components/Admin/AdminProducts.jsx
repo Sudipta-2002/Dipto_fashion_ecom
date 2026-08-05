@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit, Upload, X, Image as ImageIcon } from 'lucide-react';
 import { API_URL } from '../../api';
+import { fetchWithCache } from '../../utils/cache';
 
 const AdminProducts = () => {
   const [products, setProducts] = useState([]);
@@ -28,23 +29,37 @@ const AdminProducts = () => {
     fetchCategories();
   }, []);
 
-  const fetchProducts = async () => {
+  const fetchProducts = async (forceRefresh = false) => {
     try {
-      const res = await fetch(`${API_URL}/api/products`);
-      const data = await res.json();
-      setProducts(data);
+      const { data } = await fetchWithCache(
+        'admin_products',
+        async () => {
+          const res = await fetch(`${API_URL}/api/products`);
+          return await res.json();
+        },
+        { forceRefresh }
+      );
+      if (data) setProducts(data);
     } catch (e) {
       console.error('Error fetching products:', e);
     }
   };
 
-  const fetchCategories = async () => {
+  const fetchCategories = async (forceRefresh = false) => {
     try {
-      const res = await fetch(`${API_URL}/api/categories`);
-      const data = await res.json();
-      setCategories(data);
-      if (data.length > 0 && !formData.category) {
-        setFormData(prev => ({ ...prev, category: data[0].name }));
+      const { data } = await fetchWithCache(
+        'categories',
+        async () => {
+          const res = await fetch(`${API_URL}/api/categories`);
+          return await res.json();
+        },
+        { forceRefresh }
+      );
+      if (data) {
+        setCategories(data);
+        if (data.length > 0 && !formData.category) {
+          setFormData((prev) => ({ ...prev, category: data[0].name }));
+        }
       }
     } catch (e) {
       console.error('Error fetching categories:', e);

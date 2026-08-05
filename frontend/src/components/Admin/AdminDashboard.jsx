@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { DollarSign, Calendar, TrendingUp, ShoppingBag, Filter, Bell, ArrowRight, RotateCcw, AlertTriangle } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from 'recharts';
 import { API_URL } from '../../api';
+import { fetchWithCache } from '../../utils/cache';
+import DashboardSkeleton from '../Skeletons/DashboardSkeleton';
 
-const AdminDashboard = ({ onNavigateToOrders, onNavigateToReturns }) => {
+const AdminDashboard = ({ onNavigateToOrders, onNavigateToReturns, realtimeOrderUpdate }) => {
   const [stats, setStats] = useState({
     todaySales: 0,
     monthlySales: 0,
@@ -23,31 +25,54 @@ const AdminDashboard = ({ onNavigateToOrders, onNavigateToReturns }) => {
   const [endDate, setEndDate] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const fetchAnalytics = async () => {
-    setLoading(true);
-    try {
-      let url = `${API_URL}/api/admin/analytics`;
-      if (startDate && endDate) {
-        url += `?startDate=${startDate}&endDate=${endDate}`;
-      }
-      const res = await fetch(url);
-      const data = await res.json();
-      setStats(data);
-    } catch (err) {
-      console.error('Failed to fetch analytics:', err);
-    } finally {
+  const fetchAnalytics = async (forceRefresh = false) => {
+    const cacheKey = `admin_analytics_${startDate}_${endDate}`;
+    const { data: cachedData } = await fetchWithCache(
+      cacheKey,
+      async () => {
+        let url = `${API_URL}/api/admin/analytics`;
+        if (startDate && endDate) {
+          url += `?startDate=${startDate}&endDate=${endDate}`;
+        }
+        const res = await fetch(url);
+        return await res.json();
+      },
+      { forceRefresh }
+    );
+
+    if (cachedData) {
+      setStats(cachedData);
       setLoading(false);
+    } else {
+      setLoading(true);
     }
   };
 
   useEffect(() => {
     fetchAnalytics();
-  }, []);
+  }, [startDate, endDate]);
+
+  // Real-time Order Arrival Listener
+  useEffect(() => {
+    if (realtimeOrderUpdate) {
+      setStats((prev) => ({
+        ...prev,
+        totalOrders: (prev.totalOrders || 0) + 1,
+        pendingOrdersCount: (prev.pendingOrdersCount || 0) + 1,
+        todaySales: (prev.todaySales || 0) + (realtimeOrderUpdate.totalAmount || 0),
+        totalSales: (prev.totalSales || 0) + (realtimeOrderUpdate.totalAmount || 0)
+      }));
+    }
+  }, [realtimeOrderUpdate]);
 
   const handleFilter = (e) => {
     e.preventDefault();
     fetchAnalytics();
   };
+
+  if (loading) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <div>

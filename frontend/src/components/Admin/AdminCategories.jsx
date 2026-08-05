@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Edit, X } from 'lucide-react';
 import { API_URL } from '../../api';
+import { fetchWithCache, clearCache } from '../../utils/cache';
 
 const AdminCategories = () => {
   const [categories, setCategories] = useState([]);
@@ -17,11 +18,17 @@ const AdminCategories = () => {
     fetchCategories();
   }, []);
 
-  const fetchCategories = async () => {
+  const fetchCategories = async (forceRefresh = false) => {
     try {
-      const res = await fetch(`${API_URL}/api/categories`);
-      const data = await res.json();
-      setCategories(data);
+      const { data } = await fetchWithCache(
+        'categories',
+        async () => {
+          const res = await fetch(`${API_URL}/api/categories`);
+          return await res.json();
+        },
+        { forceRefresh }
+      );
+      if (data) setCategories(data);
     } catch (e) {
       console.error(e);
     }

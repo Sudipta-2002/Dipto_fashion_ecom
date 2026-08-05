@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { User, Lock, Mail, Phone, X, Globe, Eye, EyeOff } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { User, Lock, Mail, Phone, X, Eye, EyeOff, ShieldCheck, ArrowRight, Sparkles } from 'lucide-react';
 import { API_URL } from '../api';
 
 const COUNTRY_CODES = [
@@ -24,6 +24,25 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+
+  // Automatically reset all form fields to completely BLANK whenever the modal is opened
+  useEffect(() => {
+    if (isOpen) {
+      resetForm();
+    }
+  }, [isOpen]);
+
+  const resetForm = () => {
+    setFormData({
+      name: '',
+      email: '',
+      password: '',
+      phone: ''
+    });
+    setFieldErrors({});
+    setError('');
+    setShowPassword(false);
+  };
 
   if (!isOpen) return null;
 
@@ -95,126 +114,337 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     }
   };
 
+  const inputStyle = (hasError) => ({
+    width: '100%',
+    height: '48px',
+    padding: '0 1rem 0 2.6rem',
+    fontSize: '0.92rem',
+    borderRadius: '8px',
+    border: hasError ? '1.5px solid #ef4444' : '1.5px solid #cbd5e1',
+    background: '#ffffff',
+    color: '#0f172a',
+    outline: 'none',
+    boxSizing: 'border-box',
+    transition: 'all 0.2s ease'
+  });
+
   return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal-card" onClick={(e) => e.stopPropagation()}>
-        <div className="modal-header">
-          <h3>{isLogin ? 'Sign In to Dipto Fashion' : 'Create an Account'}</h3>
-          <button className="close-btn" onClick={onClose}>
-            <X size={20} />
-          </button>
+    <div className="modal-overlay" onClick={onClose} style={{ backdropFilter: 'blur(6px)', zIndex: 300 }}>
+      <div
+        className="modal-card flipkart-auth-modal"
+        style={{
+          maxWidth: '740px',
+          width: '92%',
+          maxHeight: '90vh',
+          borderRadius: '16px',
+          overflow: 'hidden',
+          boxShadow: '0 25px 60px -15px rgba(0, 0, 0, 0.3)',
+          animation: 'modalIn 0.3s cubic-bezier(0.16, 1, 0.3, 1)',
+          background: '#ffffff',
+          display: 'flex',
+          flexDirection: 'row'
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* FLIPKART STYLE LEFT BRAND PANEL (~40% Width) */}
+        <div
+          style={{
+            width: '40%',
+            background: 'linear-gradient(160deg, #1e1b4b 0%, #701a75 100%)',
+            padding: '2.25rem 1.75rem',
+            color: 'white',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            position: 'relative',
+            boxSizing: 'border-box'
+          }}
+          className="auth-left-banner"
+        >
+          <div>
+            <h2 style={{ fontSize: '1.65rem', fontWeight: '800', margin: 0, letterSpacing: '-0.5px' }}>
+              {isLogin ? 'Login' : "Looks like you're new here!"}
+            </h2>
+            <p style={{ fontSize: '0.88rem', color: '#f5d0fe', opacity: 0.9, marginTop: '0.65rem', lineHeight: '1.45' }}>
+              {isLogin
+                ? 'Get access to your Orders, Wishlist and Recommendations'
+                : 'Sign up with your email to get started with Dipto Fashion'}
+            </p>
+          </div>
+
+          {/* Flipkart Brand Graphic Centerpiece */}
+          <div style={{ textAlign: 'center', margin: '1.5rem 0' }}>
+            <img
+              src="/logo.jpg"
+              alt="Dipto Fashion Logo"
+              style={{
+                width: '72px',
+                height: '72px',
+                borderRadius: '18px',
+                objectFit: 'cover',
+                border: '3px solid rgba(255, 255, 255, 0.4)',
+                boxShadow: '0 10px 25px rgba(0, 0, 0, 0.35)',
+                margin: '0 auto 0.65rem'
+              }}
+              onError={(e) => { e.target.style.display = 'none'; }}
+            />
+            <div style={{ fontWeight: '800', fontSize: '1.15rem', letterSpacing: '-0.3px' }}>
+              Dipto Fashion
+            </div>
+            <div style={{ fontSize: '0.72rem', color: '#f5d0fe', opacity: 0.85, marginTop: '2px' }}>
+              Premium Ethnic & Fashion Collection
+            </div>
+          </div>
+
+          <div style={{ fontSize: '0.72rem', color: '#e9d5ff', opacity: 0.8, display: 'flex', alignItems: 'center', gap: '6px' }}>
+            <ShieldCheck size={16} /> 100% Safe & Secure Login
+          </div>
         </div>
 
-        <div className="modal-body">
-          {error && (
-            <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', padding: '0.75rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.85rem' }}>
-              {error}
-            </div>
-          )}
+        {/* FLIPKART STYLE RIGHT FORM PANEL (~60% Width, Scrollable) */}
+        <div
+          style={{
+            width: '60%',
+            padding: '2rem 1.75rem 1.5rem 1.75rem',
+            position: 'relative',
+            display: 'flex',
+            flexDirection: 'column',
+            justifyContent: 'space-between',
+            maxHeight: '90vh',
+            overflowY: 'auto',
+            boxSizing: 'border-box'
+          }}
+          className="auth-right-form"
+        >
+          {/* Close Button at top right */}
+          <button
+            className="close-btn"
+            onClick={onClose}
+            style={{
+              position: 'absolute',
+              top: '16px',
+              right: '16px',
+              color: '#64748b',
+              background: '#f1f5f9',
+              border: 'none',
+              borderRadius: '50%',
+              width: '34px',
+              height: '34px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer'
+            }}
+            title="Close Modal"
+          >
+            <X size={18} />
+          </button>
 
-          <form onSubmit={handleSubmit} noValidate>
-            {!isLogin && (
-              <div className="form-group">
-                <label>Full Name *</label>
-                <input
-                  type="text"
-                  name="name"
-                  placeholder="Enter your full name"
-                  value={formData.name}
-                  onChange={handleChange}
-                  style={{ borderColor: fieldErrors.name ? '#ef4444' : '' }}
-                />
-                {fieldErrors.name && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '2px' }}>{fieldErrors.name}</span>}
+          <div>
+            {error && (
+              <div style={{ background: '#fef2f2', border: '1.5px solid #fca5a5', color: '#b91c1c', padding: '0.75rem 0.85rem', borderRadius: '8px', marginBottom: '1.25rem', fontSize: '0.82rem', fontWeight: '600' }}>
+                ⚠️ {error}
               </div>
             )}
 
-            <div className="form-group">
-              <label>{isLogin ? 'Email ID or Mobile Number *' : 'Email Address *'}</label>
-              <input
-                type="text"
-                name="email"
-                placeholder="Email ID or Ph Number"
-                value={formData.email}
-                onChange={handleChange}
-                style={{ borderColor: fieldErrors.email ? '#ef4444' : '' }}
-              />
-              {fieldErrors.email && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '2px' }}>{fieldErrors.email}</span>}
-            </div>
+            <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+              {!isLogin && (
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
+                    Enter Full Name *
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      name="name"
+                      placeholder="Full Name"
+                      value={formData.name}
+                      onChange={handleChange}
+                      autoComplete="off"
+                      style={inputStyle(fieldErrors.name)}
+                    />
+                    <User size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                  </div>
+                  {fieldErrors.name && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.name}</span>}
+                </div>
+              )}
 
-            <div className="form-group">
-              <label>Password (Min. 8 characters) *</label>
-              <div style={{ position: 'relative' }}>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  name="password"
-                  placeholder="Password"
-                  value={formData.password}
-                  onChange={handleChange}
-                  style={{ borderColor: fieldErrors.password ? '#ef4444' : '', paddingRight: '2.5rem' }}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  style={{
-                    position: 'absolute',
-                    right: '10px',
-                    top: '50%',
-                    transform: 'translateY(-50%)',
-                    background: 'none',
-                    border: 'none',
-                    cursor: 'pointer',
-                    color: '#64748b',
-                    display: 'flex',
-                    alignItems: 'center',
-                    padding: '4px'
-                  }}
-                  title={showPassword ? 'Hide password' : 'Show password'}
-                >
-                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                </button>
-              </div>
-              {fieldErrors.password && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '2px' }}>{fieldErrors.password}</span>}
-            </div>
-
-            {!isLogin && (
-              <div className="form-group">
-                <label>Mobile Phone Number</label>
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                  <select
-                    value={countryCode}
-                    onChange={(e) => setCountryCode(e.target.value)}
-                    style={{ width: '110px', background: '#f8fafc' }}
-                  >
-                    {COUNTRY_CODES.map((c) => (
-                      <option key={c.code} value={c.code}>{c.code} ({c.country})</option>
-                    ))}
-                  </select>
+              <div className="form-group" style={{ margin: 0 }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
+                  {isLogin ? 'Enter Email ID / Mobile Number *' : 'Enter Email Address *'}
+                </label>
+                <div style={{ position: 'relative' }}>
                   <input
                     type="text"
-                    name="phone"
-                    placeholder="9876543210"
-                    value={formData.phone}
+                    name="email"
+                    placeholder={isLogin ? "Email ID or Mobile Number" : "name@example.com"}
+                    value={formData.email}
                     onChange={handleChange}
-                    style={{ flex: 1, borderColor: fieldErrors.phone ? '#ef4444' : '' }}
+                    autoComplete="off"
+                    style={inputStyle(fieldErrors.email)}
                   />
+                  <Mail size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                 </div>
-                {fieldErrors.phone && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '2px' }}>{fieldErrors.phone}</span>}
+                {fieldErrors.email && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.email}</span>}
               </div>
+
+              <div className="form-group" style={{ margin: 0 }}>
+                <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
+                  Enter Password (Min. 8 characters) *
+                </label>
+                <div style={{ position: 'relative' }}>
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    name="password"
+                    placeholder="Enter Password"
+                    value={formData.password}
+                    onChange={handleChange}
+                    autoComplete="new-password"
+                    style={{ ...inputStyle(fieldErrors.password), paddingRight: '2.6rem' }}
+                  />
+                  <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword(!showPassword)}
+                    style={{
+                      position: 'absolute',
+                      right: '12px',
+                      top: '50%',
+                      transform: 'translateY(-50%)',
+                      background: 'none',
+                      border: 'none',
+                      cursor: 'pointer',
+                      color: '#64748b',
+                      display: 'flex',
+                      alignItems: 'center',
+                      padding: '2px'
+                    }}
+                    title={showPassword ? 'Hide password' : 'Show password'}
+                  >
+                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                  </button>
+                </div>
+                {fieldErrors.password && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.password}</span>}
+              </div>
+
+              {!isLogin && (
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
+                    Mobile Number (Optional)
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <select
+                      value={countryCode}
+                      onChange={(e) => setCountryCode(e.target.value)}
+                      style={{
+                        width: '105px',
+                        height: '48px',
+                        borderRadius: '8px',
+                        border: '1.5px solid #cbd5e1',
+                        background: '#f8fafc',
+                        fontSize: '0.82rem',
+                        fontWeight: '600',
+                        padding: '0 0.4rem'
+                      }}
+                    >
+                      {COUNTRY_CODES.map((c) => (
+                        <option key={c.code} value={c.code}>{c.code} ({c.country})</option>
+                      ))}
+                    </select>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <input
+                        type="text"
+                        name="phone"
+                        placeholder="Mobile Phone"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        style={{ ...inputStyle(fieldErrors.phone), width: '100%' }}
+                      />
+                      <Phone size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    </div>
+                  </div>
+                  {fieldErrors.phone && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.phone}</span>}
+                </div>
+              )}
+
+              {/* Flipkart Style Policy Agreement Disclaimer */}
+              <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0.2rem 0 0 0', lineHeight: '1.4' }}>
+                By continuing, you agree to Dipto Fashion's{' '}
+                <span style={{ color: '#c026d3', fontWeight: '700', cursor: 'pointer' }}>Terms of Use</span> and{' '}
+                <span style={{ color: '#c026d3', fontWeight: '700', cursor: 'pointer' }}>Privacy Policy</span>.
+              </p>
+
+              <button
+                type="submit"
+                className="btn-primary blink-green auth-submit-btn"
+                style={{
+                  width: '100%',
+                  maxWidth: '240px',
+                  margin: '0.5rem auto 0 auto',
+                  height: '44px',
+                  justifyContent: 'center',
+                  fontSize: '0.92rem',
+                  fontWeight: '800',
+                  borderRadius: '8px',
+                  cursor: loading ? 'not-allowed' : 'pointer',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  display: 'flex'
+                }}
+                disabled={loading}
+              >
+                {loading ? 'AUTHENTICATING...' : isLogin ? 'CONTINUE' : 'SIGN UP'}
+              </button>
+            </form>
+          </div>
+
+          {/* Flipkart Style Switch Account Link Banner at Bottom */}
+          <div style={{ textAlign: 'center', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #f1f5f9' }}>
+            {isLogin ? (
+              <button
+                type="button"
+                onClick={() => { setIsLogin(false); resetForm(); }}
+                style={{
+                  background: '#fdf4ff',
+                  border: '1px solid #f5d0fe',
+                  color: '#c026d3',
+                  padding: '0.65rem 1.25rem',
+                  borderRadius: '8px',
+                  fontWeight: '800',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                New to Dipto Fashion? Create an account <ArrowRight size={16} />
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => { setIsLogin(true); resetForm(); }}
+                style={{
+                  background: '#fdf4ff',
+                  border: '1px solid #f5d0fe',
+                  color: '#c026d3',
+                  padding: '0.65rem 1.25rem',
+                  borderRadius: '8px',
+                  fontWeight: '800',
+                  fontSize: '0.85rem',
+                  cursor: 'pointer',
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px'
+                }}
+              >
+                Existing User? Log in <ArrowRight size={16} />
+              </button>
             )}
-
-            <button type="submit" className="btn-primary" style={{ width: '100%', justifyContent: 'center', marginTop: '1.25rem' }} disabled={loading}>
-              {loading ? 'Processing...' : isLogin ? 'Sign In' : 'Register Account'}
-            </button>
-          </form>
-
-          <div style={{ textAlign: 'center', marginTop: '1.25rem', fontSize: '0.9rem', color: '#64748b' }}>
-            {isLogin ? "Don't have an account? " : "Already have an account? "}
-            <span
-              style={{ color: '#c026d3', fontWeight: '700', cursor: 'pointer' }}
-              onClick={() => { setIsLogin(!isLogin); setError(''); setFieldErrors({}); }}
-            >
-              {isLogin ? 'Sign Up' : 'Log In'}
-            </span>
           </div>
         </div>
       </div>
