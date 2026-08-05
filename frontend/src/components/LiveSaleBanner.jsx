@@ -9,6 +9,10 @@ const LiveSaleBanner = ({ onSelectCategory }) => {
 
   useEffect(() => {
     fetchSaleConfig();
+    // Multi-device synchronization polling (10s)
+    const interval = setInterval(fetchSaleConfig, 10000);
+    const handleFocus = () => fetchSaleConfig();
+    window.addEventListener('focus', handleFocus);
 
     const handleUpdateEvent = (e) => {
       if (e.detail) {
@@ -17,12 +21,19 @@ const LiveSaleBanner = ({ onSelectCategory }) => {
       }
     };
     window.addEventListener('df_live_sale_updated', handleUpdateEvent);
-    return () => window.removeEventListener('df_live_sale_updated', handleUpdateEvent);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('df_live_sale_updated', handleUpdateEvent);
+    };
   }, []);
 
   const fetchSaleConfig = async () => {
     try {
-      const res = await apiFetch('/api/live-sale');
+      let res = await apiFetch('/api/live-sale/active');
+      if (!res.ok) {
+        res = await apiFetch('/api/live-sale');
+      }
       const data = await parseResponseSafely(res);
       if (res.ok && data) {
         setConfig(data);

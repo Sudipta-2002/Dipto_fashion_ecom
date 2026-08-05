@@ -62,6 +62,14 @@ function App() {
 
   useEffect(() => {
     fetchNotifications();
+    // Multi-device synchronization polling interval (12s)
+    const interval = setInterval(fetchNotifications, 12000);
+    const handleFocus = () => fetchNotifications();
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
   }, []);
 
   const fetchNotifications = async () => {

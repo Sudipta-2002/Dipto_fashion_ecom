@@ -583,8 +583,9 @@ const broadcastNotificationToUsers = (notificationData) => {
   });
 };
 
-// GET ALL BROADCAST NOTIFICATIONS FOR STOREFRONT
+// GET ALL BROADCAST NOTIFICATIONS FOR STOREFRONT (PUBLIC ACCESSIBLE MULTI-DEVICE)
 app.get(['/api/notifications', '/notifications'], async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
   try {
     if (isMongoConnected()) {
       const list = await Notification.find().sort({ createdAt: -1 });
@@ -685,8 +686,9 @@ let memoryLiveSale = {
   endTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
 };
 
-// GET LIVE SALE CONFIG FOR STOREFRONT
-app.get(['/api/live-sale', '/live-sale'], async (req, res) => {
+// GET LIVE SALE CONFIG FOR STOREFRONT (PUBLIC ACCESSIBLE MULTI-DEVICE)
+app.get(['/api/live-sale', '/live-sale', '/api/live-sale/active', '/live-sale/active'], async (req, res) => {
+  res.setHeader('Access-Control-Allow-Origin', '*');
   try {
     if (isMongoConnected()) {
       let sale = await LiveSale.findOne().sort({ updatedAt: -1 });
