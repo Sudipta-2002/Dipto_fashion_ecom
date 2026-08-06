@@ -17,6 +17,7 @@ import Notification from './models/Notification.js';
 import LiveSale from './models/LiveSale.js';
 import Coupon from './models/Coupon.js';
 import notificationRoutes from './routes/notificationRoutes.js';
+import couponRoutes from './routes/couponRoutes.js';
 
 dotenv.config();
 
@@ -689,7 +690,6 @@ app.post(['/api/admin/live-sale', '/admin/live-sale', '/api/live-sale', '/live-s
 });
 
 // --- COUPON API ENDPOINTS ---
-const couponRoutes = require('./routes/couponRoutes');
 app.use('/api/admin/coupons', couponRoutes);
 app.use('/api/coupons', couponRoutes);
 app.use('/coupons', couponRoutes);

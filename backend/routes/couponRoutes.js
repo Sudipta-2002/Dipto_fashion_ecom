@@ -1,11 +1,12 @@
-const express = require('express');
+import express from 'express';
+import mongoose from 'mongoose';
+import Coupon from '../models/Coupon.js';
+
 const router = express.Router();
-const Coupon = require('../models/Coupon');
 
 // Helper to check MongoDB connection status
 const isMongoConnected = () => {
   try {
-    const mongoose = require('mongoose');
     return mongoose.connection.readyState === 1;
   } catch (e) {
     return false;
@@ -219,4 +220,4 @@ router.post(['/apply', '/validate'], async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;
