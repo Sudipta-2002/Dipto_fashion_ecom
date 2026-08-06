@@ -18,6 +18,7 @@ import ProductFilterModal from './components/ProductFilterModal';
 import { SlidersHorizontal, X, RotateCcw, Filter } from 'lucide-react';
 import { fetchWithCache } from './utils/cache';
 import { API_URL, apiFetch, parseResponseSafely } from './api';
+import { useSocket } from './context/SocketContext.jsx';
 import './App.css';
 
 function App() {
@@ -90,6 +91,99 @@ function App() {
       if (saved) setNotifications(JSON.parse(saved));
     }
   };
+
+  // ============================================================
+  // REAL-TIME SOCKET.IO LISTENERS
+  // All global events from the backend are handled here so both
+  // Storefront and Admin get instant UI updates without refresh.
+  // ============================================================
+  const { socket } = useSocket();
+
+  useEffect(() => {
+    if (!socket) return;
+
+    // --- Product Catalog Sync ---
+    const onProductAdded = (newProduct) => {
+      console.log('[SOCKET] product_added', newProduct._id || newProduct.id);
+      setProducts((prev) => [newProduct, ...prev.filter(p => (p._id || p.id) !== (newProduct._id || newProduct.id))]);
+      setAllProducts((prev) => [newProduct, ...prev.filter(p => (p._id || p.id) !== (newProduct._id || newProduct.id))]);
+    };
+
+    const onProductUpdated = (updated) => {
+      console.log('[SOCKET] product_updated', updated._id || updated.id);
+      const updId = updated._id || updated.id;
+      setProducts((prev) => prev.map(p => (p._id || p.id) === updId ? { ...p, ...updated } : p));
+      setAllProducts((prev) => prev.map(p => (p._id || p.id) === updId ? { ...p, ...updated } : p));
+      // If the open product detail matches, update it too
+      setSelectedProduct((prev) => prev && (prev._id || prev.id) === updId ? { ...prev, ...updated } : prev);
+    };
+
+    const onProductDeleted = (deletedId) => {
+      console.log('[SOCKET] product_deleted', deletedId);
+      setProducts((prev) => prev.filter(p => (p._id || p.id) !== deletedId));
+      setAllProducts((prev) => prev.filter(p => (p._id || p.id) !== deletedId));
+    };
+
+    // --- New Order Placed (Admin alert + User confirmation) ---
+    const onNewOrderPlaced = (order) => {
+      console.log('[SOCKET] new_order_placed', order.orderId);
+      // Dispatch DOM event so AdminOrders can prepend the new order
+      window.dispatchEvent(new CustomEvent('df_new_order_placed', { detail: order }));
+      // Play the same chime alert used for notifications
+      try {
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.15);
+        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.35);
+      } catch (e) {}
+    };
+
+    // --- Order Status Updated (User My Orders sync) ---
+    const onOrderStatusUpdated = (updatedOrder) => {
+      console.log('[SOCKET] order_status_updated', updatedOrder.orderId, '->', updatedOrder.status);
+      // Dispatch a custom DOM event so UserProfileModal/AdminPanel can listen internally
+      window.dispatchEvent(new CustomEvent('df_order_status_updated', { detail: updatedOrder }));
+    };
+
+    // --- User Profile Updated (Auth context sync) ---
+    const onUserProfileUpdated = (updatedUser) => {
+      console.log('[SOCKET] user_profile_updated', updatedUser._id || updatedUser.id);
+      setUser((prev) => {
+        if (!prev) return prev;
+        const prevId = prev._id || prev.id;
+        const updId = updatedUser._id || updatedUser.id;
+        if (prevId && updId && String(prevId) === String(updId)) {
+          const merged = { ...prev, ...updatedUser };
+          try { localStorage.setItem('df_user', JSON.stringify(merged)); } catch (e) {}
+          return merged;
+        }
+        return prev;
+      });
+    };
+
+    socket.on('product_added', onProductAdded);
+    socket.on('product_updated', onProductUpdated);
+    socket.on('product_deleted', onProductDeleted);
+    socket.on('new_order_placed', onNewOrderPlaced);
+    socket.on('order_status_updated', onOrderStatusUpdated);
+    socket.on('user_profile_updated', onUserProfileUpdated);
+
+    return () => {
+      socket.off('product_added', onProductAdded);
+      socket.off('product_updated', onProductUpdated);
+      socket.off('product_deleted', onProductDeleted);
+      socket.off('new_order_placed', onNewOrderPlaced);
+      socket.off('order_status_updated', onOrderStatusUpdated);
+      socket.off('user_profile_updated', onUserProfileUpdated);
+    };
+  }, [socket]);
 
   // LOCAL ANNOUNCEMENT EVENT LISTENER FALLBACK
   useEffect(() => {

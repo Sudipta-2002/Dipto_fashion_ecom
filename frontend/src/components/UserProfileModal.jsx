@@ -92,6 +92,23 @@ const UserProfileModal = ({
     }
   }, [isOpen, user]);
 
+  // Real-time order status sync via Socket.io (dispatched from App.jsx)
+  useEffect(() => {
+    const handleOrderStatusUpdate = (e) => {
+      const updatedOrder = e.detail;
+      if (!updatedOrder) return;
+      setUserOrders((prev) =>
+        prev.map((o) =>
+          (o._id === updatedOrder._id || o.orderId === updatedOrder.orderId)
+            ? { ...o, ...updatedOrder }
+            : o
+        )
+      );
+    };
+    window.addEventListener('df_order_status_updated', handleOrderStatusUpdate);
+    return () => window.removeEventListener('df_order_status_updated', handleOrderStatusUpdate);
+  }, []);
+
   const fetchUserAddresses = async () => {
     try {
       const token = localStorage.getItem('df_token');

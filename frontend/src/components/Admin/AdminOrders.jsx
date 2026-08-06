@@ -99,7 +99,7 @@ const AdminOrders = ({ realtimeOrderUpdate }) => {
     }
   };
 
-  // REAL-TIME ORDER PREPENDING
+  // REAL-TIME ORDER PREPENDING (via SSE prop)
   useEffect(() => {
     if (realtimeOrderUpdate) {
       setOrders((prevOrders) => {
@@ -113,6 +113,39 @@ const AdminOrders = ({ realtimeOrderUpdate }) => {
       setTotalCount((prev) => prev + 1);
     }
   }, [realtimeOrderUpdate]);
+
+  // REAL-TIME SOCKET.IO LISTENERS (via DOM events dispatched from App.jsx)
+  useEffect(() => {
+    const handleNewOrder = (e) => {
+      const newOrder = e.detail;
+      if (!newOrder) return;
+      setOrders((prev) => {
+        const exists = prev.some((o) => (o._id || o.orderId) === (newOrder._id || newOrder.orderId));
+        if (exists) return prev;
+        return [newOrder, ...prev];
+      });
+      setTotalCount((prev) => prev + 1);
+    };
+
+    const handleStatusUpdate = (e) => {
+      const updatedOrder = e.detail;
+      if (!updatedOrder) return;
+      setOrders((prev) =>
+        prev.map((o) =>
+          (o._id === updatedOrder._id || o.orderId === updatedOrder.orderId)
+            ? { ...o, ...updatedOrder }
+            : o
+        )
+      );
+    };
+
+    window.addEventListener('df_new_order_placed', handleNewOrder);
+    window.addEventListener('df_order_status_updated', handleStatusUpdate);
+    return () => {
+      window.removeEventListener('df_new_order_placed', handleNewOrder);
+      window.removeEventListener('df_order_status_updated', handleStatusUpdate);
+    };
+  }, []);
 
   // OPTIMISTIC UI UPDATES (0ms Latency Instant Feedback with Rollback)
   const updateOrderStatus = async (orderId, newStatus, reason = '') => {

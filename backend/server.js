@@ -7,6 +7,8 @@ import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
+import http from 'http';
+import { Server as SocketIOServer } from 'socket.io';
 
 import connectDB from './config/db.js';
 import User from './models/User.js';
@@ -23,8 +25,25 @@ import reportRoutes from './routes/reportRoutes.js';
 dotenv.config();
 
 const app = express();
+const httpServer = http.createServer(app);
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'dipto_fashion_secret_key_2026';
+
+// Socket.io Setup — attached to the same HTTP server, full CORS
+const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: '*',
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+  },
+  transports: ['websocket', 'polling']
+});
+
+io.on('connection', (socket) => {
+  console.log(`[SOCKET.IO] Client connected: ${socket.id}`);
+  socket.on('disconnect', () => {
+    console.log(`[SOCKET.IO] Client disconnected: ${socket.id}`);
+  });
+});
 
 // Razorpay Payment Gateway Configuration (Test Mode & Live Approval Ready)
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_TMAyEYZpYPApGL';
@@ -556,6 +575,7 @@ app.post(['/api/products', '/products'], async (req, res) => {
         image: images[0],
         description: description || ''
       });
+      try { io.emit('product_added', prod); } catch (e) {}
       return res.json(prod);
     } else {
       const prod = {
@@ -573,6 +593,7 @@ app.post(['/api/products', '/products'], async (req, res) => {
         description: description || ''
       };
       memoryProducts.unshift(prod);
+      try { io.emit('product_added', prod); } catch (e) {}
       return res.json(prod);
     }
   } catch (err) {
@@ -617,6 +638,7 @@ app.put(['/api/products/:id', '/products/:id'], async (req, res) => {
         },
         { new: true }
       );
+      try { io.emit('product_updated', updated); } catch (e) {}
       return res.json(updated);
     } else {
       const prod = memoryProducts.find(p => p._id === id);
@@ -636,6 +658,7 @@ app.put(['/api/products/:id', '/products/:id'], async (req, res) => {
         prod.images = images;
         prod.image = images[0];
         prod.description = description || '';
+        try { io.emit('product_updated', prod); } catch (e) {}
         return res.json(prod);
       }
       return res.status(404).json({ message: 'Product not found' });
@@ -653,6 +676,7 @@ app.delete(['/api/products/:id', '/products/:id'], async (req, res) => {
     } else {
       memoryProducts = memoryProducts.filter(p => p._id !== id);
     }
+    try { io.emit('product_deleted', id); } catch (e) {}
     res.json({ message: 'Product deleted successfully' });
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -697,6 +721,29 @@ const broadcastNewOrder = (orderData) => {
       // Ignore dropped connections
     }
   });
+
+  // Socket.io real-time emit
+  try { io.emit('new_order_placed', orderData); } catch (e) {}
+};
+
+const emitOrderStatusUpdate = (order) => {
+  try { io.emit('order_status_updated', order); } catch (e) {}
+};
+
+const emitProductAdded = (product) => {
+  try { io.emit('product_added', product); } catch (e) {}
+};
+
+const emitProductUpdated = (product) => {
+  try { io.emit('product_updated', product); } catch (e) {}
+};
+
+const emitProductDeleted = (productId) => {
+  try { io.emit('product_deleted', productId); } catch (e) {}
+};
+
+const emitUserProfileUpdated = (user) => {
+  try { io.emit('user_profile_updated', user); } catch (e) {}
 };
 
 // --- NOTIFICATION REAL-TIME STREAM ---
@@ -1643,6 +1690,7 @@ app.put('/api/orders/:id/status', async (req, res) => {
         await restoreRemainingStock(existingOrder, existingOrder.items, 'ReturnApproved');
       }
 
+      try { io.emit('order_status_updated', updated); } catch (e) {}
       return res.json(updated);
     } else {
       const order = memoryOrders.find(o => o._id === id || o.orderId === id);
@@ -1659,6 +1707,7 @@ app.put('/api/orders/:id/status', async (req, res) => {
           await restoreRemainingStock(order, order.items, 'ReturnApproved');
         }
 
+        try { io.emit('order_status_updated', order); } catch (e) {}
         return res.json(order);
       }
       return res.status(404).json({ message: 'Order not found' });
@@ -1964,10 +2013,11 @@ app.use((err, req, res, next) => {
 });
 
 const startServer = (portToTry) => {
-  const server = app.listen(portToTry, () => {
+  httpServer.listen(portToTry, () => {
     console.log(`Dipto Fashion backend running on http://localhost:${portToTry}`);
+    console.log(`[SOCKET.IO] WebSocket server ready on port ${portToTry}`);
   });
-  server.on('error', (err) => {
+  httpServer.on('error', (err) => {
     if (err.code === 'EADDRINUSE') {
      
       console.log(`Port ${portToTry} in use, trying port ${portToTry + 1}...`);
