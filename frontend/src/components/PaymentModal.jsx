@@ -470,82 +470,43 @@ const PaymentModal = ({
                 </div>
               )}
 
-              {/* ULTRA-ATTRACTIVE PROFESSIONAL RAZORPAY PAYMENT CARD */}
-              <div style={{
-                background: 'linear-gradient(135deg, #090d16 0%, #1e1b4b 50%, #31103f 100%)',
-                borderRadius: '20px',
-                padding: '1.75rem 1.35rem',
-                color: 'white',
-                marginBottom: '1rem',
-                boxShadow: '0 16px 36px rgba(15, 23, 42, 0.4), 0 0 1px 1px rgba(255, 255, 255, 0.15) inset',
-                position: 'relative',
-                overflow: 'hidden',
-                textAlign: 'center'
-              }}>
-                {/* Glowing decorative gradient accent */}
-                <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '120px', height: '120px', background: 'radial-gradient(circle, rgba(192,38,211,0.35) 0%, rgba(0,0,0,0) 70%)', pointerEvents: 'none' }} />
-
-                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '5px 14px', borderRadius: '30px', marginBottom: '0.85rem' }}>
-                  <ShieldCheck size={18} style={{ color: '#38bdf8' }} />
-                  <span style={{ fontSize: '0.78rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', color: '#38bdf8' }}>
-                    100% Secure Payment
-                  </span>
-                </div>
-
-                <h4 style={{ fontSize: '1.25rem', fontWeight: '900', margin: '0 0 0.4rem 0', color: '#ffffff', letterSpacing: '-0.3px' }}>
-                  Instant Direct Checkout
-                </h4>
-                <p style={{ fontSize: '0.82rem', color: '#cbd5e1', margin: 0, lineHeight: '1.45', fontWeight: '500' }}>
-                  Pay seamlessly using <strong>UPI Apps (GPay / PhonePe / Paytm / BHIM)</strong>, QR Scanner, Cards or NetBanking.
-                </p>
-              </div>
-
-              {/* SSL ENCRYPTION TRUST BADGE */}
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#64748b', fontSize: '0.78rem', fontWeight: '700', marginTop: 'auto', paddingTop: '1rem' }}>
-                <Lock size={15} color="#16a34a" /> 256-Bit SSL Encrypted Instant Payment Verification
-              </div>
-            </div>
-
-            {/* FIXED BOTTOM NAVBAR FOR PROCEED TO PAY BUTTON */}
-            <div
-              className="modal-bottom-navbar"
-              style={{
-                flexShrink: 0,
-                padding: '0.85rem 1.15rem',
-                paddingBottom: 'max(0.85rem, env(safe-area-inset-bottom))',
-                background: '#ffffff',
-                borderTop: '1px solid #e2e8f0',
-                boxShadow: '0 -4px 16px rgba(0,0,0,0.08)',
-                zIndex: 10
-              }}
-            >
-              <button
-                type="button"
-                onClick={handleRazorpayPayment}
-                disabled={loading}
-                className="btn-primary blink-green"
+              {/* IN-FLOW SCROLLABLE ACTION BUTTON FOR PROCEED TO PAY */}
+              <div
+                className="modal-bottom-navbar"
                 style={{
-                  width: '100%',
-                  height: '52px',
-                  fontSize: '1.05rem',
-                  fontWeight: '900',
-                  borderRadius: '14px',
-                  background: 'linear-gradient(135deg, #16a34a 0%, #15803d 50%, #047857 100%)',
-                  color: '#ffffff',
-                  border: '1.5px solid rgba(255, 255, 255, 0.25)',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '10px',
-                  boxShadow: '0 8px 24px rgba(22, 163, 74, 0.45)',
-                  letterSpacing: '0.5px'
+                  padding: '0.5rem 0',
+                  background: '#ffffff',
+                  marginTop: '0.75rem'
                 }}
               >
-                <Lock size={18} />
-                <span>{loading ? 'Initializing Razorpay...' : `PROCEED TO PAY ₹${totalAmount.toLocaleString('en-IN')}`}</span>
-                <ArrowLeft size={18} style={{ transform: 'rotate(180deg)' }} />
-              </button>
+                <button
+                  type="button"
+                  onClick={handleRazorpayPayment}
+                  disabled={loading}
+                  className="btn-primary blink-green"
+                  style={{
+                    width: '100%',
+                    height: '52px',
+                    fontSize: '1.05rem',
+                    fontWeight: '900',
+                    borderRadius: '14px',
+                    background: 'linear-gradient(135deg, #16a34a 0%, #15803d 50%, #047857 100%)',
+                    color: '#ffffff',
+                    border: '1.5px solid rgba(255, 255, 255, 0.25)',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px',
+                    boxShadow: '0 8px 24px rgba(22, 163, 74, 0.45)',
+                    letterSpacing: '0.5px'
+                  }}
+                >
+                  <Lock size={18} />
+                  <span>{loading ? 'Initializing Razorpay...' : `PROCEED TO PAY ₹${totalAmount.toLocaleString('en-IN')}`}</span>
+                  <ArrowLeft size={18} style={{ transform: 'rotate(180deg)' }} />
+                </button>
+              </div>
             </div>
           </>
         )}

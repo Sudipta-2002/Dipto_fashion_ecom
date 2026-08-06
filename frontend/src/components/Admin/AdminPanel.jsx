@@ -15,7 +15,8 @@ import {
   EyeOff,
   Bell,
   Zap,
-  Tag
+  Tag,
+  HelpCircle
 } from 'lucide-react';
 import { API_URL } from '../../api';
 import { clearCache } from '../../utils/cache';
@@ -29,11 +30,12 @@ import AdminBilling from './AdminBilling';
 import AdminNotifications from './AdminNotifications';
 import AdminLiveSale from './AdminLiveSale';
 import AdminCoupons from './AdminCoupons';
+import AdminReports from './AdminReports';
 
 const AdminPanel = ({ onExitAdmin }) => {
   const getInitialAdminTab = () => {
     const hash = window.location.hash.replace('#admin-', '').replace('#', '').trim();
-    const validTabs = ['dashboard', 'products', 'categories', 'orders', 'returns', 'billing', 'notifications', 'live-sale', 'coupons'];
+    const validTabs = ['dashboard', 'products', 'categories', 'orders', 'returns', 'billing', 'notifications', 'live-sale', 'coupons', 'reports'];
     if (validTabs.includes(hash)) return hash;
     const saved = localStorage.getItem('df_admin_tab');
     if (saved && validTabs.includes(saved)) return saved;
@@ -527,6 +529,19 @@ const AdminPanel = ({ onExitAdmin }) => {
           <Tag size={18} style={{ flexShrink: 0 }} />
           <span>Coupons & Offers</span>
         </button>
+        <button
+          className={`admin-nav-btn btn-outline w-full min-h-[64px] flex items-center justify-center gap-2.5 text-center p-3.5 ${activeTab === 'reports' ? 'active' : ''}`}
+          onClick={() => setActiveTab('reports')}
+          style={{
+            background: activeTab === 'reports' ? '#fff7ed' : '#ffffff',
+            borderColor: activeTab === 'reports' ? '#ea580c' : '#cbd5e1',
+            color: activeTab === 'reports' ? '#ea580c' : '#475569',
+            fontWeight: activeTab === 'reports' ? '800' : '600'
+          }}
+        >
+          <HelpCircle size={18} style={{ flexShrink: 0 }} />
+          <span>User Reports & Support</span>
+        </button>
       </div>
 
       {/* Real-time Order Arrival Toast Notification */}
@@ -548,6 +563,7 @@ const AdminPanel = ({ onExitAdmin }) => {
       {activeTab === 'notifications' && <AdminNotifications />}
       {activeTab === 'live-sale' && <AdminLiveSale />}
       {activeTab === 'coupons' && <AdminCoupons />}
+      {activeTab === 'reports' && <AdminReports />}
     </div>
   );
 };

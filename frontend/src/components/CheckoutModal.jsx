@@ -301,41 +301,38 @@ const CheckoutModal = ({ isOpen, onClose, onBackToCart, user, onProceedToPayment
               </div>
             </div>
           )}
-        </div>
 
-        {/* FIXED BOTTOM NAVBAR FOR BACK & CONTINUE BUTTONS */}
-        <div
-          className="modal-bottom-navbar"
-          style={{
-            flexShrink: 0,
-            padding: '0.85rem 1.15rem',
-            paddingBottom: 'max(0.85rem, env(safe-area-inset-bottom))',
-            background: '#ffffff',
-            borderTop: '1px solid #e2e8f0',
-            boxShadow: '0 -4px 16px rgba(0,0,0,0.08)',
-            zIndex: 10,
-            display: 'flex',
-            gap: '0.6rem'
-          }}
-        >
-          {onBackToCart && (
-            <button
-              type="button"
-              className="btn-outline"
-              style={{ color: '#475569', borderColor: '#cbd5e1', padding: '0.85rem 1rem' }}
-              onClick={onBackToCart}
-              title="Back to Cart"
-            >
-              <ArrowLeft size={16} /> Back
-            </button>
-          )}
-          <button
-            className="btn-primary blink-green"
-            style={{ flex: 1, justifyContent: 'center', padding: '0.85rem', fontWeight: '800' }}
-            onClick={handleContinue}
+          {/* IN-FLOW SCROLLABLE ACTION BUTTONS FOR BACK & CONTINUE */}
+          <div
+            className="modal-bottom-navbar"
+            style={{
+              padding: '1rem 0 0.5rem 0',
+              background: '#ffffff',
+              borderTop: '1.5px solid #e2e8f0',
+              marginTop: '1.25rem',
+              display: 'flex',
+              gap: '0.6rem'
+            }}
           >
-            Continue
-          </button>
+            {onBackToCart && (
+              <button
+                type="button"
+                className="btn-outline"
+                style={{ color: '#475569', borderColor: '#cbd5e1', padding: '0.85rem 1rem' }}
+                onClick={onBackToCart}
+                title="Back to Cart"
+              >
+                <ArrowLeft size={16} /> Back
+              </button>
+            )}
+            <button
+              className="btn-primary blink-green"
+              style={{ flex: 1, justifyContent: 'center', padding: '0.85rem', fontWeight: '800' }}
+              onClick={handleContinue}
+            >
+              Continue
+            </button>
+          </div>
         </div>
       </div>
     </div>

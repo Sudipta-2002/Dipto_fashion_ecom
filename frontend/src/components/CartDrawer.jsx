@@ -437,80 +437,75 @@ const CartDrawer = ({
                   <span style={{ color: '#c026d3' }}>₹{finalPayable.toLocaleString('en-IN')}</span>
                 </div>
               </div>
+
+              {/* IN-FLOW SCROLLABLE ACTION BUTTON FOR PLACE ORDER */}
+              <div
+                className="modal-bottom-navbar"
+                style={{
+                  padding: '1rem 0 0.5rem 0',
+                  background: '#ffffff',
+                  borderTop: '1.5px solid #e2e8f0',
+                  marginTop: '1.25rem'
+                }}
+              >
+                {/* Terms & Conditions & Privacy Policy Checkbox */}
+                <div style={{ marginBottom: '0.75rem', padding: '0.65rem 0.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
+                  <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.78rem', color: '#475569', lineHeight: '1.4' }}>
+                    <input
+                      type="checkbox"
+                      checked={agreedToTerms}
+                      onChange={(e) => {
+                        setAgreedToTerms(e.target.checked);
+                        if (e.target.checked) setTermsError('');
+                      }}
+                      style={{ marginTop: '2px', accentColor: '#c026d3', width: '16px', height: '16px', cursor: 'pointer' }}
+                    />
+                    <span>
+                      By placing an order, I agree to <strong>Dipto Fashion's</strong>{' '}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setPolicyTab('terms');
+                          setIsPolicyOpen(true);
+                        }}
+                        style={{ background: 'none', border: 'none', color: '#c026d3', textDecoration: 'underline', fontWeight: '700', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
+                      >
+                        Terms & Conditions
+                      </button>{' '}
+                      and{' '}
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setPolicyTab('privacy');
+                          setIsPolicyOpen(true);
+                        }}
+                        style={{ background: 'none', border: 'none', color: '#c026d3', textDecoration: 'underline', fontWeight: '700', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
+                      >
+                        Privacy Policy
+                      </button>.
+                    </span>
+                  </label>
+                  {termsError && (
+                    <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.35rem', fontWeight: '600' }}>
+                      {termsError}
+                    </p>
+                  )}
+                </div>
+
+                <button
+                  className="btn-primary blink-green"
+                  style={{ width: '100%', justifyContent: 'center', padding: '0.85rem' }}
+                  onClick={handleCheckoutClick}
+                >
+                  <span>Place Order</span>
+                  <ArrowRight size={18} />
+                </button>
+              </div>
             </>
           )}
         </div>
-
-        {/* FIXED BOTTOM NAVBAR FOR PLACE ORDER */}
-        {cartItems.length > 0 && (
-          <div
-            className="modal-bottom-navbar"
-            style={{
-              flexShrink: 0,
-              padding: '0.85rem 1.15rem',
-              paddingBottom: 'max(0.85rem, env(safe-area-inset-bottom))',
-              background: '#ffffff',
-              borderTop: '1px solid #e2e8f0',
-              boxShadow: '0 -4px 16px rgba(0,0,0,0.08)',
-              zIndex: 10
-            }}
-          >
-            {/* Terms & Conditions & Privacy Policy Checkbox */}
-            <div style={{ marginBottom: '0.75rem', padding: '0.65rem 0.75rem', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '8px' }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', cursor: 'pointer', fontSize: '0.78rem', color: '#475569', lineHeight: '1.4' }}>
-                <input
-                  type="checkbox"
-                  checked={agreedToTerms}
-                  onChange={(e) => {
-                    setAgreedToTerms(e.target.checked);
-                    if (e.target.checked) setTermsError('');
-                  }}
-                  style={{ marginTop: '2px', accentColor: '#c026d3', width: '16px', height: '16px', cursor: 'pointer' }}
-                />
-                <span>
-                  By placing an order, I agree to <strong>Dipto Fashion's</strong>{' '}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPolicyTab('terms');
-                      setIsPolicyOpen(true);
-                    }}
-                    style={{ background: 'none', border: 'none', color: '#c026d3', textDecoration: 'underline', fontWeight: '700', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
-                  >
-                    Terms & Conditions
-                  </button>{' '}
-                  and{' '}
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      setPolicyTab('privacy');
-                      setIsPolicyOpen(true);
-                    }}
-                    style={{ background: 'none', border: 'none', color: '#c026d3', textDecoration: 'underline', fontWeight: '700', cursor: 'pointer', padding: 0, fontSize: 'inherit' }}
-                  >
-                    Privacy Policy
-                  </button>.
-                </span>
-              </label>
-              {termsError && (
-                <p style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '0.35rem', fontWeight: '600' }}>
-                  {termsError}
-                </p>
-              )}
-            </div>
-
-            <button
-              className="btn-primary blink-green"
-              style={{ width: '100%', justifyContent: 'center', padding: '0.85rem' }}
-              onClick={handleCheckoutClick}
-            >
-              <span>Place Order</span>
-              <ArrowRight size={18} />
-            </button>
-          </div>
-        )}
       </div>
 
       {/* REDBUS INSPIRED AVAILABLE COUPONS MODAL / DRAWER */}

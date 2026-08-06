@@ -17,11 +17,15 @@ import {
   Bot,
   Star,
   RotateCcw,
-  Plus,
-  Sparkles,
+  Trash2,
+  Send,
+  MessageSquare,
+  AlertCircle,
   Crown,
+  Sparkles,
   Ban,
-  Heart
+  Heart,
+  Plus
 } from 'lucide-react';
 import TermsPrivacyModal from './TermsPrivacyModal';
 import AiChatbotModal from './AiChatbotModal';
@@ -29,6 +33,7 @@ import ProductRatingModal from './ProductRatingModal';
 import ProductReturnModal from './ProductReturnModal';
 import OrderCancelModal from './OrderCancelModal';
 import ProductCard from './ProductCard';
+import ToastNotification from './ToastNotification';
 import { API_URL } from '../api';
 
 const UserProfileModal = ({
@@ -69,13 +74,166 @@ const UserProfileModal = ({
   });
   const [addrLoading, setAddrLoading] = useState(false);
 
+  // User Reports & Support State
+  const [userReports, setUserReports] = useState([]);
+  const [reportSubject, setReportSubject] = useState('');
+  const [reportCategory, setReportCategory] = useState('Order Issue');
+  const [reportMessage, setReportMessage] = useState('');
+  const [submittingReport, setSubmittingReport] = useState(false);
+  const [loadingReports, setLoadingReports] = useState(false);
+  const [reportToast, setReportToast] = useState(null);
+
   useEffect(() => {
     if (isOpen && user) {
       fetchUserOrders();
-      setUserAddresses(user.addresses || []);
+      fetchUserAddresses();
+      fetchUserReports();
       setActiveTab('menu');
     }
   }, [isOpen, user]);
+
+  const fetchUserAddresses = async () => {
+    try {
+      const token = localStorage.getItem('df_token');
+      let userEmail = user?.email || '';
+      if (!userEmail) {
+        try {
+          const savedUser = localStorage.getItem('df_user');
+          if (savedUser) userEmail = JSON.parse(savedUser).email || '';
+        } catch (e) {}
+      }
+      let url = `${API_URL}/api/user/addresses`;
+      if (userEmail) url += `?email=${encodeURIComponent(userEmail)}`;
+
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(url, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data)) {
+          setUserAddresses(data);
+        }
+      }
+    } catch (e) {
+      console.error('Error fetching user addresses:', e);
+    }
+  };
+
+  const fetchUserReports = async () => {
+    setLoadingReports(true);
+    try {
+      const token = localStorage.getItem('df_token');
+      let userEmail = user?.email || '';
+      if (!userEmail) {
+        try {
+          const savedUser = localStorage.getItem('df_user');
+          if (savedUser) userEmail = JSON.parse(savedUser).email || '';
+        } catch (e) {}
+      }
+      let url = `${API_URL}/api/reports/my-reports`;
+      if (userEmail) url += `?email=${encodeURIComponent(userEmail)}`;
+
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(url, { headers });
+      if (res.ok) {
+        const data = await res.json();
+        setUserReports(Array.isArray(data) ? data : []);
+      }
+    } catch (e) {
+      console.error('Error fetching user reports:', e);
+    } finally {
+      setLoadingReports(false);
+    }
+  };
+
+  const handleSubmitReport = async (e) => {
+    e.preventDefault();
+    if (!reportSubject.trim() || !reportMessage.trim()) {
+      setReportToast({ type: 'error', message: 'Subject and detailed message are required' });
+      return;
+    }
+
+    setSubmittingReport(true);
+    try {
+      const token = localStorage.getItem('df_token');
+      let userEmail = user?.email || '';
+      let userName = user?.name || 'Customer';
+
+      if (!userEmail) {
+        try {
+          const savedUser = localStorage.getItem('df_user');
+          if (savedUser) {
+            const parsed = JSON.parse(savedUser);
+            userEmail = parsed.email || '';
+            userName = parsed.name || userName;
+          }
+        } catch (e) {}
+      }
+
+      const res = await fetch(`${API_URL}/api/reports`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          subject: reportSubject.trim(),
+          category: reportCategory,
+          message: reportMessage.trim(),
+          userEmail,
+          userName
+        })
+      });
+
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setReportToast({ type: 'success', message: 'Report ticket submitted successfully! Admin will respond soon.' });
+        setReportSubject('');
+        setReportMessage('');
+        if (data.report) {
+          setUserReports((prev) => [data.report, ...prev]);
+        }
+        fetchUserReports();
+      } else {
+        setReportToast({ type: 'error', message: data.message || 'Failed to submit report' });
+      }
+    } catch (e) {
+      setReportToast({ type: 'error', message: 'Network error submitting report' });
+    } finally {
+      setSubmittingReport(false);
+    }
+  };
+
+  const handleDeleteAddress = async (addrId) => {
+    if (!window.confirm('Delete this saved address?')) return;
+    try {
+      const token = localStorage.getItem('df_token');
+      let userEmail = user?.email || '';
+      if (!userEmail) {
+        try {
+          const savedUser = localStorage.getItem('df_user');
+          if (savedUser) userEmail = JSON.parse(savedUser).email || '';
+        } catch (e) {}
+      }
+      let url = `${API_URL}/api/user/addresses/${addrId}`;
+      if (userEmail) url += `?email=${encodeURIComponent(userEmail)}`;
+
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(url, { method: 'DELETE', headers });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.addresses) setUserAddresses(data.addresses);
+        else fetchUserAddresses();
+      }
+    } catch (e) {
+      console.error('Error deleting address:', e);
+    }
+  };
 
   const fetchUserOrders = async () => {
     setLoadingOrders(true);
@@ -123,17 +281,25 @@ const UserProfileModal = ({
     setAddrLoading(true);
     try {
       const token = localStorage.getItem('df_token');
+      let userEmail = user?.email || '';
+      if (!userEmail) {
+        try {
+          const savedUser = localStorage.getItem('df_user');
+          if (savedUser) userEmail = JSON.parse(savedUser).email || '';
+        } catch (e) {}
+      }
+
       const res = await fetch(`${API_URL}/api/user/address`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
         },
-        body: JSON.stringify(newAddr)
+        body: JSON.stringify({ ...newAddr, email: userEmail })
       });
       if (res.ok) {
         const updatedAddrs = await res.json();
-        setUserAddresses(updatedAddrs);
+        setUserAddresses(Array.isArray(updatedAddrs) ? updatedAddrs : []);
         setShowAddAddrForm(false);
         setNewAddr({ userName: user?.name || '', mobileNumber: user?.phone || '', address: '', landmark: '', pincode: '' });
       }
@@ -264,9 +430,34 @@ const UserProfileModal = ({
                 My Account
               </div>
             )}
-            <button className="close-btn" onClick={onClose} style={{ color: 'white' }}>
-              <X size={20} />
-            </button>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <button
+                type="button"
+                onClick={() => {
+                  onLogout();
+                  onClose();
+                }}
+                style={{
+                  background: 'rgba(239, 68, 68, 0.25)',
+                  border: '1px solid rgba(252, 165, 165, 0.5)',
+                  color: '#fca5a5',
+                  padding: '4px 10px',
+                  borderRadius: '14px',
+                  fontSize: '0.75rem',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px'
+                }}
+                title="Log Out of your account"
+              >
+                <LogOut size={14} /> Log Out
+              </button>
+              <button className="close-btn" onClick={onClose} style={{ color: 'white' }}>
+                <X size={20} />
+              </button>
+            </div>
           </div>
 
           {/* Compact User Banner */}
@@ -324,7 +515,7 @@ const UserProfileModal = ({
         </div>
 
         {/* BODY CONTAINER */}
-        <div style={{ flex: 1, overflowY: 'auto', padding: '1.1rem' }}>
+        <div className="profile-scroll-body" style={{ flex: 1, overflowY: 'auto', padding: '1.1rem', paddingBottom: 'calc(100px + env(safe-area-inset-bottom))' }}>
           {activeTab === 'menu' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
@@ -399,6 +590,23 @@ const UserProfileModal = ({
                 <Sparkles size={18} color="#2563eb" />
               </div>
 
+              {/* Report an Issue & Support Option */}
+              <div
+                onClick={() => setActiveTab('support')}
+                style={{ background: '#fff7ed', border: '1.5px solid #fed7aa', borderRadius: '12px', padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', boxShadow: '0 2px 4px rgba(0,0,0,0.04)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#ffedd5', color: '#ea580c', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <HelpCircle size={20} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.92rem', fontWeight: '800', color: '#9a3412' }}>Report an Issue & Help</div>
+                    <div style={{ fontSize: '0.75rem', color: '#c2410c' }}>Submit queries, track tickets & view admin replies</div>
+                  </div>
+                </div>
+                <ChevronRight size={18} color="#ea580c" />
+              </div>
+
               {/* Terms & Privacy Option */}
               <div
                 onClick={() => {
@@ -420,16 +628,31 @@ const UserProfileModal = ({
               </div>
 
               {/* Logout Option */}
-              <div style={{ marginTop: '0.75rem' }}>
+              <div style={{ marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px solid #e2e8f0' }}>
                 <button
-                  className="btn-outline"
+                  type="button"
                   onClick={() => {
                     onLogout();
                     onClose();
                   }}
-                  style={{ width: '100%', justifyContent: 'center', padding: '0.85rem', color: '#ef4444', borderColor: '#fca5a5', fontWeight: '700', borderRadius: '12px' }}
+                  style={{
+                    width: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '0.65rem',
+                    padding: '0.85rem 1rem',
+                    background: '#fef2f2',
+                    color: '#dc2626',
+                    border: '1.5px solid #fca5a5',
+                    borderRadius: '12px',
+                    fontSize: '0.95rem',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    boxShadow: '0 2px 6px rgba(220, 38, 38, 0.1)'
+                  }}
                 >
-                  <LogOut size={18} />
+                  <LogOut size={19} />
                   <span>Log Out of Dipto Fashion</span>
                 </button>
               </div>
@@ -759,10 +982,20 @@ const UserProfileModal = ({
               {userAddresses.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                   {userAddresses.map((addr, idx) => (
-                    <div key={idx} style={{ background: 'white', border: '1.5px solid #cbd5e1', borderRadius: '12px', padding: '1rem', boxShadow: '0 2px 4px rgba(0,0,0,0.03)' }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '0.4rem' }}>
-                        <span style={{ fontWeight: '800', fontSize: '0.95rem', color: '#0f172a' }}>{addr.userName}</span>
-                        <span style={{ fontSize: '0.8rem', background: '#e2e8f0', padding: '2px 8px', borderRadius: '10px', fontWeight: '700' }}>{addr.mobileNumber}</span>
+                    <div key={addr._id || idx} style={{ background: 'white', border: '1.5px solid #cbd5e1', borderRadius: '12px', padding: '1rem', boxShadow: '0 2px 4px rgba(0,0,0,0.03)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                        <div>
+                          <span style={{ fontWeight: '800', fontSize: '0.95rem', color: '#0f172a' }}>{addr.userName}</span>
+                          <span style={{ marginLeft: '8px', fontSize: '0.78rem', background: '#e2e8f0', color: '#334155', padding: '2px 8px', borderRadius: '10px', fontWeight: '700' }}>{addr.mobileNumber}</span>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteAddress(addr._id || idx)}
+                          style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#dc2626', padding: '3px 8px', borderRadius: '6px', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+                          title="Delete Address"
+                        >
+                          <Trash2 size={13} /> Delete
+                        </button>
                       </div>
                       <p style={{ fontSize: '0.85rem', color: '#334155', margin: 0, lineHeight: '1.4' }}>
                         {addr.address}{addr.landmark ? `, Landmark: ${addr.landmark}` : ''}, Pincode: <strong>{addr.pincode}</strong>
@@ -773,9 +1006,9 @@ const UserProfileModal = ({
               ) : (
                 <div style={{ background: 'white', borderRadius: '12px', border: '1.5px solid #cbd5e1', padding: '2rem 1rem', textAlign: 'center' }}>
                   <MapPin size={40} color="#cbd5e1" style={{ margin: '0 auto 0.75rem' }} />
-                  <p style={{ fontWeight: '700', fontSize: '0.95rem', color: '#334155' }}>No saved addresses</p>
+                  <p style={{ fontWeight: '700', fontSize: '0.95rem', color: '#334155' }}>No saved addresses found</p>
                   <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '0.25rem' }}>
-                    Click "+ Add New Address" to save your shipping location!
+                    Click "+ Add New Address" above to save your delivery location!
                   </p>
                 </div>
               )}
@@ -784,41 +1017,167 @@ const UserProfileModal = ({
 
           {activeTab === 'support' && (
             <div>
-              <h4 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#0f172a', marginBottom: '1rem' }}>
-                Help & Customer Support
+              {reportToast && <ToastNotification toast={reportToast} onClose={() => setReportToast(null)} />}
+
+              <h4 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#0f172a', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <HelpCircle size={20} color="#ea580c" /> Report an Issue & Customer Support
               </h4>
 
-              <div style={{ background: 'white', border: '1.5px solid #cbd5e1', borderRadius: '12px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-                  <div style={{ width: '42px', height: '42px', borderRadius: '10px', background: '#dcfce7', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <Phone size={22} />
-                  </div>
+              {/* SUBMIT NEW REPORT FORM */}
+              <form onSubmit={handleSubmitReport} style={{ background: 'white', border: '1.5px solid #ea580c', borderRadius: '14px', padding: '1.15rem', marginBottom: '1.5rem', boxShadow: '0 4px 12px rgba(234, 88, 12, 0.08)' }}>
+                <h5 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#9a3412', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Send size={16} color="#ea580c" /> Submit a New Support Ticket / Issue
+                </h5>
+
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem', marginBottom: '0.75rem' }}>
                   <div>
-                    <div style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a' }}>24/7 Customer Support</div>
-                    <div style={{ fontSize: '0.8rem', color: '#64748b' }}>Fast assistance for orders & delivery queries</div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.25rem' }}>
+                      Category *
+                    </label>
+                    <select
+                      value={reportCategory}
+                      onChange={(e) => setReportCategory(e.target.value)}
+                      style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.85rem', fontWeight: '700', background: 'white' }}
+                    >
+                      <option value="Order Issue">Order Issue</option>
+                      <option value="Payment Issue">Payment Issue</option>
+                      <option value="Product Quality">Product Quality</option>
+                      <option value="App Bug">App Bug</option>
+                      <option value="Other">Other Query</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.25rem' }}>
+                      Subject *
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Brief title of the issue"
+                      value={reportSubject}
+                      onChange={(e) => setReportSubject(e.target.value)}
+                      required
+                      style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.85rem' }}
+                    />
                   </div>
                 </div>
 
-                <div style={{ borderTop: '1px solid #f1f5f9', paddingTop: '0.85rem', fontSize: '0.85rem', color: '#334155' }}>
-                  <p style={{ marginBottom: '0.5rem' }}>
-                    <strong>Email Support:</strong> support@diptofashion.com
-                  </p>
-                  <p style={{ marginBottom: '0.5rem' }}>
-                    <strong>WhatsApp Helpline:</strong> +91 98765 43210
-                  </p>
-                  <p>
-                    <strong>Working Hours:</strong> Mon - Sun (9:00 AM - 10:00 PM)
-                  </p>
+                <div style={{ marginBottom: '0.85rem' }}>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '700', color: '#0f172a', marginBottom: '0.25rem' }}>
+                    Detailed Message / Description *
+                  </label>
+                  <textarea
+                    rows="3"
+                    placeholder="Describe your issue or question in detail..."
+                    value={reportMessage}
+                    onChange={(e) => setReportMessage(e.target.value)}
+                    required
+                    style={{ width: '100%', padding: '0.6rem', border: '1px solid #cbd5e1', borderRadius: '8px', fontSize: '0.85rem', lineHeight: '1.4' }}
+                  />
                 </div>
 
                 <button
-                  type="button"
-                  className="btn-primary"
-                  onClick={() => setIsAiChatOpen(true)}
-                  style={{ width: '100%', justifyContent: 'center', padding: '0.75rem', marginTop: '0.5rem' }}
+                  type="submit"
+                  disabled={submittingReport || !reportSubject.trim() || !reportMessage.trim()}
+                  style={{
+                    width: '100%',
+                    background: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.75rem',
+                    borderRadius: '10px',
+                    fontWeight: '800',
+                    fontSize: '0.9rem',
+                    cursor: submittingReport ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: '0 4px 12px rgba(234, 88, 12, 0.25)'
+                  }}
                 >
-                  <Bot size={18} /> Open Dipto AI Chatbot
+                  <Send size={16} />
+                  <span>{submittingReport ? 'Submitting Report...' : 'Submit Support Ticket'}</span>
                 </button>
+              </form>
+
+              {/* MY REPORTED TICKETS & ADMIN REPLIES LIST */}
+              <div>
+                <h5 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.75rem' }}>
+                  My Reported Tickets & Admin Replies ({userReports.length})
+                </h5>
+
+                {loadingReports ? (
+                  <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                    Loading your support tickets...
+                  </div>
+                ) : userReports.length === 0 ? (
+                  <div style={{ background: 'white', border: '1.5px solid #cbd5e1', borderRadius: '12px', padding: '1.5rem 1rem', textAlign: 'center' }}>
+                    <MessageSquare size={36} color="#cbd5e1" style={{ margin: '0 auto 0.5rem' }} />
+                    <p style={{ fontWeight: '700', fontSize: '0.9rem', color: '#334155', margin: 0 }}>No reported tickets yet</p>
+                    <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.25rem' }}>
+                      If you face any order or payment issues, submit a ticket above for fast admin support!
+                    </p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+                    {userReports.map((report) => {
+                      const isResolved = report.status === 'Resolved';
+                      const isInProgress = report.status === 'In Progress';
+
+                      return (
+                        <div key={report._id} style={{ background: 'white', border: '1.5px solid #cbd5e1', borderRadius: '14px', padding: '1rem', boxShadow: '0 2px 6px rgba(0,0,0,0.03)' }}>
+                          {/* Ticket Header */}
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '0.5rem' }}>
+                            <div>
+                              <span style={{ fontSize: '0.72rem', fontWeight: '800', color: '#ea580c', background: '#fff7ed', border: '1px solid #ffedd5', padding: '2px 8px', borderRadius: '6px' }}>
+                                {report.category}
+                              </span>
+                              <h5 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a', margin: '0.35rem 0 0 0' }}>
+                                {report.subject}
+                              </h5>
+                            </div>
+                            {isResolved ? (
+                              <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#15803d', background: '#dcfce7', border: '1px solid #86efac', padding: '2px 8px', borderRadius: '10px' }}>
+                                ✓ Resolved
+                              </span>
+                            ) : isInProgress ? (
+                              <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#1e40af', background: '#dbeafe', border: '1px solid #93c5fd', padding: '2px 8px', borderRadius: '10px' }}>
+                                ⏳ In Progress
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.75rem', fontWeight: '800', color: '#b45309', background: '#fef3c7', border: '1px solid #fde68a', padding: '2px 8px', borderRadius: '10px' }}>
+                                • Pending
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Ticket Details */}
+                          <div style={{ fontSize: '0.75rem', color: '#64748b', marginBottom: '0.5rem' }}>
+                            Submitted on {new Date(report.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </div>
+
+                          <div style={{ fontSize: '0.85rem', color: '#334155', background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.75rem', borderRadius: '8px', lineHeight: '1.4', whiteSpace: 'pre-wrap' }}>
+                            "{report.message}"
+                          </div>
+
+                          {/* ADMIN REPLY CALLOUT BOX */}
+                          {report.adminReply && (
+                            <div style={{ marginTop: '0.75rem', background: '#eff6ff', border: '1.5px solid #93c5fd', borderRadius: '10px', padding: '0.85rem', color: '#1e40af' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.82rem', fontWeight: '800', color: '#1d4ed8', marginBottom: '0.35rem' }}>
+                                <MessageSquare size={16} color="#2563eb" />
+                                <span>Official Admin Reply {report.repliedAt ? `• ${new Date(report.repliedAt).toLocaleDateString()}` : ''}</span>
+                              </div>
+                              <p style={{ fontSize: '0.85rem', color: '#1e3a8a', margin: 0, lineHeight: '1.45', whiteSpace: 'pre-wrap', fontWeight: '600' }}>
+                                {report.adminReply}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             </div>
           )}

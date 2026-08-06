@@ -18,6 +18,7 @@ import LiveSale from './models/LiveSale.js';
 import Coupon from './models/Coupon.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
+import reportRoutes from './routes/reportRoutes.js';
 
 dotenv.config();
 
@@ -43,10 +44,14 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Register Notification API Router (Top Priority BEFORE Health or Fallbacks)
+// Register Notification & Report API Routers (Top Priority BEFORE Health or Fallbacks)
 app.use('/api/notifications', notificationRoutes);
 app.use('/notifications', notificationRoutes);
 app.use('/api/admin/notifications', notificationRoutes);
+
+app.use('/api/reports', reportRoutes);
+app.use('/api/admin/reports', reportRoutes);
+app.use('/reports', reportRoutes);
 
 // Root Health Check Endpoints
 app.get(['/', '/health'], (req, res) => {
@@ -257,45 +262,76 @@ app.post('/api/auth/login', async (req, res) => {
 
 // --- ADDRESS ROUTES ---
 
-app.get('/api/user/addresses', async (req, res) => {
+import Report from './models/Report.js';
+
+const memoryReports = [];
+
+app.get(['/api/user/addresses', '/api/user/address', '/api/addresses'], async (req, res) => {
+  let userId = null;
   const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ message: 'Unauthorized' });
-  const token = authHeader.split(' ')[1];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.verify(token, JWT_SECRET);
+      userId = decoded.userId;
+    } catch (e) {}
+  }
+
+  const emailParam = req.query.email || req.query.userEmail;
+
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
     if (isMongoConnected()) {
-      const user = await User.findById(decoded.userId);
-      return res.json(user ? user.addresses : []);
+      let user = null;
+      if (userId) user = await User.findById(userId);
+      else if (emailParam) user = await User.findOne({ email: new RegExp(`^${emailParam.trim()}$`, 'i') });
+
+      return res.json(user ? user.addresses || [] : []);
     } else {
-      const user = memoryUsers.find(u => u._id === decoded.userId);
+      let user = null;
+      if (userId) user = memoryUsers.find(u => u._id === userId);
+      else if (emailParam) user = memoryUsers.find(u => u.email.toLowerCase() === emailParam.trim().toLowerCase());
+
       return res.json(user ? user.addresses || [] : []);
     }
   } catch (e) {
-    res.status(401).json({ message: 'Invalid token' });
+    res.json([]);
   }
 });
 
-app.post('/api/user/addresses', async (req, res) => {
+app.post(['/api/user/addresses', '/api/user/address', '/api/addresses'], async (req, res) => {
+  let userId = null;
   const authHeader = req.headers.authorization;
-  if (!authHeader) return res.status(401).json({ message: 'Unauthorized' });
-  const token = authHeader.split(' ')[1];
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.verify(token, JWT_SECRET);
+      userId = decoded.userId;
+    } catch (e) {}
+  }
+
   try {
-    const decoded = jwt.verify(token, JWT_SECRET);
-    const { userName, mobileNumber, address, landmark, pincode } = req.body;
+    const { userName, mobileNumber, address, landmark, pincode, email: bodyEmail } = req.body;
     if (!userName || !mobileNumber || !address || !pincode) {
       return res.status(400).json({ message: 'Missing required address fields' });
     }
 
+    const emailParam = bodyEmail || req.query.email;
     const newAddr = { userName, mobileNumber, address, landmark: landmark || '', pincode, isDefault: true };
 
     if (isMongoConnected()) {
-      const user = await User.findById(decoded.userId);
+      let user = null;
+      if (userId) user = await User.findById(userId);
+      else if (emailParam) user = await User.findOne({ email: new RegExp(`^${emailParam.trim()}$`, 'i') });
+
       if (!user) return res.status(404).json({ message: 'User not found' });
       user.addresses.push(newAddr);
       await user.save();
       return res.json(user.addresses);
     } else {
-      const user = memoryUsers.find(u => u._id === decoded.userId);
+      let user = null;
+      if (userId) user = memoryUsers.find(u => u._id === userId);
+      else if (emailParam) user = memoryUsers.find(u => u.email.toLowerCase() === emailParam.trim().toLowerCase());
+
       if (user) {
         if (!user.addresses) user.addresses = [];
         user.addresses.push({ _id: 'addr_' + Date.now(), ...newAddr });
@@ -304,7 +340,49 @@ app.post('/api/user/addresses', async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
   } catch (e) {
-    res.status(401).json({ message: 'Invalid token' });
+    res.status(500).json({ message: e.message });
+  }
+});
+
+app.delete(['/api/user/addresses/:id', '/api/user/address/:id', '/api/addresses/:id'], async (req, res) => {
+  try {
+    let userId = null;
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        userId = decoded.userId;
+      } catch (e) {}
+    }
+
+    const { id } = req.params;
+    const emailParam = req.query.email || req.query.userEmail;
+
+    if (isMongoConnected()) {
+      let user = null;
+      if (userId) user = await User.findById(userId);
+      else if (emailParam) user = await User.findOne({ email: new RegExp(`^${emailParam.trim()}$`, 'i') });
+
+      if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+      user.addresses = user.addresses.filter(a => String(a._id) !== String(id));
+      await user.save();
+      return res.json({ success: true, addresses: user.addresses });
+    } else {
+      let user = null;
+      if (userId) user = memoryUsers.find(u => u._id === userId);
+      else if (emailParam) user = memoryUsers.find(u => u.email.toLowerCase() === emailParam.trim().toLowerCase());
+
+      if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+      if (user.addresses) {
+        user.addresses = user.addresses.filter(a => String(a._id) !== String(id));
+      }
+      return res.json({ success: true, addresses: user.addresses || [] });
+    }
+  } catch (err) {
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 

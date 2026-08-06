@@ -12,6 +12,7 @@ import UserProfileModal from './components/UserProfileModal';
 import NotificationModal from './components/NotificationModal';
 import LiveSaleBanner from './components/LiveSaleBanner';
 import AdminPanel from './components/Admin/AdminPanel';
+import MobileBottomNav from './components/MobileBottomNav';
 import ProductGridSkeleton from './components/Skeletons/ProductGridSkeleton';
 import { fetchWithCache } from './utils/cache';
 import { API_URL, apiFetch, parseResponseSafely } from './api';
@@ -530,6 +531,37 @@ function App() {
     } catch (e) {}
   };
 
+  const closeAllModals = () => {
+    setIsCartOpen(false);
+    setIsCheckoutOpen(false);
+    setIsPaymentOpen(false);
+    setIsProfileOpen(false);
+    setIsAuthOpen(false);
+    setIsDetailOpen(false);
+    setIsNotificationsOpen(false);
+    setIsLightboxOpen(false);
+  };
+
+  const handleMobileHomeClick = () => {
+    closeAllModals();
+    setSelectedCategory('All');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleMobileAccountClick = () => {
+    closeAllModals();
+    if (user) {
+      setIsProfileOpen(true);
+    } else {
+      setIsAuthOpen(true);
+    }
+  };
+
+  const handleMobileCartClick = () => {
+    closeAllModals();
+    setIsCartOpen(true);
+  };
+
   // Keyboard Escape & Browser Back Button (popstate) Handler for active modals
   useEffect(() => {
     const handlePopState = () => {
@@ -772,6 +804,24 @@ function App() {
         onMarkSingleAsRead={handleMarkSingleAsRead}
         onNavigateToShop={() => setView('shop')}
       />
+
+      {/* Mobile-Only Fixed Bottom Navigation Bar (Home, Account, Cart) */}
+      {currentView === 'shop' && (
+        <MobileBottomNav
+          activeTab={
+            (isCartOpen || isCheckoutOpen || isPaymentOpen)
+              ? 'cart'
+              : (isProfileOpen || isAuthOpen)
+              ? 'account'
+              : 'home'
+          }
+          onHomeClick={handleMobileHomeClick}
+          onAccountClick={handleMobileAccountClick}
+          onCartClick={handleMobileCartClick}
+          cartCount={cartItems.reduce((acc, item) => acc + item.quantity, 0)}
+          isLoggedIn={Boolean(user)}
+        />
+      )}
     </div>
   );
 }

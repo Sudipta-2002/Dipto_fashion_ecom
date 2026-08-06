@@ -9,7 +9,8 @@ const ExpandableSearchBar = ({
   onSelectProduct,
   onSearchSubmit,
   placeholder = 'Search Sarees, Punjabi Suits, Collections...',
-  expandedMaxWidth = 'min(750px, 85vw)'
+  expandedMaxWidth = 'min(750px, 85vw)',
+  isMobileFullWidth = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -89,6 +90,143 @@ const ExpandableSearchBar = ({
     setIsOpen(false);
     setShowSuggestions(false);
   };
+
+  if (isMobileFullWidth) {
+    return (
+      <div ref={containerRef} style={{ position: 'relative', width: '100%' }}>
+        <div style={{ position: 'relative', display: 'flex', alignItems: 'center', width: '100%' }}>
+          <Search
+            size={18}
+            style={{
+              position: 'absolute',
+              left: '12px',
+              color: '#c026d3',
+              pointerEvents: 'none'
+            }}
+          />
+          <input
+            ref={inputRef}
+            type="text"
+            placeholder={placeholder}
+            value={searchTerm}
+            onFocus={() => setShowSuggestions(true)}
+            onKeyDown={handleKeyDown}
+            onChange={(e) => {
+              if (setSearchTerm) setSearchTerm(e.target.value);
+              setShowSuggestions(true);
+            }}
+            style={{
+              width: '100%',
+              padding: '0.55rem 2.2rem 0.55rem 2.35rem',
+              border: '1.5px solid #e2e8f0',
+              borderRadius: '20px',
+              fontSize: '0.86rem',
+              fontWeight: '600',
+              background: '#f8fafc',
+              outline: 'none',
+              color: '#0f172a',
+              boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.03)'
+            }}
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={handleClear}
+              style={{
+                position: 'absolute',
+                right: '10px',
+                background: '#cbd5e1',
+                border: 'none',
+                borderRadius: '50%',
+                width: '20px',
+                height: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                fontSize: '0.72rem',
+                color: '#334155'
+              }}
+            >
+              ✕
+            </button>
+          )}
+        </div>
+
+        {/* DYNAMIC SUGGESTIONS DROPDOWN FOR MOBILE */}
+        {showSuggestions && query && (matchedCategories.length > 0 || matchedProducts.length > 0) && (
+          <div
+            className="expandable-search-suggestions"
+            style={{
+              position: 'absolute',
+              top: 'calc(100% + 6px)',
+              left: 0,
+              right: 0,
+              background: '#ffffff',
+              border: '1.5px solid #f0abfc',
+              borderRadius: '14px',
+              boxShadow: '0 10px 28px rgba(192, 38, 211, 0.2), 0 4px 12px rgba(0,0,0,0.1)',
+              zIndex: 1000,
+              maxHeight: '340px',
+              overflowY: 'auto',
+              padding: '0.5rem 0'
+            }}
+          >
+            {matchedCategories.length > 0 && (
+              <div>
+                <div style={{ padding: '0.35rem 0.85rem', fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>
+                  Categories
+                </div>
+                {matchedCategories.map((cat) => (
+                  <div
+                    key={cat}
+                    onClick={() => handleSelectSuggestion(cat)}
+                    style={{ padding: '0.5rem 0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '700', color: '#0f172a' }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                      <Search size={14} color="#c026d3" />
+                      <span>{cat}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {matchedProducts.length > 0 && (
+              <div style={{ borderTop: matchedCategories.length > 0 ? '1px solid #f1f5f9' : 'none', marginTop: matchedCategories.length > 0 ? '0.3rem' : 0, paddingTop: matchedCategories.length > 0 ? '0.3rem' : 0 }}>
+                <div style={{ padding: '0.35rem 0.85rem', fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>
+                  Matching Products ({matchedProducts.length})
+                </div>
+                {matchedProducts.map((prod) => {
+                  const prodImg = (prod.images && prod.images[0]) || prod.image;
+                  return (
+                    <div
+                      key={prod._id || prod.id}
+                      onClick={() => handleProductClick(prod)}
+                      style={{ padding: '0.5rem 0.85rem', display: 'flex', alignItems: 'center', gap: '0.65rem', cursor: 'pointer' }}
+                    >
+                      {prodImg && (
+                        <img src={prodImg} alt="" style={{ width: '32px', height: '32px', borderRadius: '6px', objectFit: 'cover' }} />
+                      )}
+                      <div style={{ flex: 1, overflow: 'hidden' }}>
+                        <div style={{ fontSize: '0.84rem', fontWeight: '700', color: '#0f172a', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                          {prod.name}
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: '#c026d3', fontWeight: '800' }}>
+                          ₹{prod.price?.toLocaleString('en-IN')}
+                        </div>
+                      </div>
+                      <ArrowUpRight size={14} color="#94a3b8" />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div ref={containerRef} className="expandable-search-container" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
