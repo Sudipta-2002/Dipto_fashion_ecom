@@ -1,32 +1,36 @@
 import mongoose from 'mongoose';
 
 const orderItemSchema = new mongoose.Schema({
-  product: { type: mongoose.Schema.Types.ObjectId, ref: 'Product', required: true },
+  product: { type: mongoose.Schema.Types.Mixed, required: false },
   name: { type: String, required: true },
-  quantity: { type: Number, required: true },
+  quantity: { type: Number, required: true, default: 1 },
   price: { type: Number, required: true },
-  mrp: { type: Number },
-  image: { type: String, required: true },
+  mrp: { type: Number, default: 0 },
+  image: { type: String, default: '' },
   selectedSize: { type: String, default: '' }
-});
+}, { _id: false });
 
 const orderSchema = new mongoose.Schema({
-  orderId: { type: String, required: true, unique: true },
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  userName: { type: String, required: true },
-  userEmail: { type: String },
+  orderId: { type: String, required: true, index: true },
+  user: { type: mongoose.Schema.Types.Mixed, required: false },
+  userName: { type: String, default: 'Customer' },
+  userEmail: { type: String, default: '' },
   shippingAddress: {
-    userName: { type: String, required: true },
-    mobileNumber: { type: String, required: true },
-    address: { type: String, required: true },
-    landmark: { type: String },
-    pincode: { type: String, required: true }
+    userName: { type: String, default: 'Customer' },
+    mobileNumber: { type: String, default: '' },
+    address: { type: String, default: '' },
+    landmark: { type: String, default: '' },
+    pincode: { type: String, default: '' }
   },
   items: [orderItemSchema],
   totalAmount: { type: Number, required: true },
   couponCode: { type: String, default: '' },
   couponDiscount: { type: Number, default: 0 },
-  utrNumber: { type: String, required: true },
+  utrNumber: { type: String, default: 'N/A' },
+  paymentMethod: { type: String, default: 'UPI_QR' },
+  razorpayOrderId: { type: String, default: '' },
+  razorpayPaymentId: { type: String, default: '' },
+  razorpaySignature: { type: String, default: '' },
   status: { 
     type: String, 
     enum: ['Pending Verification', 'Accepted', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Rejected', 'Return Requested', 'Return Approved', 'Refund Completed'], 

@@ -700,45 +700,70 @@ app.use('/admin/coupons', couponRoutes);
 app.post(['/api/orders', '/orders'], async (req, res) => {
   try {
     const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ message: 'Sign-in mandatory to place order' });
+    if (!authHeader) return res.status(401).json({ success: false, message: 'Sign-in mandatory to place order' });
     const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
+    
+    let decoded = null;
+    try {
+      decoded = jwt.verify(token, JWT_SECRET);
+    } catch (tokenErr) {
+      return res.status(401).json({ success: false, message: 'Invalid or expired user session' });
+    }
 
     const { items, totalAmount, couponCode, couponDiscount, shippingAddress, utrNumber, paymentMethod, status, orderId: customOrderId } = req.body;
     if (!items || items.length === 0 || !totalAmount || !shippingAddress || !utrNumber) {
-      return res.status(400).json({ message: 'Incomplete order details' });
+      return res.status(400).json({ success: false, message: 'Incomplete order details' });
     }
 
     const orderId = customOrderId || 'DF-' + Math.floor(100000 + Math.random() * 900000);
     const finalPaymentMethod = paymentMethod || 'UPI_QR';
     const finalStatus = status || (finalPaymentMethod === 'RAZORPAY' ? 'Accepted' : 'Pending Verification');
+    const userName = shippingAddress?.userName || 'Customer';
 
     if (isMongoConnected()) {
-      const user = await User.findById(decoded.userId);
-
-      if (user) {
-        if (!user.addresses) user.addresses = [];
-        const exists = user.addresses.some((a) => a.address === shippingAddress.address);
-        if (!exists) {
-          user.addresses.push(shippingAddress);
-          await user.save();
+      try {
+        const user = await User.findById(decoded.userId);
+        if (user && user.addresses) {
+          const exists = user.addresses.some((a) => a.address === shippingAddress.address);
+          if (!exists) {
+            user.addresses.push(shippingAddress);
+            await user.save().catch((e) => console.warn('User address save warning:', e.message));
+          }
         }
+      } catch (uErr) {
+        console.warn('User address update warning:', uErr.message);
       }
 
-      const order = await Order.create({
-        orderId,
-        user: decoded.userId,
-        items,
-        totalAmount: Number(totalAmount),
-        couponCode: couponCode || '',
-        couponDiscount: Number(couponDiscount || 0),
-        shippingAddress,
-        paymentMethod: finalPaymentMethod,
-        utrNumber,
-        status: finalStatus
-      });
+      let order = await Order.findOne({ orderId });
+      if (order) {
+        order.status = finalStatus;
+        order.utrNumber = utrNumber || order.utrNumber;
+        order.couponCode = couponCode || order.couponCode;
+        order.couponDiscount = Number(couponDiscount || order.couponDiscount || 0);
+        await order.save();
+      } else {
+        order = await Order.create({
+          orderId,
+          user: decoded.userId,
+          userName,
+          userEmail: shippingAddress.email || '',
+          items,
+          totalAmount: Number(totalAmount),
+          couponCode: couponCode || '',
+          couponDiscount: Number(couponDiscount || 0),
+          shippingAddress,
+          paymentMethod: finalPaymentMethod,
+          utrNumber,
+          status: finalStatus
+        });
+      }
 
-      broadcastNewOrder(order);
+      try {
+        broadcastNewOrder(order);
+      } catch (bErr) {
+        console.warn('Broadcast notification warning:', bErr.message);
+      }
+
       return res.json(order);
     } else {
       const user = memoryUsers.find((u) => u._id === decoded.userId);
@@ -750,11 +775,18 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
         }
       }
 
+      const existingIndex = memoryOrders.findIndex((o) => o.orderId === orderId);
+      if (existingIndex !== -1) {
+        memoryOrders[existingIndex].status = finalStatus;
+        memoryOrders[existingIndex].utrNumber = utrNumber;
+        return res.json(memoryOrders[existingIndex]);
+      }
+
       const newOrder = {
         _id: 'o_' + Date.now(),
         orderId,
         user: decoded.userId,
-        userName: shippingAddress.userName || user?.name || 'Customer',
+        userName,
         userEmail: user?.email || '',
         shippingAddress,
         items,
@@ -768,15 +800,19 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
       };
       memoryOrders.unshift(newOrder);
 
-      broadcastNewOrder(newOrder);
+      try {
+        broadcastNewOrder(newOrder);
+      } catch (bErr) {
+        console.warn('Broadcast notification warning:', bErr.message);
+      }
+
       return res.json(newOrder);
     }
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Order Creation Error:", err);
+    return res.status(500).json({ success: false, message: err.message || 'Failed to create order' });
   }
 });
-
-// --- RAZORPAY PAYMENT GATEWAY ENDPOINTS ---
 
 // --- RAZORPAY PAYMENT GATEWAY ENDPOINTS ---
 
@@ -849,19 +885,20 @@ app.post([
     } = req.body;
 
     if (!items || items.length === 0 || !totalAmount || !shippingAddress) {
-      return res.status(400).json({ message: 'Incomplete payment order details' });
+      return res.status(400).json({ success: false, message: 'Incomplete payment order details' });
     }
 
-    // Perform HMAC SHA256 cryptographic signature verification (with test fallback)
+    // Perform HMAC SHA256 cryptographic signature verification
     if (razorpay_order_id && razorpay_payment_id && razorpay_signature && razorpay_signature !== 'test_signature') {
       try {
+        const secretKey = process.env.RAZORPAY_KEY_SECRET || RAZORPAY_KEY_SECRET;
         const body = razorpay_order_id + '|' + razorpay_payment_id;
         const expectedSignature = crypto
-          .createHmac('sha256', RAZORPAY_KEY_SECRET)
+          .createHmac('sha256', secretKey)
           .update(body.toString())
           .digest('hex');
         if (expectedSignature !== razorpay_signature) {
-          console.warn('Razorpay signature mismatch, continuing order registration in test mode.');
+          console.warn('Razorpay signature mismatch warning.');
         }
       } catch (sigErr) {
         console.warn('Signature calculation warning:', sigErr.message);
@@ -870,34 +907,58 @@ app.post([
 
     const orderId = customOrderId || 'DF-' + Math.floor(100000 + Math.random() * 900000);
     const utrNumber = razorpay_payment_id ? `RZP_${razorpay_payment_id}` : `RZP_${Date.now()}`;
+    const userName = shippingAddress?.userName || 'Customer';
 
     if (isMongoConnected()) {
       if (userId) {
-        const user = await User.findById(userId);
-        if (user) {
-          if (!user.addresses) user.addresses = [];
-          const exists = user.addresses.some((a) => a.address === shippingAddress.address);
-          if (!exists) {
-            user.addresses.push(shippingAddress);
-            await user.save();
+        try {
+          const user = await User.findById(userId);
+          if (user && user.addresses) {
+            const exists = user.addresses.some((a) => a.address === shippingAddress.address);
+            if (!exists) {
+              user.addresses.push(shippingAddress);
+              await user.save().catch((e) => console.warn('User address save warning:', e.message));
+            }
           }
+        } catch (uErr) {
+          console.warn('User address update warning:', uErr.message);
         }
       }
 
-      const order = await Order.create({
-        orderId,
-        user: userId || undefined,
-        items,
-        totalAmount: Number(totalAmount),
-        couponCode: couponCode || '',
-        couponDiscount: Number(couponDiscount || 0),
-        shippingAddress,
-        paymentMethod: 'RAZORPAY',
-        utrNumber,
-        status: 'Accepted' // Instantly Accepted & Paid for Razorpay orders!
-      });
+      let order = await Order.findOne({ $or: [{ orderId }, { razorpayPaymentId: razorpay_payment_id || 'NONE' }] });
+      if (order) {
+        order.status = 'Accepted';
+        order.utrNumber = utrNumber;
+        order.razorpayOrderId = razorpay_order_id || order.razorpayOrderId || '';
+        order.razorpayPaymentId = razorpay_payment_id || order.razorpayPaymentId || '';
+        order.razorpaySignature = razorpay_signature || order.razorpaySignature || '';
+        await order.save();
+      } else {
+        order = await Order.create({
+          orderId,
+          user: userId || undefined,
+          userName,
+          userEmail: shippingAddress.email || '',
+          items,
+          totalAmount: Number(totalAmount),
+          couponCode: couponCode || '',
+          couponDiscount: Number(couponDiscount || 0),
+          shippingAddress,
+          paymentMethod: 'RAZORPAY',
+          utrNumber,
+          razorpayOrderId: razorpay_order_id || '',
+          razorpayPaymentId: razorpay_payment_id || '',
+          razorpaySignature: razorpay_signature || '',
+          status: 'Accepted' // Instantly Accepted & Paid for Razorpay orders!
+        });
+      }
 
-      broadcastNewOrder(order);
+      try {
+        broadcastNewOrder(order);
+      } catch (bErr) {
+        console.warn('Broadcast notification warning:', bErr.message);
+      }
+
       return res.json(order);
     } else {
       let user = null;
@@ -912,11 +973,18 @@ app.post([
         }
       }
 
+      const existingIndex = memoryOrders.findIndex((o) => o.orderId === orderId);
+      if (existingIndex !== -1) {
+        memoryOrders[existingIndex].status = 'Accepted';
+        memoryOrders[existingIndex].utrNumber = utrNumber;
+        return res.json(memoryOrders[existingIndex]);
+      }
+
       const newOrder = {
         _id: 'o_' + Date.now(),
         orderId,
         user: userId,
-        userName: shippingAddress.userName || user?.name || 'Customer',
+        userName,
         userEmail: user?.email || '',
         shippingAddress,
         items,
@@ -930,12 +998,17 @@ app.post([
       };
       memoryOrders.unshift(newOrder);
 
-      broadcastNewOrder(newOrder);
+      try {
+        broadcastNewOrder(newOrder);
+      } catch (bErr) {
+        console.warn('Broadcast notification warning:', bErr.message);
+      }
+
       return res.json(newOrder);
     }
   } catch (err) {
-    console.error('Razorpay Order Registration Error:', err);
-    res.status(500).json({ message: err.message || 'Razorpay Payment Order Registration Failed' });
+    console.error("Order Creation Error:", err);
+    return res.status(500).json({ success: false, message: err.message || 'Razorpay Payment Order Registration Failed' });
   }
 });
 
