@@ -13,7 +13,7 @@ const productSchema = new mongoose.Schema({
   mrp: { type: Number, required: true },
   price: { type: Number, required: true },
   quantity: { type: Number, required: true, default: 10 },
-  remainingStock: { type: Number },
+  remainingStock: { type: Number, required: true, default: 10 },
   images: [{ type: String, required: true }],
   image: { type: String },
   rating: { type: Number, default: 4.5 },

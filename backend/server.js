@@ -44,6 +44,15 @@ app.use(cors({
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
+// Global POST Request Diagnostics Logger
+app.use((req, res, next) => {
+  if (req.method === 'POST') {
+    const bodyKeys = req.body && typeof req.body === 'object' ? Object.keys(req.body) : [];
+    console.log(`[INCOMING POST REQUEST]: ${req.url} | Body Keys: ${bodyKeys.join(', ') || '(empty)'}`);
+  }
+  next();
+});
+
 // Register Notification & Report API Routers (Top Priority BEFORE Health or Fallbacks)
 app.use('/api/notifications', notificationRoutes);
 app.use('/notifications', notificationRoutes);
@@ -812,58 +821,70 @@ app.use('/admin/coupons', couponRoutes);
 
 // --- INVENTORY REMAINING STOCK SYSTEM HELPERS ---
 
-const findProductByItem = async (item) => {
-  if (!item) return null;
-  const rawId = item.productId || item._id || item.id || (typeof item.product === 'object' ? (item.product._id || item.product.id) : item.product);
+const extractOrderItems = (input) => {
+  if (!input) return [];
+  let rawList = [];
 
-  if (isMongoConnected()) {
-    if (rawId) {
-      try {
-        const prod = await Product.findById(rawId);
-        if (prod) return prod;
-      } catch (err) {}
-    }
-    if (item.name) {
-      try {
-        const prod = await Product.findOne({ name: item.name });
-        if (prod) return prod;
-      } catch (err) {}
-    }
-  } else {
-    if (rawId) {
-      const prod = memoryProducts.find((p) => String(p._id || p.id) === String(rawId));
-      if (prod) return prod;
-    }
-    if (item.name) {
-      const prod = memoryProducts.find((p) => p.name === item.name);
-      if (prod) return prod;
-    }
+  if (Array.isArray(input)) {
+    rawList = input;
+  } else if (typeof input === 'object') {
+    if (Array.isArray(input.items)) rawList = input.items;
+    else if (Array.isArray(input.cartItems)) rawList = input.cartItems;
+    else if (Array.isArray(input.products)) rawList = input.products;
+    else if (Array.isArray(input.orderItems)) rawList = input.orderItems;
+    else if (Array.isArray(input.cart)) rawList = input.cart;
+    else if (input.body && Array.isArray(input.body.items)) rawList = input.body.items;
   }
-  return null;
+
+  if (!Array.isArray(rawList)) return [];
+
+  return rawList.map((item) => {
+    if (!item) return null;
+    const targetId = item.productId || item.product?._id || item.product || item._id || item.id || null;
+    const qty = Number(item.qty || item.quantity || item.count || 1);
+    const name = item.name || item.title || item.productName || item.product?.name || '';
+    return { targetId, productId: targetId, qty, quantity: qty, name, raw: item };
+  }).filter(Boolean);
 };
 
-const checkStockValidation = async (items) => {
-  if (!items || !Array.isArray(items) || items.length === 0) return { valid: true };
+const checkStockValidation = async (input) => {
+  const extractedItems = extractOrderItems(input);
+  if (extractedItems.length === 0) return { valid: true };
 
-  for (const item of items) {
-    const reqQty = Number(item.quantity) || 1;
-    const prod = await findProductByItem(item);
+  for (const item of extractedItems) {
+    const reqQty = item.qty;
     let available = 10;
-    if (prod) {
-      available = prod.remainingStock !== undefined && prod.remainingStock !== null ? prod.remainingStock : prod.quantity;
+    let prod = null;
+
+    if (isMongoConnected()) {
+      if (item.targetId) {
+        prod = await Product.findById(item.targetId).catch(() => null);
+      }
+      if (!prod && item.name) {
+        prod = await Product.findOne({ name: item.name }).catch(() => null);
+      }
+      if (prod) {
+        available = prod.remainingStock !== undefined && prod.remainingStock !== null ? prod.remainingStock : prod.quantity;
+      }
+    } else {
+      prod = memoryProducts.find((p) => String(p._id || p.id) === String(item.targetId)) || memoryProducts.find((p) => p.name === item.name);
+      if (prod) {
+        available = prod.remainingStock !== undefined && prod.remainingStock !== null ? prod.remainingStock : prod.quantity;
+      }
     }
 
-    if (available < reqQty) {
+    if (reqQty > available) {
       const prodName = prod ? prod.name : (item.name || 'Product');
-      return { valid: false, message: `Insufficient stock for ${prodName}` };
+      return { valid: false, message: `Insufficient stock for ${prodName}. Requested: ${reqQty}, Available: ${available}` };
     }
   }
 
   return { valid: true };
 };
 
-const deductRemainingStock = async (orderRef, items) => {
-  if (!items || !Array.isArray(items) || items.length === 0) return;
+const deductRemainingStock = async (orderRef, itemsInput) => {
+  const extractedItems = extractOrderItems(itemsInput || orderRef);
+  if (extractedItems.length === 0) return;
 
   let orderObj = null;
   let orderIdStr = typeof orderRef === 'string' ? orderRef : (orderRef?.orderId || orderRef?._id || 'ORDER');
@@ -871,7 +892,7 @@ const deductRemainingStock = async (orderRef, items) => {
   if (isMongoConnected()) {
     if (typeof orderRef === 'string') {
       orderObj = await Order.findOne({ $or: [{ _id: orderRef }, { orderId: orderRef }] }).catch(() => null);
-    } else {
+    } else if (typeof orderRef === 'object' && orderRef.save) {
       orderObj = orderRef;
     }
 
@@ -884,29 +905,54 @@ const deductRemainingStock = async (orderRef, items) => {
     return;
   }
 
-  for (const item of items) {
-    const qtyDeduct = Number(item.quantity) || 1;
-    const prod = await findProductByItem(item);
+  for (const item of extractedItems) {
+    const qtyToDeduct = item.qty;
+    const targetId = item.targetId;
+    let updatedProduct = null;
 
-    if (prod) {
-      const prevRem = prod.remainingStock !== undefined && prod.remainingStock !== null ? prod.remainingStock : prod.quantity;
-      const newRem = Math.max(0, prevRem - qtyDeduct);
-      prod.remainingStock = newRem;
-
-      if (isMongoConnected() && typeof prod.save === 'function') {
-        await prod.save();
+    if (isMongoConnected()) {
+      if (targetId) {
+        try {
+          updatedProduct = await Product.findByIdAndUpdate(
+            targetId,
+            { $inc: { remainingStock: -qtyToDeduct, quantity: -qtyToDeduct } },
+            { new: true }
+          );
+        } catch (err) {}
       }
 
-      console.log(`========================================`);
-      console.log(`[STOCK DEDUCTION EXECUTED]`);
-      console.log(`Order ID: ${orderIdStr}`);
-      console.log(`Product ID: ${prod._id || prod.id}`);
-      console.log(`Ordered Quantity: ${qtyDeduct}`);
-      console.log(`Previous remainingStock: ${prevRem}`);
-      console.log(`New remainingStock: ${newRem}`);
-      console.log(`========================================`);
+      if (!updatedProduct && item.name) {
+        try {
+          updatedProduct = await Product.findOneAndUpdate(
+            { name: item.name },
+            { $inc: { remainingStock: -qtyToDeduct, quantity: -qtyToDeduct } },
+            { new: true }
+          );
+        } catch (err) {}
+      }
+
+      if (updatedProduct) {
+        // Enforce non-negative bounds
+        if (updatedProduct.remainingStock < 0 || updatedProduct.quantity < 0) {
+          updatedProduct.remainingStock = Math.max(0, updatedProduct.remainingStock);
+          updatedProduct.quantity = Math.max(0, updatedProduct.quantity);
+          await updatedProduct.save().catch(() => {});
+        }
+        console.log(`========================================`);
+        console.log(`[FORCE DEDUCT SUCCESS] Product ID: ${updatedProduct._id} | New remainingStock: ${updatedProduct.remainingStock} | New quantity: ${updatedProduct.quantity}`);
+        console.log(`========================================`);
+      } else {
+        console.warn(`[DB DEDUCTION FAILED] Product not found in MongoDB for targetId: ${targetId} or name: ${item.name}`);
+      }
     } else {
-      console.warn(`[STOCK DEDUCTION FAILED] Product not found for item:`, item.name || item);
+      const prod = memoryProducts.find((p) => String(p._id || p.id) === String(targetId)) || memoryProducts.find((p) => p.name === item.name);
+      if (prod) {
+        const prevRem = prod.remainingStock !== undefined && prod.remainingStock !== null ? prod.remainingStock : prod.quantity;
+        const prevTotal = prod.quantity !== undefined ? prod.quantity : 10;
+        prod.remainingStock = Math.max(0, prevRem - qtyToDeduct);
+        prod.quantity = Math.max(0, prevTotal - qtyToDeduct);
+        console.log(`[MEM FORCE DEDUCT SUCCESS] Product ID: ${prod._id || prod.id} | New remainingStock: ${prod.remainingStock} | New quantity: ${prod.quantity}`);
+      }
     }
   }
 
@@ -918,8 +964,9 @@ const deductRemainingStock = async (orderRef, items) => {
   }
 };
 
-const restoreRemainingStock = async (orderRef, items, reasonType = 'Cancellation') => {
-  if (!items || !Array.isArray(items) || items.length === 0) return;
+const restoreRemainingStock = async (orderRef, itemsInput, reasonType = 'Cancellation') => {
+  const extractedItems = extractOrderItems(itemsInput || orderRef);
+  if (extractedItems.length === 0) return;
 
   let orderObj = null;
   let orderIdStr = typeof orderRef === 'string' ? orderRef : (orderRef?.orderId || orderRef?._id || 'ORDER');
@@ -927,7 +974,7 @@ const restoreRemainingStock = async (orderRef, items, reasonType = 'Cancellation
   if (isMongoConnected()) {
     if (typeof orderRef === 'string') {
       orderObj = await Order.findOne({ $or: [{ _id: orderRef }, { orderId: orderRef }] }).catch(() => null);
-    } else {
+    } else if (typeof orderRef === 'object' && orderRef.save) {
       orderObj = orderRef;
     }
 
@@ -944,27 +991,50 @@ const restoreRemainingStock = async (orderRef, items, reasonType = 'Cancellation
     if (reasonType === 'ReturnApproved' && orderRef.returnStockRestored) return;
   }
 
-  for (const item of items) {
-    const qtyRestore = Number(item.quantity) || 1;
-    const prod = await findProductByItem(item);
+  for (const item of extractedItems) {
+    const qtyToRestore = item.qty;
+    const targetId = item.targetId;
+    let updatedProduct = null;
 
-    if (prod) {
-      const prevRem = prod.remainingStock !== undefined && prod.remainingStock !== null ? prod.remainingStock : prod.quantity;
-      const newRem = prevRem + qtyRestore;
-      prod.remainingStock = newRem;
-
-      if (isMongoConnected() && typeof prod.save === 'function') {
-        await prod.save();
+    if (isMongoConnected()) {
+      if (targetId) {
+        try {
+          updatedProduct = await Product.findByIdAndUpdate(
+            targetId,
+            { $inc: { remainingStock: qtyToRestore, quantity: qtyToRestore } },
+            { new: true }
+          );
+        } catch (err) {}
       }
 
-      console.log(`========================================`);
-      console.log(`[STOCK RESTORATION EXECUTED (${reasonType})]`);
-      console.log(`Order ID: ${orderIdStr}`);
-      console.log(`Product ID: ${prod._id || prod.id}`);
-      console.log(`Restored Quantity: ${qtyRestore}`);
-      console.log(`Previous remainingStock: ${prevRem}`);
-      console.log(`New remainingStock: ${newRem}`);
-      console.log(`========================================`);
+      if (!updatedProduct && item.name) {
+        try {
+          updatedProduct = await Product.findOneAndUpdate(
+            { name: item.name },
+            { $inc: { remainingStock: qtyToRestore, quantity: qtyToRestore } },
+            { new: true }
+          );
+        } catch (err) {}
+      }
+
+      if (updatedProduct) {
+        const logHeader = reasonType === 'Cancellation' ? '[STOCK RESTORED - USER CANCEL]' : '[STOCK RESTORED - ADMIN REFUND]';
+        console.log(`========================================`);
+        console.log(`${logHeader} Product ID: ${updatedProduct._id} | New remainingStock: ${updatedProduct.remainingStock} | New quantity: ${updatedProduct.quantity}`);
+        console.log(`========================================`);
+      } else {
+        console.warn(`[DB RESTORATION FAILED] Product not found in MongoDB for targetId: ${targetId} or name: ${item.name}`);
+      }
+    } else {
+      const prod = memoryProducts.find((p) => String(p._id || p.id) === String(targetId)) || memoryProducts.find((p) => p.name === item.name);
+      if (prod) {
+        const prevRem = prod.remainingStock !== undefined && prod.remainingStock !== null ? prod.remainingStock : prod.quantity;
+        const prevTotal = prod.quantity !== undefined ? prod.quantity : 10;
+        prod.remainingStock = prevRem + qtyToRestore;
+        prod.quantity = prevTotal + qtyToRestore;
+        const logHeader = reasonType === 'Cancellation' ? '[STOCK RESTORED - USER CANCEL]' : '[STOCK RESTORED - ADMIN REFUND]';
+        console.log(`${logHeader} Product ID: ${prod._id || prod.id} | New remainingStock: ${prod.remainingStock} | New quantity: ${prod.quantity}`);
+      }
     }
   }
 
@@ -1056,7 +1126,24 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
         });
       }
 
-      await deductRemainingStock(order, items);
+      // Inline fail-safe stock deduction
+      console.log(`[STOCK DEDUCTION START] Route: ${req.url} | Items count: ${items.length}`);
+      for (const item of items) {
+        const targetId = item.productId || item.product?._id || item.product || item._id || item.id;
+        const qtyToDeduct = Number(item.qty || item.quantity || item.count || 1);
+        let deducted = null;
+        if (targetId) {
+          try { deducted = await Product.findByIdAndUpdate(targetId, { $inc: { remainingStock: -qtyToDeduct, quantity: -qtyToDeduct } }, { new: true }); } catch (e) {}
+          if (deducted) console.log(`[FORCE DEDUCT SUCCESS] Product ID: ${targetId} | New remainingStock: ${deducted.remainingStock}`);
+        }
+        if (!deducted && item.name) {
+          try { deducted = await Product.findOneAndUpdate({ name: item.name }, { $inc: { remainingStock: -qtyToDeduct, quantity: -qtyToDeduct } }, { new: true }); } catch (e) {}
+          if (deducted) console.log(`[FORCE DEDUCT BY NAME SUCCESS] Name: ${item.name} | New remainingStock: ${deducted.remainingStock}`);
+        }
+        if (!deducted) console.warn(`[DEDUCTION FAILED] Cannot find product for item:`, item.name || targetId);
+      }
+      if (!order.stockDeducted) { order.stockDeducted = true; await order.save().catch(() => {}); }
+      console.log(`[SUCCESS] Stock updated for route ${req.url}`);
 
       try {
         broadcastNewOrder(order);
@@ -1101,6 +1188,7 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
       };
       memoryOrders.unshift(newOrder);
       await deductRemainingStock(newOrder, items);
+      console.log(`[SUCCESS] Stock updated for route ${req.url}`);
 
       try {
         broadcastNewOrder(newOrder);
@@ -1267,6 +1355,25 @@ app.post([
         });
       }
 
+      // Inline fail-safe stock deduction for Razorpay
+      console.log(`[STOCK DEDUCTION START] Route: ${req.url} | Items count: ${items.length}`);
+      for (const item of items) {
+        const targetId = item.productId || item.product?._id || item.product || item._id || item.id;
+        const qtyToDeduct = Number(item.qty || item.quantity || item.count || 1);
+        let deducted = null;
+        if (targetId) {
+          try { deducted = await Product.findByIdAndUpdate(targetId, { $inc: { remainingStock: -qtyToDeduct, quantity: -qtyToDeduct } }, { new: true }); } catch (e) {}
+          if (deducted) console.log(`[FORCE DEDUCT SUCCESS] Product ID: ${targetId} | New remainingStock: ${deducted.remainingStock}`);
+        }
+        if (!deducted && item.name) {
+          try { deducted = await Product.findOneAndUpdate({ name: item.name }, { $inc: { remainingStock: -qtyToDeduct, quantity: -qtyToDeduct } }, { new: true }); } catch (e) {}
+          if (deducted) console.log(`[FORCE DEDUCT BY NAME SUCCESS] Name: ${item.name} | New remainingStock: ${deducted.remainingStock}`);
+        }
+        if (!deducted) console.warn(`[DEDUCTION FAILED] Cannot find product for item:`, item.name || targetId);
+      }
+      if (!order.stockDeducted) { order.stockDeducted = true; await order.save().catch(() => {}); }
+      console.log(`[SUCCESS] Stock updated for route ${req.url}`);
+
       try {
         broadcastNewOrder(order);
       } catch (bErr) {
@@ -1311,6 +1418,8 @@ app.post([
         createdAt: new Date().toISOString()
       };
       memoryOrders.unshift(newOrder);
+      await deductRemainingStock(newOrder, items);
+      console.log(`[SUCCESS] Stock updated for route ${req.url}`);
 
       try {
         broadcastNewOrder(newOrder);
