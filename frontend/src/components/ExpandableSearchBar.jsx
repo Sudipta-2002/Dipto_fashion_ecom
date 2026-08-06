@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Search, X, ArrowUpRight } from 'lucide-react';
+import { Search, X, ArrowUpRight, SlidersHorizontal } from 'lucide-react';
 
 const ExpandableSearchBar = ({
   searchTerm = '',
@@ -8,6 +8,8 @@ const ExpandableSearchBar = ({
   allProducts = [],
   onSelectProduct,
   onSearchSubmit,
+  activeFilterCount = 0,
+  onOpenFilterModal,
   placeholder = 'Search Sarees, Punjabi Suits, Collections...',
   expandedMaxWidth = 'min(750px, 85vw)',
   isMobileFullWidth = false
@@ -117,7 +119,7 @@ const ExpandableSearchBar = ({
             }}
             style={{
               width: '100%',
-              padding: '0.55rem 2.2rem 0.55rem 2.35rem',
+              padding: searchTerm ? '0.55rem 4.4rem 0.55rem 2.35rem' : '0.55rem 2.7rem 0.55rem 2.35rem',
               border: '1.5px solid #e2e8f0',
               borderRadius: '20px',
               fontSize: '0.86rem',
@@ -134,23 +136,70 @@ const ExpandableSearchBar = ({
               onClick={handleClear}
               style={{
                 position: 'absolute',
-                right: '10px',
+                right: '34px',
                 background: '#cbd5e1',
                 border: 'none',
                 borderRadius: '50%',
-                width: '20px',
-                height: '20px',
+                width: '18px',
+                height: '18px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 cursor: 'pointer',
-                fontSize: '0.72rem',
+                fontSize: '0.68rem',
                 color: '#334155'
               }}
             >
               ✕
             </button>
           )}
+          {/* FILTER SEARCH ICON BUTTON ON FAR RIGHT */}
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              if (onOpenFilterModal) onOpenFilterModal();
+            }}
+            style={{
+              position: 'absolute',
+              right: '6px',
+              background: activeFilterCount > 0 ? '#fdf4ff' : '#ffffff',
+              border: activeFilterCount > 0 ? '1.5px solid #c026d3' : '1px solid #cbd5e1',
+              borderRadius: '50%',
+              width: '26px',
+              height: '26px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              cursor: 'pointer',
+              color: activeFilterCount > 0 ? '#c026d3' : '#475569',
+              boxShadow: '0 1px 3px rgba(0,0,0,0.08)'
+            }}
+            title="Filter Products"
+          >
+            <SlidersHorizontal size={13} color={activeFilterCount > 0 ? '#c026d3' : '#475569'} />
+            {activeFilterCount > 0 && (
+              <span
+                style={{
+                  position: 'absolute',
+                  top: '-3px',
+                  right: '-3px',
+                  background: '#c026d3',
+                  color: 'white',
+                  borderRadius: '50%',
+                  width: '14px',
+                  height: '14px',
+                  fontSize: '0.62rem',
+                  fontWeight: '900',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center'
+                }}
+              >
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* DYNAMIC SUGGESTIONS DROPDOWN FOR MOBILE */}
@@ -180,22 +229,20 @@ const ExpandableSearchBar = ({
                 {matchedCategories.map((cat) => (
                   <div
                     key={cat}
-                    onClick={() => handleSelectSuggestion(cat)}
-                    style={{ padding: '0.5rem 0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', fontSize: '0.85rem', fontWeight: '700', color: '#0f172a' }}
+                    onClick={() => handleCategoryClick(cat)}
+                    style={{ padding: '0.5rem 0.85rem', fontSize: '0.86rem', color: '#1e1b4b', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
                   >
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <Search size={14} color="#c026d3" />
-                      <span>{cat}</span>
-                    </div>
+                    <span>{cat}</span>
+                    <ArrowUpRight size={14} color="#94a3b8" />
                   </div>
                 ))}
               </div>
             )}
 
             {matchedProducts.length > 0 && (
-              <div style={{ borderTop: matchedCategories.length > 0 ? '1px solid #f1f5f9' : 'none', marginTop: matchedCategories.length > 0 ? '0.3rem' : 0, paddingTop: matchedCategories.length > 0 ? '0.3rem' : 0 }}>
+              <div style={{ borderTop: matchedCategories.length > 0 ? '1px solid #f1f5f9' : 'none', paddingTop: matchedCategories.length > 0 ? '0.35rem' : 0 }}>
                 <div style={{ padding: '0.35rem 0.85rem', fontSize: '0.72rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase' }}>
-                  Matching Products ({matchedProducts.length})
+                  Products
                 </div>
                 {matchedProducts.map((prod) => {
                   const prodImg = (prod.images && prod.images[0]) || prod.image;
@@ -229,7 +276,7 @@ const ExpandableSearchBar = ({
   }
 
   return (
-    <div ref={containerRef} className="expandable-search-container" style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+    <div ref={containerRef} className="expandable-search-container" style={{ position: 'relative', display: 'flex', alignItems: 'center', gap: '6px' }}>
       {!isOpen ? (
         /* SEARCH ICON BUTTON DISPLAYED BESIDE CART / WISHLIST */
         <button
@@ -302,7 +349,7 @@ const ExpandableSearchBar = ({
               }}
               style={{
                 width: '100%',
-                padding: '0.7rem 2.4rem 0.7rem 2.8rem',
+                padding: searchTerm ? '0.7rem 4.8rem 0.7rem 2.8rem' : '0.7rem 3.2rem 0.7rem 2.8rem',
                 border: '2px solid #c026d3',
                 borderRadius: '28px',
                 fontSize: '0.96rem',
@@ -319,7 +366,7 @@ const ExpandableSearchBar = ({
                 onClick={handleClear}
                 style={{
                   position: 'absolute',
-                  right: '12px',
+                  right: '42px',
                   background: '#e2e8f0',
                   border: 'none',
                   borderRadius: '50%',
@@ -338,6 +385,53 @@ const ExpandableSearchBar = ({
                 ✕
               </button>
             )}
+
+            {/* FILTER SEARCH ICON BUTTON INSIDE EXPANDED INPUT */}
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                if (onOpenFilterModal) onOpenFilterModal();
+              }}
+              style={{
+                position: 'absolute',
+                right: '8px',
+                background: activeFilterCount > 0 ? '#fdf4ff' : '#f1f5f9',
+                border: activeFilterCount > 0 ? '1.5px solid #c026d3' : '1px solid #cbd5e1',
+                borderRadius: '50%',
+                width: '30px',
+                height: '30px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                color: activeFilterCount > 0 ? '#c026d3' : '#475569'
+              }}
+              title="Filter Products"
+            >
+              <SlidersHorizontal size={16} color={activeFilterCount > 0 ? '#c026d3' : '#475569'} />
+              {activeFilterCount > 0 && (
+                <span
+                  style={{
+                    position: 'absolute',
+                    top: '-3px',
+                    right: '-3px',
+                    background: '#c026d3',
+                    color: 'white',
+                    borderRadius: '50%',
+                    width: '15px',
+                    height: '15px',
+                    fontSize: '0.65rem',
+                    fontWeight: '900',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center'
+                  }}
+                >
+                  {activeFilterCount}
+                </span>
+              )}
+            </button>
           </div>
 
           {/* CLOSE SEARCH BUTTON */}

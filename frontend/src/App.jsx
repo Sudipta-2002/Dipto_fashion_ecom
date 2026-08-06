@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Navbar from './components/Navbar';
 import CategorySidebar from './components/CategorySidebar';
 import ProductCard from './components/ProductCard';
@@ -14,6 +14,8 @@ import LiveSaleBanner from './components/LiveSaleBanner';
 import AdminPanel from './components/Admin/AdminPanel';
 import MobileBottomNav from './components/MobileBottomNav';
 import ProductGridSkeleton from './components/Skeletons/ProductGridSkeleton';
+import ProductFilterModal from './components/ProductFilterModal';
+import { SlidersHorizontal, X, RotateCcw, Filter } from 'lucide-react';
 import { fetchWithCache } from './utils/cache';
 import { API_URL, apiFetch, parseResponseSafely } from './api';
 import './App.css';
@@ -225,6 +227,93 @@ function App() {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
+
+  // Flipkart-Style Product Filter State System
+  const DEFAULT_FILTERS = {
+    category: 'All',
+    presetPrice: 'all',
+    minPrice: '',
+    maxPrice: '',
+    minDiscount: 0,
+    minRating: 0,
+    inStockOnly: false
+  };
+
+  const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+
+  const activeFilterCount = useMemo(() => {
+    let count = 0;
+    if (appliedFilters.category && appliedFilters.category !== 'All') count++;
+    if (appliedFilters.presetPrice && appliedFilters.presetPrice !== 'all') count++;
+    if (appliedFilters.minPrice || appliedFilters.maxPrice) count++;
+    if (appliedFilters.minDiscount > 0) count++;
+    if (appliedFilters.minRating > 0) count++;
+    if (appliedFilters.inStockOnly) count++;
+    return count;
+  }, [appliedFilters]);
+
+  const displayedProducts = useMemo(() => {
+    let list = allProducts.length > 0 ? allProducts : products;
+
+    // 1. Category Filter (from Category Sidebar OR Filter Modal)
+    if (selectedCategory && selectedCategory !== 'All') {
+      list = list.filter((p) => p.category?.toLowerCase() === selectedCategory.toLowerCase());
+    } else if (appliedFilters.category && appliedFilters.category !== 'All') {
+      list = list.filter((p) => p.category?.toLowerCase() === appliedFilters.category.toLowerCase());
+    }
+
+    // 2. Search Term Filter
+    if (searchTerm.trim()) {
+      const q = searchTerm.trim().toLowerCase();
+      list = list.filter(
+        (p) =>
+          p.name?.toLowerCase().includes(q) ||
+          p.category?.toLowerCase().includes(q) ||
+          p.description?.toLowerCase().includes(q)
+      );
+    }
+
+    // 3. Custom Price Filter
+    if (appliedFilters.minPrice !== '' && !isNaN(appliedFilters.minPrice)) {
+      list = list.filter((p) => Number(p.price) >= Number(appliedFilters.minPrice));
+    }
+    if (appliedFilters.maxPrice !== '' && !isNaN(appliedFilters.maxPrice)) {
+      list = list.filter((p) => Number(p.price) <= Number(appliedFilters.maxPrice));
+    }
+
+    // 4. Preset Price Range Filter
+    if (appliedFilters.presetPrice === 'under500') {
+      list = list.filter((p) => Number(p.price) < 500);
+    } else if (appliedFilters.presetPrice === '500-1000') {
+      list = list.filter((p) => Number(p.price) >= 500 && Number(p.price) <= 1000);
+    } else if (appliedFilters.presetPrice === '1000-2000') {
+      list = list.filter((p) => Number(p.price) >= 1000 && Number(p.price) <= 2000);
+    } else if (appliedFilters.presetPrice === 'above2000') {
+      list = list.filter((p) => Number(p.price) > 2000);
+    }
+
+    // 5. Minimum Discount % Filter
+    if (appliedFilters.minDiscount > 0) {
+      list = list.filter((p) => {
+        if (!p.mrp || p.mrp <= p.price) return false;
+        const disc = Math.round(((p.mrp - p.price) / p.mrp) * 100);
+        return disc >= appliedFilters.minDiscount;
+      });
+    }
+
+    // 6. Minimum Rating Filter
+    if (appliedFilters.minRating > 0) {
+      list = list.filter((p) => (p.rating || 4.5) >= appliedFilters.minRating);
+    }
+
+    // 7. In Stock Only Filter
+    if (appliedFilters.inStockOnly) {
+      list = list.filter((p) => (p.quantity !== undefined ? p.quantity > 0 : true));
+    }
+
+    return list;
+  }, [allProducts, products, selectedCategory, searchTerm, appliedFilters]);
 
   // Modals & Selected Product History
   const [selectedProduct, setSelectedProduct] = useState(null);
@@ -652,6 +741,8 @@ function App() {
         showNotificationBubble={showNotificationBubble}
         latestNotificationTitle={latestNotificationTitle}
         onOpenNotifications={handleOpenNotifications}
+        activeFilterCount={activeFilterCount}
+        onOpenFilterModal={() => setIsFilterModalOpen(true)}
       />
 
       {/* Main View Switch */}
@@ -668,25 +759,138 @@ function App() {
 
           {/* Products Grid */}
           <main className="products-section">
-            <h2>
-              <span>{selectedCategory === 'All' ? 'All Collections' : selectedCategory}</span>
-              <span style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 'normal' }}>
-                ({products.length} products)
-              </span>
-            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+              <h2>
+                <span>{selectedCategory === 'All' ? 'All Collections' : selectedCategory}</span>
+                <span style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 'normal', marginLeft: '8px' }}>
+                  ({displayedProducts.length} products)
+                </span>
+              </h2>
+
+              <button
+                type="button"
+                onClick={() => setIsFilterModalOpen(true)}
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  background: activeFilterCount > 0 ? '#fdf4ff' : '#ffffff',
+                  border: activeFilterCount > 0 ? '1.5px solid #c026d3' : '1px solid #cbd5e1',
+                  color: activeFilterCount > 0 ? '#c026d3' : '#334155',
+                  padding: '0.45rem 0.85rem',
+                  borderRadius: '10px',
+                  fontWeight: '700',
+                  fontSize: '0.82rem',
+                  cursor: 'pointer',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+                }}
+              >
+                <SlidersHorizontal size={15} color={activeFilterCount > 0 ? '#c026d3' : '#475569'} />
+                <span>Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}</span>
+              </button>
+            </div>
+
+            {/* ACTIVE FILTERS STRIP */}
+            {activeFilterCount > 0 && (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '0.5rem',
+                  flexWrap: 'wrap',
+                  background: '#fdf4ff',
+                  border: '1.5px solid #f0abfc',
+                  padding: '0.65rem 0.85rem',
+                  borderRadius: '12px',
+                  marginBottom: '1.25rem'
+                }}
+              >
+                <span style={{ fontSize: '0.78rem', fontWeight: '800', color: '#86198f', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                  <Filter size={14} /> Active Filters:
+                </span>
+
+                {appliedFilters.category && appliedFilters.category !== 'All' && (
+                  <span style={{ background: '#ffffff', border: '1px solid #d8b4fe', color: '#7e22ce', padding: '2px 8px', borderRadius: '14px', fontSize: '0.75rem', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    Category: {appliedFilters.category}
+                  </span>
+                )}
+
+                {appliedFilters.presetPrice && appliedFilters.presetPrice !== 'all' && (
+                  <span style={{ background: '#ffffff', border: '1px solid #d8b4fe', color: '#7e22ce', padding: '2px 8px', borderRadius: '14px', fontSize: '0.75rem', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    Price: {appliedFilters.presetPrice}
+                  </span>
+                )}
+
+                {(appliedFilters.minPrice || appliedFilters.maxPrice) && (
+                  <span style={{ background: '#ffffff', border: '1px solid #d8b4fe', color: '#7e22ce', padding: '2px 8px', borderRadius: '14px', fontSize: '0.75rem', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    ₹{appliedFilters.minPrice || 0} - ₹{appliedFilters.maxPrice || '∞'}
+                  </span>
+                )}
+
+                {appliedFilters.minDiscount > 0 && (
+                  <span style={{ background: '#ffffff', border: '1px solid #d8b4fe', color: '#7e22ce', padding: '2px 8px', borderRadius: '14px', fontSize: '0.75rem', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    {appliedFilters.minDiscount}%+ Off
+                  </span>
+                )}
+
+                {appliedFilters.minRating > 0 && (
+                  <span style={{ background: '#ffffff', border: '1px solid #d8b4fe', color: '#7e22ce', padding: '2px 8px', borderRadius: '14px', fontSize: '0.75rem', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    {appliedFilters.minRating}★ & above
+                  </span>
+                )}
+
+                {appliedFilters.inStockOnly && (
+                  <span style={{ background: '#ffffff', border: '1px solid #bbf7d0', color: '#15803d', padding: '2px 8px', borderRadius: '14px', fontSize: '0.75rem', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                    In Stock Only
+                  </span>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setAppliedFilters(DEFAULT_FILTERS)}
+                  style={{
+                    background: '#fef2f2',
+                    border: '1px solid #fca5a5',
+                    color: '#dc2626',
+                    padding: '2px 8px',
+                    borderRadius: '14px',
+                    fontSize: '0.75rem',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '3px',
+                    marginLeft: 'auto'
+                  }}
+                >
+                  <RotateCcw size={12} /> Clear All
+                </button>
+              </div>
+            )}
 
             {loading ? (
               <ProductGridSkeleton count={8} />
-            ) : products.length === 0 ? (
+            ) : displayedProducts.length === 0 ? (
               <div style={{ background: 'white', padding: '3rem', textAlign: 'center', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-                <h3>No products found</h3>
+                <h3>No matching products found</h3>
                 <p style={{ color: '#64748b', marginTop: '0.5rem' }}>
-                  Try selecting another category or clear your search query.
+                  Try resetting your filters or selecting another category.
                 </p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAppliedFilters(DEFAULT_FILTERS);
+                    setSelectedCategory('All');
+                    setSearchTerm('');
+                  }}
+                  style={{ marginTop: '1rem', background: '#c026d3', color: 'white', border: 'none', padding: '0.65rem 1.2rem', borderRadius: '10px', fontWeight: '800', cursor: 'pointer' }}
+                >
+                  Clear All Filters & Search
+                </button>
               </div>
             ) : (
               <div className="product-grid">
-                {products.map((product) => {
+                {displayedProducts.map((product) => {
                   const isWishlisted = wishlist.some(w => (w._id || w.id) === (product._id || product.id));
                   return (
                     <ProductCard
@@ -822,6 +1026,17 @@ function App() {
           isLoggedIn={Boolean(user)}
         />
       )}
+
+      {/* Flipkart-Style Product Filter Modal */}
+      <ProductFilterModal
+        isOpen={isFilterModalOpen}
+        onClose={() => setIsFilterModalOpen(false)}
+        categories={categories}
+        allProducts={allProducts.length > 0 ? allProducts : products}
+        currentFilters={appliedFilters}
+        onApplyFilters={(newFilters) => setAppliedFilters(newFilters)}
+        onResetFilters={() => setAppliedFilters(DEFAULT_FILTERS)}
+      />
     </div>
   );
 }

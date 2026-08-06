@@ -19,7 +19,9 @@ const Navbar = ({
   unreadNotificationCount = 0,
   showNotificationBubble = false,
   latestNotificationTitle = '',
-  onOpenNotifications
+  onOpenNotifications,
+  activeFilterCount = 0,
+  onOpenFilterModal
 }) => {
   return (
     <header className="navbar">
@@ -48,6 +50,8 @@ const Navbar = ({
                   categories={categories}
                   allProducts={allProducts}
                   onSelectProduct={onSelectProduct}
+                  activeFilterCount={activeFilterCount}
+                  onOpenFilterModal={onOpenFilterModal}
                   expandedMaxWidth="min(560px, 75vw)"
                 />
 
@@ -243,6 +247,8 @@ const Navbar = ({
                 categories={categories}
                 allProducts={allProducts}
                 onSelectProduct={onSelectProduct}
+                activeFilterCount={activeFilterCount}
+                onOpenFilterModal={onOpenFilterModal}
                 isMobileFullWidth={true}
               />
             </div>
