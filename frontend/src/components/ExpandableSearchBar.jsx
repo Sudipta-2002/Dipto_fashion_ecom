@@ -66,14 +66,27 @@ const ExpandableSearchBar = ({
   const handleSelectSuggestion = (text) => {
     if (setSearchTerm) setSearchTerm(text);
     setShowSuggestions(false);
+    if (inputRef.current) {
+      inputRef.current.value = text;
+      inputRef.current.blur();
+    }
     if (onSearchSubmit) onSearchSubmit(text);
   };
 
+  const handleCategoryClick = (categoryName) => {
+    handleSelectSuggestion(categoryName);
+  };
+
   const handleProductClick = (product) => {
-    if (setSearchTerm) setSearchTerm(product.name);
+    const text = product.name || '';
+    if (setSearchTerm) setSearchTerm(text);
     setShowSuggestions(false);
+    if (inputRef.current) {
+      inputRef.current.value = text;
+      inputRef.current.blur();
+    }
     if (onSelectProduct) onSelectProduct(product);
-    if (onSearchSubmit) onSearchSubmit(product.name);
+    if (onSearchSubmit) onSearchSubmit(text);
   };
 
   const handleKeyDown = (e) => {
