@@ -915,7 +915,7 @@ const deductRemainingStock = async (orderRef, itemsInput) => {
         try {
           updatedProduct = await Product.findByIdAndUpdate(
             targetId,
-            { $inc: { remainingStock: -qtyToDeduct, quantity: -qtyToDeduct } },
+            { $inc: { remainingStock: -qtyToDeduct } },
             { new: true }
           );
         } catch (err) {}
@@ -925,21 +925,20 @@ const deductRemainingStock = async (orderRef, itemsInput) => {
         try {
           updatedProduct = await Product.findOneAndUpdate(
             { name: item.name },
-            { $inc: { remainingStock: -qtyToDeduct, quantity: -qtyToDeduct } },
+            { $inc: { remainingStock: -qtyToDeduct } },
             { new: true }
           );
         } catch (err) {}
       }
 
       if (updatedProduct) {
-        // Enforce non-negative bounds
-        if (updatedProduct.remainingStock < 0 || updatedProduct.quantity < 0) {
-          updatedProduct.remainingStock = Math.max(0, updatedProduct.remainingStock);
-          updatedProduct.quantity = Math.max(0, updatedProduct.quantity);
+        // Enforce non-negative bounds on remainingStock only (quantity = fixed total stock)
+        if (updatedProduct.remainingStock < 0) {
+          updatedProduct.remainingStock = 0;
           await updatedProduct.save().catch(() => {});
         }
         console.log(`========================================`);
-        console.log(`[FORCE DEDUCT SUCCESS] Product ID: ${updatedProduct._id} | New remainingStock: ${updatedProduct.remainingStock} | New quantity: ${updatedProduct.quantity}`);
+        console.log(`[DEDUCT SUCCESS] Product ID: ${updatedProduct._id} | remainingStock: ${updatedProduct.remainingStock} (quantity unchanged: ${updatedProduct.quantity})`);
         console.log(`========================================`);
       } else {
         console.warn(`[DB DEDUCTION FAILED] Product not found in MongoDB for targetId: ${targetId} or name: ${item.name}`);
@@ -948,10 +947,9 @@ const deductRemainingStock = async (orderRef, itemsInput) => {
       const prod = memoryProducts.find((p) => String(p._id || p.id) === String(targetId)) || memoryProducts.find((p) => p.name === item.name);
       if (prod) {
         const prevRem = prod.remainingStock !== undefined && prod.remainingStock !== null ? prod.remainingStock : prod.quantity;
-        const prevTotal = prod.quantity !== undefined ? prod.quantity : 10;
         prod.remainingStock = Math.max(0, prevRem - qtyToDeduct);
-        prod.quantity = Math.max(0, prevTotal - qtyToDeduct);
-        console.log(`[MEM FORCE DEDUCT SUCCESS] Product ID: ${prod._id || prod.id} | New remainingStock: ${prod.remainingStock} | New quantity: ${prod.quantity}`);
+        // quantity (total stock) is intentionally NOT modified
+        console.log(`[MEM DEDUCT SUCCESS] Product ID: ${prod._id || prod.id} | New remainingStock: ${prod.remainingStock}`);
       }
     }
   }
@@ -1001,7 +999,7 @@ const restoreRemainingStock = async (orderRef, itemsInput, reasonType = 'Cancell
         try {
           updatedProduct = await Product.findByIdAndUpdate(
             targetId,
-            { $inc: { remainingStock: qtyToRestore, quantity: qtyToRestore } },
+            { $inc: { remainingStock: qtyToRestore } },
             { new: true }
           );
         } catch (err) {}
@@ -1011,7 +1009,7 @@ const restoreRemainingStock = async (orderRef, itemsInput, reasonType = 'Cancell
         try {
           updatedProduct = await Product.findOneAndUpdate(
             { name: item.name },
-            { $inc: { remainingStock: qtyToRestore, quantity: qtyToRestore } },
+            { $inc: { remainingStock: qtyToRestore } },
             { new: true }
           );
         } catch (err) {}
@@ -1020,7 +1018,7 @@ const restoreRemainingStock = async (orderRef, itemsInput, reasonType = 'Cancell
       if (updatedProduct) {
         const logHeader = reasonType === 'Cancellation' ? '[STOCK RESTORED - USER CANCEL]' : '[STOCK RESTORED - ADMIN REFUND]';
         console.log(`========================================`);
-        console.log(`${logHeader} Product ID: ${updatedProduct._id} | New remainingStock: ${updatedProduct.remainingStock} | New quantity: ${updatedProduct.quantity}`);
+        console.log(`${logHeader} Product ID: ${updatedProduct._id} | remainingStock: ${updatedProduct.remainingStock} (quantity fixed at: ${updatedProduct.quantity})`);
         console.log(`========================================`);
       } else {
         console.warn(`[DB RESTORATION FAILED] Product not found in MongoDB for targetId: ${targetId} or name: ${item.name}`);
@@ -1029,11 +1027,10 @@ const restoreRemainingStock = async (orderRef, itemsInput, reasonType = 'Cancell
       const prod = memoryProducts.find((p) => String(p._id || p.id) === String(targetId)) || memoryProducts.find((p) => p.name === item.name);
       if (prod) {
         const prevRem = prod.remainingStock !== undefined && prod.remainingStock !== null ? prod.remainingStock : prod.quantity;
-        const prevTotal = prod.quantity !== undefined ? prod.quantity : 10;
         prod.remainingStock = prevRem + qtyToRestore;
-        prod.quantity = prevTotal + qtyToRestore;
+        // quantity (total stock) is intentionally NOT modified
         const logHeader = reasonType === 'Cancellation' ? '[STOCK RESTORED - USER CANCEL]' : '[STOCK RESTORED - ADMIN REFUND]';
-        console.log(`${logHeader} Product ID: ${prod._id || prod.id} | New remainingStock: ${prod.remainingStock} | New quantity: ${prod.quantity}`);
+        console.log(`${logHeader} Product ID: ${prod._id || prod.id} | New remainingStock: ${prod.remainingStock}`);
       }
     }
   }
@@ -1133,12 +1130,12 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
         const qtyToDeduct = Number(item.qty || item.quantity || item.count || 1);
         let deducted = null;
         if (targetId) {
-          try { deducted = await Product.findByIdAndUpdate(targetId, { $inc: { remainingStock: -qtyToDeduct, quantity: -qtyToDeduct } }, { new: true }); } catch (e) {}
-          if (deducted) console.log(`[FORCE DEDUCT SUCCESS] Product ID: ${targetId} | New remainingStock: ${deducted.remainingStock}`);
+          try { deducted = await Product.findByIdAndUpdate(targetId, { $inc: { remainingStock: -qtyToDeduct } }, { new: true }); } catch (e) {}
+          if (deducted) console.log(`[DEDUCT SUCCESS] Product ID: ${targetId} | remainingStock: ${deducted.remainingStock} (quantity fixed: ${deducted.quantity})`);
         }
         if (!deducted && item.name) {
-          try { deducted = await Product.findOneAndUpdate({ name: item.name }, { $inc: { remainingStock: -qtyToDeduct, quantity: -qtyToDeduct } }, { new: true }); } catch (e) {}
-          if (deducted) console.log(`[FORCE DEDUCT BY NAME SUCCESS] Name: ${item.name} | New remainingStock: ${deducted.remainingStock}`);
+          try { deducted = await Product.findOneAndUpdate({ name: item.name }, { $inc: { remainingStock: -qtyToDeduct } }, { new: true }); } catch (e) {}
+          if (deducted) console.log(`[DEDUCT BY NAME SUCCESS] Name: ${item.name} | remainingStock: ${deducted.remainingStock}`);
         }
         if (!deducted) console.warn(`[DEDUCTION FAILED] Cannot find product for item:`, item.name || targetId);
       }
@@ -1362,12 +1359,12 @@ app.post([
         const qtyToDeduct = Number(item.qty || item.quantity || item.count || 1);
         let deducted = null;
         if (targetId) {
-          try { deducted = await Product.findByIdAndUpdate(targetId, { $inc: { remainingStock: -qtyToDeduct, quantity: -qtyToDeduct } }, { new: true }); } catch (e) {}
-          if (deducted) console.log(`[FORCE DEDUCT SUCCESS] Product ID: ${targetId} | New remainingStock: ${deducted.remainingStock}`);
+          try { deducted = await Product.findByIdAndUpdate(targetId, { $inc: { remainingStock: -qtyToDeduct } }, { new: true }); } catch (e) {}
+          if (deducted) console.log(`[DEDUCT SUCCESS] Product ID: ${targetId} | remainingStock: ${deducted.remainingStock} (quantity fixed: ${deducted.quantity})`);
         }
         if (!deducted && item.name) {
-          try { deducted = await Product.findOneAndUpdate({ name: item.name }, { $inc: { remainingStock: -qtyToDeduct, quantity: -qtyToDeduct } }, { new: true }); } catch (e) {}
-          if (deducted) console.log(`[FORCE DEDUCT BY NAME SUCCESS] Name: ${item.name} | New remainingStock: ${deducted.remainingStock}`);
+          try { deducted = await Product.findOneAndUpdate({ name: item.name }, { $inc: { remainingStock: -qtyToDeduct } }, { new: true }); } catch (e) {}
+          if (deducted) console.log(`[DEDUCT BY NAME SUCCESS] Name: ${item.name} | remainingStock: ${deducted.remainingStock}`);
         }
         if (!deducted) console.warn(`[DEDUCTION FAILED] Cannot find product for item:`, item.name || targetId);
       }
