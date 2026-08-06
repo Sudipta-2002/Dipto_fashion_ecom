@@ -92,7 +92,10 @@ const CheckoutModal = ({ isOpen, onClose, onBackToCart, user, onProceedToPayment
     let finalAddress = null;
 
     if (!showNewAddressForm && selectedAddressIndex !== null && savedAddresses[selectedAddressIndex]) {
-      finalAddress = savedAddresses[selectedAddressIndex];
+      finalAddress = {
+        ...savedAddresses[selectedAddressIndex],
+        email: savedAddresses[selectedAddressIndex].email || user?.email || ''
+      };
     } else {
       if (!validateAddress()) return;
 
@@ -102,6 +105,7 @@ const CheckoutModal = ({ isOpen, onClose, onBackToCart, user, onProceedToPayment
 
       finalAddress = {
         ...addressData,
+        email: user?.email || '',
         mobileNumber: formattedMobile
       };
     }

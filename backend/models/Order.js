@@ -12,11 +12,13 @@ const orderItemSchema = new mongoose.Schema({
 
 const orderSchema = new mongoose.Schema({
   orderId: { type: String, required: true, index: true },
-  user: { type: mongoose.Schema.Types.Mixed, required: false },
+  user: { type: mongoose.Schema.Types.Mixed, required: false, index: true },
   userName: { type: String, default: 'Customer' },
-  userEmail: { type: String, default: '' },
+  userEmail: { type: String, default: '', index: true },
+  email: { type: String, default: '', index: true },
   shippingAddress: {
     userName: { type: String, default: 'Customer' },
+    email: { type: String, default: '' },
     mobileNumber: { type: String, default: '' },
     address: { type: String, default: '' },
     landmark: { type: String, default: '' },

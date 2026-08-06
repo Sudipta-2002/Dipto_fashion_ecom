@@ -718,7 +718,16 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
     const orderId = customOrderId || 'DF-' + Math.floor(100000 + Math.random() * 900000);
     const finalPaymentMethod = paymentMethod || 'UPI_QR';
     const finalStatus = status || (finalPaymentMethod === 'RAZORPAY' ? 'Accepted' : 'Pending Verification');
-    const userName = shippingAddress?.userName || 'Customer';
+    
+    let userObj = null;
+    if (decoded?.userId && isMongoConnected()) {
+      userObj = await User.findById(decoded.userId).catch(() => null);
+    } else if (decoded?.userId) {
+      userObj = memoryUsers.find(u => u._id === decoded.userId);
+    }
+
+    const userEmail = req.body.userEmail || shippingAddress?.email || userObj?.email || decoded?.email || '';
+    const userName = req.body.userName || shippingAddress?.userName || userObj?.name || 'Customer';
 
     if (isMongoConnected()) {
       try {
@@ -740,13 +749,15 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
         order.utrNumber = utrNumber || order.utrNumber;
         order.couponCode = couponCode || order.couponCode;
         order.couponDiscount = Number(couponDiscount || order.couponDiscount || 0);
+        if (userEmail) order.userEmail = userEmail;
+        if (userName) order.userName = userName;
         await order.save();
       } else {
         order = await Order.create({
           orderId,
           user: decoded.userId,
           userName,
-          userEmail: shippingAddress.email || '',
+          userEmail,
           items,
           totalAmount: Number(totalAmount),
           couponCode: couponCode || '',
@@ -787,7 +798,7 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
         orderId,
         user: decoded.userId,
         userName,
-        userEmail: user?.email || '',
+        userEmail,
         shippingAddress,
         items,
         totalAmount: Number(totalAmount),
@@ -861,12 +872,13 @@ app.post([
 ], async (req, res) => {
   try {
     let userId = null;
+    let decodedToken = null;
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       try {
         const token = authHeader.split(' ')[1];
-        const decoded = jwt.verify(token, JWT_SECRET);
-        userId = decoded.userId;
+        decodedToken = jwt.verify(token, JWT_SECRET);
+        userId = decodedToken.userId;
       } catch (tokenErr) {
         console.warn('Razorpay verify token decode warning:', tokenErr.message);
       }
@@ -907,7 +919,16 @@ app.post([
 
     const orderId = customOrderId || 'DF-' + Math.floor(100000 + Math.random() * 900000);
     const utrNumber = razorpay_payment_id ? `RZP_${razorpay_payment_id}` : `RZP_${Date.now()}`;
-    const userName = shippingAddress?.userName || 'Customer';
+    
+    let userObj = null;
+    if (userId && isMongoConnected()) {
+      userObj = await User.findById(userId).catch(() => null);
+    } else if (userId) {
+      userObj = memoryUsers.find(u => u._id === userId);
+    }
+
+    const userEmail = req.body.userEmail || shippingAddress?.email || userObj?.email || decodedToken?.email || '';
+    const userName = req.body.userName || shippingAddress?.userName || userObj?.name || 'Customer';
 
     if (isMongoConnected()) {
       if (userId) {
@@ -932,13 +953,15 @@ app.post([
         order.razorpayOrderId = razorpay_order_id || order.razorpayOrderId || '';
         order.razorpayPaymentId = razorpay_payment_id || order.razorpayPaymentId || '';
         order.razorpaySignature = razorpay_signature || order.razorpaySignature || '';
+        if (userEmail) order.userEmail = userEmail;
+        if (userName) order.userName = userName;
         await order.save();
       } else {
         order = await Order.create({
           orderId,
           user: userId || undefined,
           userName,
-          userEmail: shippingAddress.email || '',
+          userEmail,
           items,
           totalAmount: Number(totalAmount),
           couponCode: couponCode || '',
@@ -985,7 +1008,7 @@ app.post([
         orderId,
         user: userId,
         userName,
-        userEmail: user?.email || '',
+        userEmail,
         shippingAddress,
         items,
         totalAmount: Number(totalAmount),
@@ -1012,36 +1035,86 @@ app.post([
   }
 });
 
-app.get('/api/orders', async (req, res) => {
+app.get(['/api/orders', '/orders', '/api/admin/orders', '/admin/orders'], async (req, res) => {
   try {
     if (isMongoConnected()) {
       const orders = await Order.find().sort({ createdAt: -1 });
+      console.log("Fetched all orders for Admin:", orders.length);
       return res.json(orders);
     } else {
+      console.log("Fetched all orders for Admin (memory):", memoryOrders.length);
       return res.json(memoryOrders);
     }
   } catch (err) {
-    res.json(memoryOrders);
+    console.error("Error fetching all orders for Admin:", err);
+    return res.json(memoryOrders);
   }
 });
 
 // GET LOGGED-IN USER ORDERS FOR PROFILE PAGE
-app.get('/api/user/my-orders', async (req, res) => {
+app.get([
+  '/api/user/my-orders',
+  '/api/orders/my-orders',
+  '/api/orders/user',
+  '/api/orders/user/:email',
+  '/api/orders/by-email',
+  '/user/my-orders'
+], async (req, res) => {
   try {
+    let userId = null;
+    let tokenEmail = null;
+
     const authHeader = req.headers.authorization;
-    if (!authHeader) return res.status(401).json({ message: 'Authorization token required' });
-    const token = authHeader.split(' ')[1];
-    const decoded = jwt.verify(token, JWT_SECRET);
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.split(' ')[1];
+        const decoded = jwt.verify(token, JWT_SECRET);
+        userId = decoded.userId;
+        tokenEmail = decoded.email;
+      } catch (tokenErr) {}
+    }
+
+    const emailParam = req.params.email || req.query.email || req.query.userEmail || tokenEmail;
+    
+    const orConditions = [];
+
+    if (userId) {
+      orConditions.push({ user: userId });
+      orConditions.push({ user: String(userId) });
+    }
+
+    if (emailParam && emailParam.trim()) {
+      const cleanEmail = emailParam.trim();
+      const emailRegex = new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+      orConditions.push({ userEmail: emailRegex });
+      orConditions.push({ email: emailRegex });
+      orConditions.push({ 'shippingAddress.email': emailRegex });
+    }
+
+    let filter = {};
+    if (orConditions.length > 0) {
+      filter = { $or: orConditions };
+    } else if (!authHeader && !emailParam) {
+      return res.status(400).json({ success: false, message: 'User identification (token or email) required to fetch user orders' });
+    }
 
     if (isMongoConnected()) {
-      const userOrders = await Order.find({ user: decoded.userId }).sort({ createdAt: -1 });
+      const userOrders = await Order.find(filter).sort({ createdAt: -1 });
+      console.log(`Fetched orders for user (${userId || emailParam || 'filter'}):`, userOrders.length);
       return res.json(userOrders);
     } else {
-      const userOrders = memoryOrders.filter(o => o.user === decoded.userId);
+      const cleanEmail = emailParam ? emailParam.trim().toLowerCase() : '';
+      const userOrders = memoryOrders.filter(o => {
+        if (userId && String(o.user) === String(userId)) return true;
+        if (cleanEmail && ((o.userEmail && o.userEmail.toLowerCase() === cleanEmail) || (o.email && o.email.toLowerCase() === cleanEmail) || (o.shippingAddress?.email && o.shippingAddress.email.toLowerCase() === cleanEmail))) return true;
+        return false;
+      });
+      console.log(`Fetched orders for user memory (${userId || emailParam}):`, userOrders.length);
       return res.json(userOrders);
     }
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('Error fetching user orders:', err);
+    return res.status(500).json({ success: false, message: err.message || 'Failed to fetch user orders' });
   }
 });
 

@@ -30,16 +30,29 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
   const fetchMyOrders = async () => {
     try {
       const token = localStorage.getItem('df_token');
-      if (!token) return;
-      const res = await fetch(`${API_URL}/api/user/my-orders`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const savedUser = localStorage.getItem('df_user');
+      let userEmail = '';
+      if (savedUser) {
+        try { userEmail = JSON.parse(savedUser).email || ''; } catch (e) {}
+      }
+
+      let url = `${API_URL}/api/user/my-orders`;
+      if (userEmail) {
+        url += `?email=${encodeURIComponent(userEmail)}`;
+      }
+
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(url, { headers });
       if (res.ok) {
         const data = await res.json();
-        setOrders(data);
+        const ordersArray = Array.isArray(data) ? data : [];
+        console.log("Fetched orders for user (chatbot):", ordersArray.length);
+        setOrders(ordersArray);
       }
     } catch (e) {
-      console.error(e);
+      console.error('Chatbot order fetch error:', e);
     }
   };
 

@@ -81,16 +81,34 @@ const UserProfileModal = ({
     setLoadingOrders(true);
     try {
       const token = localStorage.getItem('df_token');
-      if (!token) return;
-      const res = await fetch(`${API_URL}/api/user/my-orders`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      let userEmail = user?.email || '';
+      if (!userEmail) {
+        try {
+          const savedUser = localStorage.getItem('df_user');
+          if (savedUser) userEmail = JSON.parse(savedUser).email || '';
+        } catch (e) {}
+      }
+      
+      let url = `${API_URL}/api/user/my-orders`;
+      if (userEmail) {
+        url += `?email=${encodeURIComponent(userEmail)}&userEmail=${encodeURIComponent(userEmail)}`;
+      }
+
+      const headers = {};
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch(url, { headers });
       if (res.ok) {
         const data = await res.json();
-        setUserOrders(data);
+        const ordersArray = Array.isArray(data) ? data : (data.orders || []);
+        console.log("Fetched orders for user:", ordersArray.length);
+        setUserOrders(ordersArray);
+      } else {
+        setUserOrders([]);
       }
     } catch (e) {
       console.error('Error fetching user orders:', e);
+      setUserOrders([]);
     } finally {
       setLoadingOrders(false);
     }
