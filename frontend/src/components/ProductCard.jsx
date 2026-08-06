@@ -64,7 +64,7 @@ const ProductCard = ({
         onClick={() => onClickProductImage(product)}
         title="Click to view product details & catalogue"
       >
-        <img src={displayImage} alt={name} loading="lazy" />
+        <img src={displayImage} alt={`Dipto Fashion - ${name} (${category || 'Collection'})`} loading="lazy" />
         
         {category && <span className="category-tag">{category}</span>}
 

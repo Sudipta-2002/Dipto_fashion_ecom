@@ -1,0 +1,9 @@
+# User-agent permissions for Dipto Fashion (https://www.diptofashion.in)
+User-agent: *
+Allow: /
+Disallow: /admin
+Disallow: /api/
+Disallow: /private/
+
+# Sitemap location
+Sitemap: https://www.diptofashion.in/sitemap.xml
