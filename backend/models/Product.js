@@ -13,12 +13,13 @@ const productSchema = new mongoose.Schema({
   mrp: { type: Number, required: true },
   price: { type: Number, required: true },
   quantity: { type: Number, required: true, default: 10 },
+  remainingStock: { type: Number },
   images: [{ type: String, required: true }],
   image: { type: String },
   rating: { type: Number, default: 4.5 },
   reviewsCount: { type: Number, default: 142 },
   reviews: [reviewSchema],
-  availableSizes: [{ type: String }], // e.g. ['S', 'M', 'L', 'XL', 'XXL', 'Free Size']
+  availableSizes: [{ type: String }],
   description: { type: String, default: '' },
   isFeatured: { type: Boolean, default: false }
 }, { timestamps: true });

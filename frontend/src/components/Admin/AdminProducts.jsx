@@ -204,17 +204,30 @@ const AdminProducts = () => {
     }
   };
 
+  // 0ms Optimistic UI Product Deletion
   const handleDeleteProduct = async (id) => {
     if (!window.confirm('Are you sure you want to delete this product?')) return;
+    
+    let previousProducts = [];
+
+    // 1. Instantly update React local UI state (0ms latency)
+    setProducts((prevProducts) => {
+      previousProducts = prevProducts;
+      return prevProducts.filter(p => (p._id || p.id) !== id);
+    });
+
+    // 2. Execute background API call
     try {
       const res = await fetch(`${API_URL}/api/products/${id}`, {
         method: 'DELETE'
       });
-      if (res.ok) {
-        fetchProducts();
+      if (!res.ok) {
+        setProducts(previousProducts);
+        alert('Failed to delete product on server. Reverting change.');
       }
     } catch (e) {
-      alert('Failed to delete product');
+      setProducts(previousProducts);
+      alert('Network error deleting product. Reverting change.');
     }
   };
 
@@ -422,6 +435,7 @@ const AdminProducts = () => {
               <th>Offer Price</th>
               <th>Discount</th>
               <th>Stock Qty</th>
+              <th>Remaining Stock</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -430,6 +444,7 @@ const AdminProducts = () => {
               const discountPercent = Math.round(((p.mrp - p.price) / p.mrp) * 100);
               const imgCount = p.images ? p.images.length : (p.image ? 1 : 0);
               const mainImg = p.images && p.images.length > 0 ? p.images[0] : p.image;
+              const remStock = p.remainingStock !== undefined && p.remainingStock !== null ? p.remainingStock : p.quantity;
 
               return (
                 <tr key={p._id}>
@@ -457,6 +472,7 @@ const AdminProducts = () => {
                     <span style={{ color: '#16a34a', fontWeight: '700' }}>{discountPercent}% OFF</span>
                   </td>
                   <td><strong>{p.quantity}</strong></td>
+                  <td><strong>{remStock}</strong></td>
                   <td>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                       <button

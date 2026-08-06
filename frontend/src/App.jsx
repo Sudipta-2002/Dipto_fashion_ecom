@@ -315,6 +315,14 @@ function App() {
     return list;
   }, [allProducts, products, selectedCategory, searchTerm, appliedFilters]);
 
+  const [visibleCount, setVisibleCount] = useState(16);
+
+  useEffect(() => {
+    setVisibleCount(16);
+  }, [selectedCategory, searchTerm, appliedFilters]);
+
+  const visibleProducts = displayedProducts.slice(0, visibleCount);
+
   // Modals & Selected Product History
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -523,6 +531,12 @@ function App() {
 
   // Cart Actions
   const handleAddToCart = (product) => {
+    const remStock = product.remainingStock !== undefined && product.remainingStock !== null ? product.remainingStock : (product.quantity !== undefined ? product.quantity : 10);
+    if (remStock <= 0) {
+      alert('Out of Stock - Cannot add to cart!');
+      return;
+    }
+
     const sizesList = (product?.availableSizes && product.availableSizes.length > 0)
       ? product.availableSizes
       : (product?.category === 'Saree' ? ['Free Size'] : ['S', 'M', 'L', 'XL', 'XXL']);
@@ -889,24 +903,49 @@ function App() {
                 </button>
               </div>
             ) : (
-              <div className="product-grid">
-                {displayedProducts.map((product) => {
-                  const isWishlisted = wishlist.some(w => (w._id || w.id) === (product._id || product.id));
-                  return (
-                    <ProductCard
-                      key={product._id || product.id}
-                      product={product}
-                      onAddToCart={handleAddToCart}
-                      onClickProductTitle={handleOpenProductDetail}
-                      onClickProductImage={handleOpenProductDetail}
-                      isWishlisted={isWishlisted}
-                      onToggleWishlist={handleToggleWishlist}
-                      cartItems={cartItems}
-                      onOpenCart={() => setIsCartOpen(true)}
-                    />
-                  );
-                })}
-              </div>
+              <>
+                <div className="product-grid">
+                  {visibleProducts.map((product) => {
+                    const isWishlisted = wishlist.some(w => (w._id || w.id) === (product._id || product.id));
+                    return (
+                      <ProductCard
+                        key={product._id || product.id}
+                        product={product}
+                        onAddToCart={handleAddToCart}
+                        onClickProductTitle={handleOpenProductDetail}
+                        onClickProductImage={handleOpenProductDetail}
+                        isWishlisted={isWishlisted}
+                        onToggleWishlist={handleToggleWishlist}
+                        cartItems={cartItems}
+                        onOpenCart={() => setIsCartOpen(true)}
+                      />
+                    );
+                  })}
+                </div>
+
+                {displayedProducts.length > visibleCount && (
+                  <div style={{ textAlign: 'center', marginTop: '2.5rem', marginBottom: '2rem' }}>
+                    <button
+                      type="button"
+                      onClick={() => setVisibleCount((prev) => prev + 16)}
+                      style={{
+                        background: 'linear-gradient(135deg, #c026d3 0%, #a21caf 100%)',
+                        color: 'white',
+                        border: 'none',
+                        padding: '0.8rem 2.2rem',
+                        borderRadius: '24px',
+                        fontWeight: '800',
+                        fontSize: '0.95rem',
+                        cursor: 'pointer',
+                        boxShadow: '0 4px 14px rgba(192, 38, 211, 0.25)',
+                        transition: 'all 0.2s ease'
+                      }}
+                    >
+                      Show More Products ({displayedProducts.length - visibleCount} Remaining)
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </main>
         </div>

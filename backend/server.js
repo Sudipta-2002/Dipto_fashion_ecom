@@ -65,6 +65,22 @@ app.get('/api', (req, res) => {
 // Connect DB
 connectDB();
 
+// Initialize remainingStock = quantity for existing products if missing
+const initializeRemainingStockForExistingProducts = async () => {
+  try {
+    if (isMongoConnected()) {
+      await Product.updateMany(
+        { $or: [{ remainingStock: { $exists: false } }, { remainingStock: null }] },
+        [{ $set: { remainingStock: '$quantity' } }]
+      );
+      console.log('Sanitized existing products with remainingStock = quantity in MongoDB.');
+    }
+  } catch (err) {
+    console.warn('Remaining stock initialization warning:', err.message);
+  }
+};
+setTimeout(initializeRemainingStockForExistingProducts, 3000);
+
 // In-Memory Fallback Store with Flipkart/Myntra style Ratings & Reviews
 let memoryCategories = [
   { _id: 'cat_1', name: 'Saree', description: 'Traditional & Designer Sarees' },
@@ -515,13 +531,16 @@ app.post(['/api/products', '/products'], async (req, res) => {
       return res.status(400).json({ message: 'Product title, category, MRP, offer price, and at least 1 image are required' });
     }
 
+    const enteredQty = Number(quantity) || 10;
+
     if (isMongoConnected()) {
       const prod = await Product.create({
         name,
         category,
         mrp: Number(mrp),
         price: Number(price),
-        quantity: Number(quantity) || 10,
+        quantity: enteredQty,
+        remainingStock: enteredQty,
         rating: Number(rating) || 4.5,
         reviewsCount: Number(reviewsCount) || 142,
         images,
@@ -536,7 +555,8 @@ app.post(['/api/products', '/products'], async (req, res) => {
         category,
         mrp: Number(mrp),
         price: Number(price),
-        quantity: Number(quantity) || 10,
+        quantity: enteredQty,
+        remainingStock: enteredQty,
         rating: Number(rating) || 4.5,
         reviewsCount: Number(reviewsCount) || 142,
         images,
@@ -559,7 +579,18 @@ app.put(['/api/products/:id', '/products/:id'], async (req, res) => {
       return res.status(400).json({ message: 'At least 1 image is required for product update' });
     }
 
+    const enteredQty = Number(quantity) || 10;
+
     if (isMongoConnected()) {
+      const existing = await Product.findById(id);
+      let newRemaining = enteredQty;
+      if (existing) {
+        const oldQty = Number(existing.quantity) || 0;
+        const oldRem = existing.remainingStock !== undefined && existing.remainingStock !== null ? Number(existing.remainingStock) : oldQty;
+        const diff = enteredQty - oldQty;
+        newRemaining = Math.max(0, oldRem + diff);
+      }
+
       const updated = await Product.findByIdAndUpdate(
         id,
         {
@@ -567,7 +598,8 @@ app.put(['/api/products/:id', '/products/:id'], async (req, res) => {
           category,
           mrp: Number(mrp),
           price: Number(price),
-          quantity: Number(quantity),
+          quantity: enteredQty,
+          remainingStock: newRemaining,
           rating: Number(rating) || 4.5,
           reviewsCount: Number(reviewsCount) || 142,
           images,
@@ -580,11 +612,16 @@ app.put(['/api/products/:id', '/products/:id'], async (req, res) => {
     } else {
       const prod = memoryProducts.find(p => p._id === id);
       if (prod) {
+        const oldQty = Number(prod.quantity) || 0;
+        const oldRem = prod.remainingStock !== undefined && prod.remainingStock !== null ? Number(prod.remainingStock) : oldQty;
+        const diff = enteredQty - oldQty;
+
         prod.name = name;
         prod.category = category;
         prod.mrp = Number(mrp);
         prod.price = Number(price);
-        prod.quantity = Number(quantity);
+        prod.quantity = enteredQty;
+        prod.remainingStock = Math.max(0, oldRem + diff);
         prod.rating = Number(rating) || 4.5;
         prod.reviewsCount = Number(reviewsCount) || 142;
         prod.images = images;
@@ -773,6 +810,173 @@ app.use('/api/coupons', couponRoutes);
 app.use('/coupons', couponRoutes);
 app.use('/admin/coupons', couponRoutes);
 
+// --- INVENTORY REMAINING STOCK SYSTEM HELPERS ---
+
+const findProductByItem = async (item) => {
+  if (!item) return null;
+  const rawId = item.productId || item._id || item.id || (typeof item.product === 'object' ? (item.product._id || item.product.id) : item.product);
+
+  if (isMongoConnected()) {
+    if (rawId) {
+      try {
+        const prod = await Product.findById(rawId);
+        if (prod) return prod;
+      } catch (err) {}
+    }
+    if (item.name) {
+      try {
+        const prod = await Product.findOne({ name: item.name });
+        if (prod) return prod;
+      } catch (err) {}
+    }
+  } else {
+    if (rawId) {
+      const prod = memoryProducts.find((p) => String(p._id || p.id) === String(rawId));
+      if (prod) return prod;
+    }
+    if (item.name) {
+      const prod = memoryProducts.find((p) => p.name === item.name);
+      if (prod) return prod;
+    }
+  }
+  return null;
+};
+
+const checkStockValidation = async (items) => {
+  if (!items || !Array.isArray(items) || items.length === 0) return { valid: true };
+
+  for (const item of items) {
+    const reqQty = Number(item.quantity) || 1;
+    const prod = await findProductByItem(item);
+    let available = 10;
+    if (prod) {
+      available = prod.remainingStock !== undefined && prod.remainingStock !== null ? prod.remainingStock : prod.quantity;
+    }
+
+    if (available < reqQty) {
+      const prodName = prod ? prod.name : (item.name || 'Product');
+      return { valid: false, message: `Insufficient stock for ${prodName}` };
+    }
+  }
+
+  return { valid: true };
+};
+
+const deductRemainingStock = async (orderRef, items) => {
+  if (!items || !Array.isArray(items) || items.length === 0) return;
+
+  let orderObj = null;
+  let orderIdStr = typeof orderRef === 'string' ? orderRef : (orderRef?.orderId || orderRef?._id || 'ORDER');
+
+  if (isMongoConnected()) {
+    if (typeof orderRef === 'string') {
+      orderObj = await Order.findOne({ $or: [{ _id: orderRef }, { orderId: orderRef }] }).catch(() => null);
+    } else {
+      orderObj = orderRef;
+    }
+
+    if (orderObj && orderObj.stockDeducted) {
+      console.log(`[STOCK DEDUCTION SKIPPED] Order ${orderIdStr} stock was already deducted.`);
+      return;
+    }
+  } else if (typeof orderRef === 'object' && orderRef.stockDeducted) {
+    console.log(`[STOCK DEDUCTION SKIPPED] Order ${orderIdStr} stock was already deducted.`);
+    return;
+  }
+
+  for (const item of items) {
+    const qtyDeduct = Number(item.quantity) || 1;
+    const prod = await findProductByItem(item);
+
+    if (prod) {
+      const prevRem = prod.remainingStock !== undefined && prod.remainingStock !== null ? prod.remainingStock : prod.quantity;
+      const newRem = Math.max(0, prevRem - qtyDeduct);
+      prod.remainingStock = newRem;
+
+      if (isMongoConnected() && typeof prod.save === 'function') {
+        await prod.save();
+      }
+
+      console.log(`========================================`);
+      console.log(`[STOCK DEDUCTION EXECUTED]`);
+      console.log(`Order ID: ${orderIdStr}`);
+      console.log(`Product ID: ${prod._id || prod.id}`);
+      console.log(`Ordered Quantity: ${qtyDeduct}`);
+      console.log(`Previous remainingStock: ${prevRem}`);
+      console.log(`New remainingStock: ${newRem}`);
+      console.log(`========================================`);
+    } else {
+      console.warn(`[STOCK DEDUCTION FAILED] Product not found for item:`, item.name || item);
+    }
+  }
+
+  if (orderObj) {
+    orderObj.stockDeducted = true;
+    if (isMongoConnected() && typeof orderObj.save === 'function') {
+      await orderObj.save().catch(() => {});
+    }
+  }
+};
+
+const restoreRemainingStock = async (orderRef, items, reasonType = 'Cancellation') => {
+  if (!items || !Array.isArray(items) || items.length === 0) return;
+
+  let orderObj = null;
+  let orderIdStr = typeof orderRef === 'string' ? orderRef : (orderRef?.orderId || orderRef?._id || 'ORDER');
+
+  if (isMongoConnected()) {
+    if (typeof orderRef === 'string') {
+      orderObj = await Order.findOne({ $or: [{ _id: orderRef }, { orderId: orderRef }] }).catch(() => null);
+    } else {
+      orderObj = orderRef;
+    }
+
+    if (reasonType === 'Cancellation' && orderObj && orderObj.stockRestored) {
+      console.log(`[STOCK RESTORATION SKIPPED] Order ${orderIdStr} stock was already restored for cancellation.`);
+      return;
+    }
+    if (reasonType === 'ReturnApproved' && orderObj && orderObj.returnStockRestored) {
+      console.log(`[STOCK RESTORATION SKIPPED] Order ${orderIdStr} stock was already restored for return approval.`);
+      return;
+    }
+  } else if (orderRef) {
+    if (reasonType === 'Cancellation' && orderRef.stockRestored) return;
+    if (reasonType === 'ReturnApproved' && orderRef.returnStockRestored) return;
+  }
+
+  for (const item of items) {
+    const qtyRestore = Number(item.quantity) || 1;
+    const prod = await findProductByItem(item);
+
+    if (prod) {
+      const prevRem = prod.remainingStock !== undefined && prod.remainingStock !== null ? prod.remainingStock : prod.quantity;
+      const newRem = prevRem + qtyRestore;
+      prod.remainingStock = newRem;
+
+      if (isMongoConnected() && typeof prod.save === 'function') {
+        await prod.save();
+      }
+
+      console.log(`========================================`);
+      console.log(`[STOCK RESTORATION EXECUTED (${reasonType})]`);
+      console.log(`Order ID: ${orderIdStr}`);
+      console.log(`Product ID: ${prod._id || prod.id}`);
+      console.log(`Restored Quantity: ${qtyRestore}`);
+      console.log(`Previous remainingStock: ${prevRem}`);
+      console.log(`New remainingStock: ${newRem}`);
+      console.log(`========================================`);
+    }
+  }
+
+  if (orderObj) {
+    if (reasonType === 'Cancellation') orderObj.stockRestored = true;
+    if (reasonType === 'ReturnApproved') orderObj.returnStockRestored = true;
+    if (isMongoConnected() && typeof orderObj.save === 'function') {
+      await orderObj.save().catch(() => {});
+    }
+  }
+};
+
 // --- ORDER ROUTES ---
 
 app.post(['/api/orders', '/orders'], async (req, res) => {
@@ -791,6 +995,11 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
     const { items, totalAmount, couponCode, couponDiscount, shippingAddress, utrNumber, paymentMethod, status, orderId: customOrderId } = req.body;
     if (!items || items.length === 0 || !totalAmount || !shippingAddress || !utrNumber) {
       return res.status(400).json({ success: false, message: 'Incomplete order details' });
+    }
+
+    const stockCheck = await checkStockValidation(items);
+    if (!stockCheck.valid) {
+      return res.status(400).json({ success: false, message: stockCheck.message });
     }
 
     const orderId = customOrderId || 'DF-' + Math.floor(100000 + Math.random() * 900000);
@@ -847,6 +1056,8 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
         });
       }
 
+      await deductRemainingStock(order, items);
+
       try {
         broadcastNewOrder(order);
       } catch (bErr) {
@@ -868,6 +1079,7 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
       if (existingIndex !== -1) {
         memoryOrders[existingIndex].status = finalStatus;
         memoryOrders[existingIndex].utrNumber = utrNumber;
+        await deductRemainingStock(memoryOrders[existingIndex], items);
         return res.json(memoryOrders[existingIndex]);
       }
 
@@ -888,6 +1100,7 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
         createdAt: new Date().toISOString()
       };
       memoryOrders.unshift(newOrder);
+      await deductRemainingStock(newOrder, items);
 
       try {
         broadcastNewOrder(newOrder);
@@ -1115,12 +1328,27 @@ app.post([
 
 app.get(['/api/orders', '/orders', '/api/admin/orders', '/admin/orders'], async (req, res) => {
   try {
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 0;
+
     if (isMongoConnected()) {
-      const orders = await Order.find().sort({ createdAt: -1 });
-      console.log("Fetched all orders for Admin:", orders.length);
+      const totalCount = await Order.countDocuments();
+      res.setHeader('X-Total-Count', totalCount);
+
+      let mongoQuery = Order.find().sort({ createdAt: -1 });
+      if (limit > 0) {
+        const skip = (page - 1) * limit;
+        mongoQuery = mongoQuery.skip(skip).limit(limit);
+      }
+      const orders = await mongoQuery;
+      console.log(`Fetched orders for Admin (page=${page}, limit=${limit}, total=${totalCount}):`, orders.length);
       return res.json(orders);
     } else {
-      console.log("Fetched all orders for Admin (memory):", memoryOrders.length);
+      res.setHeader('X-Total-Count', memoryOrders.length);
+      if (limit > 0) {
+        const skip = (page - 1) * limit;
+        return res.json(memoryOrders.slice(skip, skip + limit));
+      }
       return res.json(memoryOrders);
     }
   } catch (err) {
@@ -1248,9 +1476,15 @@ app.post('/api/orders/:id/cancel', async (req, res) => {
         return res.status(400).json({ message: 'Cannot cancel order once it has been shipped or delivered!' });
       }
 
+      const prevStatus = order.status;
       order.status = 'Cancelled';
       order.cancellationDetails = cancellationData;
       await order.save();
+
+      if (prevStatus !== 'Cancelled') {
+        await restoreRemainingStock(order, order.items, 'Cancellation');
+      }
+
       return res.json({ message: 'Cancelled Confirmed', order });
     } else {
       const order = memoryOrders.find(o => o._id === id || o.orderId === id);
@@ -1260,8 +1494,14 @@ app.post('/api/orders/:id/cancel', async (req, res) => {
         return res.status(400).json({ message: 'Cannot cancel order once it has been shipped or delivered!' });
       }
 
+      const prevStatus = order.status;
       order.status = 'Cancelled';
       order.cancellationDetails = cancellationData;
+
+      if (prevStatus !== 'Cancelled') {
+        await restoreRemainingStock(order, order.items, 'Cancellation');
+      }
+
       return res.json({ message: 'Cancelled Confirmed', order });
     }
   } catch (err) {
@@ -1280,17 +1520,39 @@ app.put('/api/orders/:id/status', async (req, res) => {
     }
 
     if (isMongoConnected()) {
-      const order = await Order.findByIdAndUpdate(
-        id,
-        { status, rejectionReason: rejectionReason || '' },
-        { new: true }
-      );
-      return res.json(order);
+      const existingOrder = await Order.findById(id);
+      if (!existingOrder) return res.status(404).json({ message: 'Order not found' });
+      const previousStatus = existingOrder.status;
+
+      existingOrder.status = status;
+      if (rejectionReason) existingOrder.rejectionReason = rejectionReason;
+      const updated = await existingOrder.save();
+
+      // Trigger stock deduction upon Order Confirmation (Accepted / Shipped / Out for Delivery / Delivered)
+      if (['Accepted', 'Shipped', 'Out for Delivery', 'Delivered'].includes(status)) {
+        await deductRemainingStock(existingOrder, existingOrder.items);
+      } else if (['Cancelled', 'Rejected'].includes(status)) {
+        await restoreRemainingStock(existingOrder, existingOrder.items, 'Cancellation');
+      } else if (['Return Approved', 'Refund Completed'].includes(status)) {
+        await restoreRemainingStock(existingOrder, existingOrder.items, 'ReturnApproved');
+      }
+
+      return res.json(updated);
     } else {
       const order = memoryOrders.find(o => o._id === id || o.orderId === id);
       if (order) {
+        const previousStatus = order.status;
         order.status = status;
         if (rejectionReason) order.rejectionReason = rejectionReason;
+
+        if (['Accepted', 'Shipped', 'Out for Delivery', 'Delivered'].includes(status)) {
+          await deductRemainingStock(order, order.items);
+        } else if (['Cancelled', 'Rejected'].includes(status)) {
+          await restoreRemainingStock(order, order.items, 'Cancellation');
+        } else if (['Return Approved', 'Refund Completed'].includes(status)) {
+          await restoreRemainingStock(order, order.items, 'ReturnApproved');
+        }
+
         return res.json(order);
       }
       return res.status(404).json({ message: 'Order not found' });

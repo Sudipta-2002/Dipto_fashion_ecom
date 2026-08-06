@@ -44,30 +44,60 @@ const groupOrdersByDate = (ordersList) => {
 const AdminOrders = ({ realtimeOrderUpdate }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [totalCount, setTotalCount] = useState(0);
   const [selectedUtrModal, setSelectedUtrModal] = useState(null);
   const [shippingDocketOrder, setShippingDocketOrder] = useState(null);
 
-  const fetchOrders = async (forceRefresh = false) => {
-    const { data: cachedData } = await fetchWithCache(
-      'admin_orders',
-      async () => {
-        const res = await fetch(`${API_URL}/api/orders`);
-        return await res.json();
-      },
-      { forceRefresh }
-    );
-
-    if (cachedData) {
-      setOrders(cachedData);
-      setLoading(false);
-    } else {
+  const fetchOrders = async (pageNum = 1, isAppend = false) => {
+    if (pageNum === 1 && !isAppend) {
       setLoading(true);
+    } else {
+      setLoadingMore(true);
+    }
+
+    try {
+      const res = await fetch(`${API_URL}/api/orders?page=${pageNum}&limit=15`);
+      const totalHeader = res.headers.get('X-Total-Count');
+      const total = totalHeader ? parseInt(totalHeader, 10) : 0;
+      const data = await res.json();
+
+      if (Array.isArray(data)) {
+        if (isAppend) {
+          setOrders((prev) => {
+            const existingIds = new Set(prev.map((o) => o._id || o.orderId));
+            const newUnique = data.filter((o) => !existingIds.has(o._id || o.orderId));
+            return [...prev, ...newUnique];
+          });
+        } else {
+          setOrders(data);
+        }
+
+        const totalNum = total || data.length;
+        setTotalCount(totalNum);
+        setPage(pageNum);
+        const currentLoaded = isAppend ? orders.length + data.length : data.length;
+        setHasMore(data.length === 15 && (totalNum ? currentLoaded < totalNum : true));
+      }
+    } catch (err) {
+      console.error('Error fetching admin orders:', err);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
     }
   };
 
   useEffect(() => {
-    fetchOrders();
+    fetchOrders(1, false);
   }, []);
+
+  const handleLoadMore = () => {
+    if (!loadingMore && hasMore) {
+      fetchOrders(page + 1, true);
+    }
+  };
 
   // REAL-TIME ORDER PREPENDING
   useEffect(() => {
@@ -80,27 +110,52 @@ const AdminOrders = ({ realtimeOrderUpdate }) => {
         if (exists) return prevOrders;
         return [realtimeOrderUpdate, ...prevOrders];
       });
+      setTotalCount((prev) => prev + 1);
     }
   }, [realtimeOrderUpdate]);
 
+  // OPTIMISTIC UI UPDATES (0ms Latency Instant Feedback with Rollback)
   const updateOrderStatus = async (orderId, newStatus, reason = '') => {
+    let previousOrders = [];
+
+    // 1. Instantly update React local UI state (0ms latency)
+    setOrders((prevOrders) => {
+      previousOrders = prevOrders;
+      return prevOrders.map((o) => {
+        if ((o._id || o.orderId) === orderId) {
+          const updatedObj = { ...o, status: newStatus };
+          if (reason) updatedObj.rejectionReason = reason;
+          return updatedObj;
+        }
+        return o;
+      });
+    });
+
+    // If Accepted, automatically open Shipping Label Docket
+    if (newStatus === 'Accepted') {
+      const targetOrder = orders.find((o) => (o._id || o.orderId) === orderId);
+      if (targetOrder) {
+        setShippingDocketOrder({ ...targetOrder, status: 'Accepted' });
+      }
+    }
+
+    // 2. Perform background API request
     try {
       const res = await fetch(`${API_URL}/api/orders/${orderId}/status`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus, rejectionReason: reason })
       });
-      if (res.ok) {
-        const updated = await res.json();
-        alert(`Order status updated to "${newStatus}"`);
-        fetchOrders();
 
-        if (newStatus === 'Accepted') {
-          setShippingDocketOrder(updated);
-        }
+      if (!res.ok) {
+        // Rollback state if server returns non-ok status
+        setOrders(previousOrders);
+        alert(`Failed to update order status to "${newStatus}". Reverting change.`);
       }
     } catch (e) {
-      alert('Error updating order status');
+      // Rollback state on network error
+      setOrders(previousOrders);
+      alert(`Network error updating order status. Reverting change.`);
     }
   };
 
@@ -271,7 +326,7 @@ const AdminOrders = ({ realtimeOrderUpdate }) => {
           Customer Orders Management
         </h3>
         <span style={{ fontSize: '0.82rem', fontWeight: '700', color: '#64748b', background: '#f1f5f9', padding: '4px 10px', borderRadius: '20px' }}>
-          Total Orders: {orders.length}
+          Loaded: {orders.length} {totalCount ? `/ ${totalCount} Total Orders` : 'Orders'}
         </span>
       </div>
 
@@ -369,6 +424,31 @@ const AdminOrders = ({ realtimeOrderUpdate }) => {
               </div>
             );
           })}
+
+          {/* LOAD MORE ORDERS BUTTON */}
+          {hasMore && (
+            <div style={{ textAlign: 'center', marginTop: '1rem', marginBottom: '1rem' }}>
+              <button
+                onClick={handleLoadMore}
+                disabled={loadingMore}
+                style={{
+                  background: 'white',
+                  color: '#c026d3',
+                  border: '2px solid #c026d3',
+                  borderRadius: '24px',
+                  padding: '0.65rem 1.8rem',
+                  fontSize: '0.9rem',
+                  fontWeight: '800',
+                  cursor: loadingMore ? 'not-allowed' : 'pointer',
+                  boxShadow: '0 4px 12px rgba(192, 38, 211, 0.12)',
+                  transition: 'all 0.2s ease',
+                  opacity: loadingMore ? 0.7 : 1
+                }}
+              >
+                {loadingMore ? 'Loading More Orders...' : `Load More Orders (Showing ${orders.length}${totalCount ? ` of ${totalCount}` : ''})`}
+              </button>
+            </div>
+          )}
         </>
       )}
 

@@ -462,20 +462,35 @@ const ProductDetailModal = ({
             </p>
 
             {/* Features list */}
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.85rem 1rem', marginBottom: '1.25rem', fontSize: '0.85rem', color: '#334155', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <ShieldCheck size={18} color="#16a34a" /> 100% Authentic Quality
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Truck size={18} color="#0284c7" /> Express Free Shipping
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <RotateCcw size={18} color="#c026d3" /> 7-Day Easy Return
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                <Check size={18} color="#d97706" /> In Stock & Ready to Ship
-              </div>
-            </div>
+            {(() => {
+              const remStock = product.remainingStock !== undefined && product.remainingStock !== null ? product.remainingStock : (product.quantity !== undefined ? product.quantity : 10);
+              const isOutOfStock = remStock <= 0;
+
+              return (
+                <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.85rem 1rem', marginBottom: '1.25rem', fontSize: '0.85rem', color: '#334155', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.6rem' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <ShieldCheck size={18} color="#16a34a" /> 100% Authentic Quality
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <Truck size={18} color="#0284c7" /> Express Free Shipping
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <RotateCcw size={18} color="#c026d3" /> 7-Day Easy Return
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {isOutOfStock ? (
+                      <span style={{ color: '#dc2626', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <AlertCircle size={18} color="#dc2626" /> Out of Stock
+                      </span>
+                    ) : (
+                      <span style={{ color: '#16a34a', fontWeight: '800', display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                        <Check size={18} color="#16a34a" /> In Stock ({remStock} Available)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Customer Comments & Ratings List */}
             {product.reviews && product.reviews.length > 0 && (
@@ -499,10 +514,23 @@ const ProductDetailModal = ({
               </div>
             )}
 
-            {/* DYNAMIC ACTION BUTTON: Add Product (blinking green) when not in cart, Place Order (blinking green) when in cart */}
+            {/* DYNAMIC ACTION BUTTON: Disabled when out of stock */}
             {(() => {
+              const remStock = product.remainingStock !== undefined && product.remainingStock !== null ? product.remainingStock : (product.quantity !== undefined ? product.quantity : 10);
+              const isOutOfStock = remStock <= 0;
               const isCurrentInCart = cartItems.some((item) => (item._id || item.id) === currentId);
-              if (!isCurrentInCart) {
+
+              if (isOutOfStock) {
+                return (
+                  <button
+                    className="btn-primary"
+                    style={{ width: '100%', justifyContent: 'center', padding: '0.95rem', fontSize: '1.05rem', marginTop: 'auto', borderRadius: '12px', background: '#94a3b8', cursor: 'not-allowed', boxShadow: 'none' }}
+                    disabled
+                  >
+                    <span>Out of Stock</span>
+                  </button>
+                );
+              } else if (!isCurrentInCart) {
                 return (
                   <button
                     className="btn-primary blink-green"
@@ -518,13 +546,10 @@ const ProductDetailModal = ({
                   <button
                     className="btn-primary blink-green"
                     style={{ width: '100%', justifyContent: 'center', padding: '0.95rem', fontSize: '1.05rem', marginTop: 'auto', borderRadius: '12px' }}
-                    onClick={() => {
-                      onClose();
-                      if (onOpenCart) onOpenCart();
-                    }}
+                    onClick={() => (onOpenCart ? onOpenCart() : handleAddToCart())}
                   >
                     <ArrowRight size={20} />
-                    <span>Place Order {selectedSize ? `(Size: ${selectedSize})` : ''}</span>
+                    <span>Place Order</span>
                   </button>
                 );
               }

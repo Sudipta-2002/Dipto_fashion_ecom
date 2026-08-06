@@ -2,6 +2,8 @@ import mongoose from 'mongoose';
 
 const orderItemSchema = new mongoose.Schema({
   product: { type: mongoose.Schema.Types.Mixed, required: false },
+  productId: { type: String, required: false },
+  _id: { type: String, required: false },
   name: { type: String, required: true },
   quantity: { type: Number, required: true, default: 1 },
   price: { type: Number, required: true },
@@ -38,6 +40,9 @@ const orderSchema = new mongoose.Schema({
     enum: ['Pending Verification', 'Accepted', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Rejected', 'Return Requested', 'Return Approved', 'Refund Completed'], 
     default: 'Pending Verification' 
   },
+  stockDeducted: { type: Boolean, default: false },
+  stockRestored: { type: Boolean, default: false },
+  returnStockRestored: { type: Boolean, default: false },
   rejectionReason: { type: String, default: '' },
   cancellationDetails: {
     reason: { type: String, default: '' },

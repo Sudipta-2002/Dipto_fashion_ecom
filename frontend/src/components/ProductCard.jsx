@@ -22,9 +22,11 @@ const ProductCard = ({
   // Check if product is currently in cart
   const productId = product._id || product.id;
   const isInCart = cartItems.some((item) => (item._id || item.id) === productId);
+  const remStock = product.remainingStock !== undefined && product.remainingStock !== null ? product.remainingStock : (product.quantity !== undefined ? product.quantity : 10);
+  const isOutOfStock = remStock <= 0;
 
   return (
-    <div className="product-card" style={{ position: 'relative' }}>
+    <div className="product-card" style={{ position: 'relative', opacity: isOutOfStock ? 0.82 : 1 }}>
       {/* WISHLIST HEART BUTTON AT TOP RIGHT */}
       {onToggleWishlist && (
         <button
@@ -68,8 +70,14 @@ const ProductCard = ({
         
         {category && <span className="category-tag">{category}</span>}
 
-        {discountPercent > 0 && (
-          <span className="discount-badge">{discountPercent}% OFF</span>
+        {isOutOfStock ? (
+          <span style={{ position: 'absolute', top: '10px', left: '10px', background: '#dc2626', color: 'white', fontWeight: '900', fontSize: '0.72rem', padding: '3px 9px', borderRadius: '12px', zIndex: 12, boxShadow: '0 2px 6px rgba(220, 38, 38, 0.4)' }}>
+            OUT OF STOCK
+          </span>
+        ) : (
+          discountPercent > 0 && (
+            <span className="discount-badge">{discountPercent}% OFF</span>
+          )
         )}
 
         {/* MYNTRA APP STYLE RATING CAPSULE OVERLAY AT BOTTOM LEFT */}
@@ -110,8 +118,16 @@ const ProductCard = ({
           )}
         </div>
 
-        {/* Dynamic Blinking Green Button: Add Product when not in cart, Place Order when in cart */}
-        {!isInCart ? (
+        {/* Dynamic Button: Disabled when Out of Stock */}
+        {isOutOfStock ? (
+          <button
+            className="btn-primary"
+            style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem', padding: '0.5rem', fontSize: '0.82rem', background: '#94a3b8', cursor: 'not-allowed', boxShadow: 'none' }}
+            disabled
+          >
+            <span>Out of Stock</span>
+          </button>
+        ) : !isInCart ? (
           <button
             className="btn-primary blink-green"
             style={{ width: '100%', justifyContent: 'center', marginTop: '0.5rem', padding: '0.5rem', fontSize: '0.82rem' }}
