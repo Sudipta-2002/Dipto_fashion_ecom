@@ -1371,7 +1371,7 @@ table.admin-table th {
 
   /* Middle Scrollable Body in Mobile Modals (Cart, Address, Payment, Profile) */
   .modal-body {
-    padding-bottom: calc(130px + env(safe-area-inset-bottom)) !important;
+    padding-bottom: calc(210px + env(safe-area-inset-bottom)) !important;
     overflow-y: auto !important;
     -webkit-overflow-scrolling: touch;
   }

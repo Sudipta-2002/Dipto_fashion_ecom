@@ -247,7 +247,7 @@ const CartDrawer = ({
         </div>
 
         {/* SCROLLABLE BODY */}
-        <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflowY: 'auto', padding: '1.15rem', minHeight: 0 }}>
+        <div className="modal-body overflow-y-auto pb-52 md:pb-8" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflowY: 'auto', padding: '1.15rem', paddingBottom: 'calc(210px + env(safe-area-inset-bottom))', minHeight: 0 }}>
           {cartItems.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b' }}>
               <p style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem' }}>Your cart is empty</p>
