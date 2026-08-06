@@ -187,7 +187,7 @@ const Navbar = ({
                 style={{ width: '32px', height: '32px', borderRadius: '8px', objectFit: 'cover' }}
                 onError={(e) => { e.target.style.display = 'none'; }}
               />
-              <span style={{ fontSize: '1.15rem', fontWeight: '800', color: '#1e1b4b', letterSpacing: '-0.3px' }}>
+              <span style={{ fontSize: '1.15rem', fontWeight: '800', color: 'var(--primary, #c026d3)', letterSpacing: '-0.3px' }}>
                 Dipto Fashion
               </span>
             </div>
