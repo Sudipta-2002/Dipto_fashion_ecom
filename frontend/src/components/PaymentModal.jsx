@@ -12,6 +12,7 @@ const PaymentModal = ({
   user,
   cartItems,
   deliveryAddress,
+  appliedCoupon,
   onOrderSuccess
 }) => {
   const [step, setStep] = useState('payment'); // 'payment', 'failed', or 'success'
@@ -29,6 +30,10 @@ const PaymentModal = ({
 
   // Target UPI ID: palsudipto3@ybl
   const TARGET_UPI_ID = 'palsudipto3@ybl';
+
+  const rawTotalAmount = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  const couponDiscount = appliedCoupon ? Number(appliedCoupon.discountAmount || 0) : 0;
+  const totalAmount = Math.max(0, rawTotalAmount - couponDiscount);
 
   // Pre-load Razorpay Checkout SDK Script & Reset Timer when Modal Opens
   useEffect(() => {
@@ -122,8 +127,6 @@ const PaymentModal = ({
   }, [isOpen, step]);
 
   if (!isOpen) return null;
-
-  const totalAmount = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
 
   // Format seconds to mm:ss (e.g. 180 -> 03:00)
   const formatTime = (seconds) => {
@@ -287,6 +290,8 @@ const PaymentModal = ({
                   image: item.image
                 })),
                 totalAmount,
+                couponCode: appliedCoupon?.code || '',
+                couponDiscount,
                 shippingAddress: deliveryAddress
               })
             });
@@ -316,6 +321,8 @@ const PaymentModal = ({
                       image: item.image
                     })),
                     totalAmount,
+                    couponCode: appliedCoupon?.code || '',
+                    couponDiscount,
                     shippingAddress: deliveryAddress,
                     paymentMethod: 'RAZORPAY',
                     status: 'Accepted',
@@ -398,89 +405,120 @@ const PaymentModal = ({
         style={
           step === 'success'
             ? { width: '92%', maxWidth: '460px', borderRadius: '16px', margin: 'auto', position: 'relative', height: 'auto', maxHeight: '92vh', overflowY: 'auto' }
-            : { width: '100%', maxWidth: '400px', height: '100vh', borderRadius: '0', position: 'fixed', right: '0', top: '0', bottom: '0', padding: 0, display: 'flex', flexDirection: 'column' }
+            : { width: '100%', maxWidth: '400px', height: '100dvh', borderRadius: '0', position: 'fixed', right: '0', top: '0', bottom: '0', padding: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }
         }
         onClick={(e) => e.stopPropagation()}
       >
-        {/* Header with Dipto Fashion Logo & Brand Name */}
-        <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)', padding: '1rem 1.25rem', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            {step !== 'success' && onBackToCheckout && (
-              <button
-                type="button"
-                onClick={onBackToCheckout}
-                style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-                title="Back to Address"
-              >
-                <ArrowLeft size={18} />
-              </button>
-            )}
-            <img src="/logo.jpg" alt="Dipto Fashion" style={{ width: '38px', height: '38px', borderRadius: '8px', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.3)' }} onError={(e) => e.target.style.display = 'none'} />
-            <div>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, letterSpacing: '0.5px' }}>Dipto Fashion</h3>
-              <p style={{ fontSize: '0.72rem', opacity: 0.85, margin: 0 }}>
-                {step === 'success' ? 'Order Confirmation' : 'UPI QR Payment Gateway'}
-              </p>
+        {/* FIXED TOP NAVBAR */}
+        <div className="modal-top-navbar" style={{ flexShrink: 0, zIndex: 10 }}>
+          {/* Header with Dipto Fashion Logo & Brand Name */}
+          <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)', padding: '1rem 1.25rem', paddingTop: 'max(1rem, env(safe-area-inset-top))', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+              {step !== 'success' && onBackToCheckout && (
+                <button
+                  type="button"
+                  onClick={onBackToCheckout}
+                  style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', width: '32px', height: '32px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+                  title="Back to Address"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+              )}
+              <img src="/logo.jpg" alt="Dipto Fashion" style={{ width: '38px', height: '38px', borderRadius: '8px', objectFit: 'cover', border: '2px solid rgba(255,255,255,0.3)' }} onError={(e) => e.target.style.display = 'none'} />
+              <div>
+                <h3 style={{ fontSize: '1.15rem', fontWeight: '800', margin: 0, letterSpacing: '0.5px' }}>Dipto Fashion</h3>
+                <p style={{ fontSize: '0.72rem', opacity: 0.85, margin: 0 }}>
+                  {step === 'success' ? 'Order Confirmation' : 'UPI QR Payment Gateway'}
+                </p>
+              </div>
             </div>
+            <button className="close-btn" onClick={onClose} style={{ color: 'white', background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }} title="Close Modal">
+              <X size={18} />
+            </button>
           </div>
-          <button className="close-btn" onClick={onClose} style={{ color: 'white', background: 'rgba(255,255,255,0.2)', border: 'none', borderRadius: '50%', width: '30px', height: '30px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer' }} title="Close Modal">
-            <X size={18} />
-          </button>
+
+          {/* 3-STEP PROGRESS TRACKER SYSTEM */}
+          <CheckoutProgressTracker currentStep={step === 'success' ? 'confirmation' : 'payment'} />
         </div>
 
-        {/* 3-STEP PROGRESS TRACKER SYSTEM */}
-        <CheckoutProgressTracker currentStep={step === 'success' ? 'confirmation' : 'payment'} />
         {step === 'payment' && (
-          <div className="modal-body" style={{ padding: '1.25rem 1.25rem' }}>
-            {/* ORDER SUMMARY HEADER */}
-            <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.85rem 1rem', marginBottom: '1rem' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
-                <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '700' }}>Order ID</span>
-                <span style={{ fontSize: '0.95rem', fontWeight: '800', color: '#c026d3' }}>{fixedOrderId}</span>
+          <>
+            {/* SCROLLABLE BODY CONTENT */}
+            <div className="modal-body" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflowY: 'auto', padding: '1.25rem', minHeight: 0 }}>
+              {/* ORDER SUMMARY HEADER */}
+              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.85rem 1rem', marginBottom: '1rem' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '700' }}>Order ID</span>
+                  <span style={{ fontSize: '0.95rem', fontWeight: '800', color: '#c026d3' }}>{fixedOrderId}</span>
+                </div>
+                {couponDiscount > 0 && (
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.4rem', fontSize: '0.82rem', color: '#15803d', fontWeight: '700' }}>
+                    <span>Coupon Discount ({appliedCoupon.code})</span>
+                    <span>-₹{couponDiscount.toLocaleString('en-IN')}</span>
+                  </div>
+                )}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '700' }}>Payable Amount</span>
+                  <span style={{ fontSize: '1.15rem', fontWeight: '900', color: '#16a34a' }}>₹{totalAmount.toLocaleString('en-IN')}</span>
+                </div>
               </div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ fontSize: '0.75rem', color: '#64748b', textTransform: 'uppercase', fontWeight: '700' }}>Payable Amount</span>
-                <span style={{ fontSize: '1.15rem', fontWeight: '900', color: '#16a34a' }}>₹{totalAmount.toLocaleString('en-IN')}</span>
+
+              {/* ERROR ALERT DISPLAY */}
+              {utrError && (
+                <div style={{ background: '#fef2f2', border: '1.5px solid #fca5a5', color: '#b91c1c', padding: '0.75rem 0.85rem', borderRadius: '10px', marginBottom: '1rem', fontSize: '0.82rem', fontWeight: '600' }}>
+                  ⚠️ {utrError}
+                </div>
+              )}
+
+              {/* ULTRA-ATTRACTIVE PROFESSIONAL RAZORPAY PAYMENT CARD */}
+              <div style={{
+                background: 'linear-gradient(135deg, #090d16 0%, #1e1b4b 50%, #31103f 100%)',
+                borderRadius: '20px',
+                padding: '1.75rem 1.35rem',
+                color: 'white',
+                marginBottom: '1rem',
+                boxShadow: '0 16px 36px rgba(15, 23, 42, 0.4), 0 0 1px 1px rgba(255, 255, 255, 0.15) inset',
+                position: 'relative',
+                overflow: 'hidden',
+                textAlign: 'center'
+              }}>
+                {/* Glowing decorative gradient accent */}
+                <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '120px', height: '120px', background: 'radial-gradient(circle, rgba(192,38,211,0.35) 0%, rgba(0,0,0,0) 70%)', pointerEvents: 'none' }} />
+
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '5px 14px', borderRadius: '30px', marginBottom: '0.85rem' }}>
+                  <ShieldCheck size={18} style={{ color: '#38bdf8' }} />
+                  <span style={{ fontSize: '0.78rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', color: '#38bdf8' }}>
+                    100% Secure Payment
+                  </span>
+                </div>
+
+                <h4 style={{ fontSize: '1.25rem', fontWeight: '900', margin: '0 0 0.4rem 0', color: '#ffffff', letterSpacing: '-0.3px' }}>
+                  Instant Direct Checkout
+                </h4>
+                <p style={{ fontSize: '0.82rem', color: '#cbd5e1', margin: 0, lineHeight: '1.45', fontWeight: '500' }}>
+                  Pay seamlessly using <strong>UPI Apps (GPay / PhonePe / Paytm / BHIM)</strong>, QR Scanner, Cards or NetBanking.
+                </p>
+              </div>
+
+              {/* SSL ENCRYPTION TRUST BADGE */}
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#64748b', fontSize: '0.78rem', fontWeight: '700', marginTop: 'auto', paddingTop: '1rem' }}>
+                <Lock size={15} color="#16a34a" /> 256-Bit SSL Encrypted Instant Payment Verification
               </div>
             </div>
 
-            {/* ERROR ALERT DISPLAY */}
-            {utrError && (
-              <div style={{ background: '#fef2f2', border: '1.5px solid #fca5a5', color: '#b91c1c', padding: '0.75rem 0.85rem', borderRadius: '10px', marginBottom: '1rem', fontSize: '0.82rem', fontWeight: '600' }}>
-                ⚠️ {utrError}
-              </div>
-            )}
-
-            {/* ULTRA-ATTRACTIVE PROFESSIONAL RAZORPAY PAYMENT CARD & PROCEED TO PAY BUTTON */}
-            <div style={{
-              background: 'linear-gradient(135deg, #090d16 0%, #1e1b4b 50%, #31103f 100%)',
-              borderRadius: '20px',
-              padding: '1.75rem 1.35rem',
-              color: 'white',
-              marginBottom: '1rem',
-              boxShadow: '0 16px 36px rgba(15, 23, 42, 0.4), 0 0 1px 1px rgba(255, 255, 255, 0.15) inset',
-              position: 'relative',
-              overflow: 'hidden',
-              textAlign: 'center'
-            }}>
-              {/* Glowing decorative gradient accent */}
-              <div style={{ position: 'absolute', top: '-40px', right: '-40px', width: '120px', height: '120px', background: 'radial-gradient(circle, rgba(192,38,211,0.35) 0%, rgba(0,0,0,0) 70%)', pointerEvents: 'none' }} />
-
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: '8px', background: 'rgba(56, 189, 248, 0.12)', border: '1px solid rgba(56, 189, 248, 0.3)', padding: '5px 14px', borderRadius: '30px', marginBottom: '0.85rem' }}>
-                <ShieldCheck size={18} style={{ color: '#38bdf8' }} />
-                <span style={{ fontSize: '0.78rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', color: '#38bdf8' }}>
-                  100% Secure Payment
-                </span>
-              </div>
-
-              <h4 style={{ fontSize: '1.25rem', fontWeight: '900', margin: '0 0 0.4rem 0', color: '#ffffff', letterSpacing: '-0.3px' }}>
-                Instant Direct Checkout
-              </h4>
-              <p style={{ fontSize: '0.82rem', color: '#cbd5e1', margin: '0 0 1.35rem 0', lineHeight: '1.45', fontWeight: '500' }}>
-                Pay seamlessly using <strong>UPI Apps (GPay / PhonePe / Paytm / BHIM)</strong>, QR Scanner, Cards or NetBanking.
-              </p>
-
-              {/* HIGHLY ATTRACTIVE VIBRANT PROCEED TO PAY BUTTON */}
+            {/* FIXED BOTTOM NAVBAR FOR PROCEED TO PAY BUTTON */}
+            <div
+              className="modal-bottom-navbar"
+              style={{
+                flexShrink: 0,
+                padding: '0.85rem 1.15rem',
+                paddingBottom: 'max(0.85rem, env(safe-area-inset-bottom))',
+                background: '#ffffff',
+                borderTop: '1px solid #e2e8f0',
+                boxShadow: '0 -4px 16px rgba(0,0,0,0.08)',
+                zIndex: 10
+              }}
+            >
               <button
                 type="button"
                 onClick={handleRazorpayPayment}
@@ -488,8 +526,8 @@ const PaymentModal = ({
                 className="btn-primary blink-green"
                 style={{
                   width: '100%',
-                  height: '54px',
-                  fontSize: '1.08rem',
+                  height: '52px',
+                  fontSize: '1.05rem',
                   fontWeight: '900',
                   borderRadius: '14px',
                   background: 'linear-gradient(135deg, #16a34a 0%, #15803d 50%, #047857 100%)',
@@ -509,12 +547,7 @@ const PaymentModal = ({
                 <ArrowLeft size={18} style={{ transform: 'rotate(180deg)' }} />
               </button>
             </div>
-
-            {/* SSL ENCRYPTION TRUST BADGE */}
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', color: '#64748b', fontSize: '0.78rem', fontWeight: '700', marginTop: '1rem' }}>
-              <Lock size={15} color="#16a34a" /> 256-Bit SSL Encrypted Instant Payment Verification
-            </div>
-          </div>
+          </>
         )}
 
         {step === 'failed' && (

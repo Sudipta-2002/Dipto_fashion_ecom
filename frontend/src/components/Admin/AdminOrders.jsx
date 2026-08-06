@@ -147,9 +147,14 @@ const AdminOrders = ({ realtimeOrderUpdate }) => {
                 </div>
               </td>
               <td>
-                <strong style={{ fontSize: '1.05rem', color: '#0f172a' }}>
+                <strong style={{ fontSize: '1.05rem', color: '#0f172a', display: 'block' }}>
                   ₹{o.totalAmount?.toLocaleString('en-IN')}
                 </strong>
+                {o.couponDiscount > 0 && (
+                  <div style={{ fontSize: '0.72rem', color: '#15803d', background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '1px 6px', borderRadius: '4px', marginTop: '2px', display: 'inline-block', fontWeight: '700' }}>
+                    Discount: -₹{o.couponDiscount?.toLocaleString('en-IN')} ({o.couponCode})
+                  </div>
+                )}
               </td>
               <td>
                 <button
@@ -383,9 +388,14 @@ const AdminOrders = ({ realtimeOrderUpdate }) => {
                 {selectedUtrModal.utrNumber}
               </div>
               <div style={{ textAlign: 'left', fontSize: '0.9rem', color: '#334155' }}>
-                <p><strong>Order ID:</strong> {selectedUtrModal.orderId}</p>
-                <p><strong>Customer Name:</strong> {selectedUtrModal.shippingAddress?.userName || selectedUtrModal.userName}</p>
-                <p><strong>Order Amount:</strong> ₹{selectedUtrModal.totalAmount?.toLocaleString('en-IN')}</p>
+                <p style={{ margin: '0 0 0.35rem 0' }}><strong>Order ID:</strong> {selectedUtrModal.orderId}</p>
+                <p style={{ margin: '0 0 0.35rem 0' }}><strong>Customer Name:</strong> {selectedUtrModal.shippingAddress?.userName || selectedUtrModal.userName}</p>
+                <p style={{ margin: '0 0 0.35rem 0' }}><strong>Actual Paid Amount:</strong> <span style={{ color: '#16a34a', fontWeight: '800' }}>₹{selectedUtrModal.totalAmount?.toLocaleString('en-IN')}</span></p>
+                {selectedUtrModal.couponDiscount > 0 && (
+                  <div style={{ color: '#15803d', background: '#f0fdf4', padding: '0.5rem 0.75rem', borderRadius: '8px', border: '1px solid #bbf7d0', fontSize: '0.82rem', marginTop: '0.5rem' }}>
+                    <strong>🏷️ Coupon Discount Applied:</strong> -₹{selectedUtrModal.couponDiscount?.toLocaleString('en-IN')} (Code: <strong>{selectedUtrModal.couponCode}</strong>)
+                  </div>
+                )}
               </div>
             </div>
           </div>

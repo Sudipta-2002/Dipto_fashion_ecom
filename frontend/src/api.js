@@ -34,17 +34,21 @@ export const parseResponseSafely = async (res) => {
       return await res.json();
     }
     const text = await res.text();
+    let cleanMessage = text;
+    if (text && (text.includes('<!DOCTYPE') || text.includes('<html') || text.includes('Cannot POST') || text.includes('Cannot GET'))) {
+      cleanMessage = `Server communication error (${res.status}): Route not found or backend service restarting.`;
+    }
     return {
       success: false,
       isHtmlError: true,
       status: res.status,
-      message: text || `Backend API returned HTTP status ${res.status}`
+      message: cleanMessage || `Backend API returned HTTP status ${res.status}`
     };
   } catch (e) {
     return {
       success: false,
       isHtmlError: true,
-      message: e.message || 'Failed to parse response payload'
+      message: 'Failed to communicate with backend server. Please try again.'
     };
   }
 };

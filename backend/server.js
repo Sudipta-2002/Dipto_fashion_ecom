@@ -15,6 +15,7 @@ import Product from './models/Product.js';
 import Order from './models/Order.js';
 import Notification from './models/Notification.js';
 import LiveSale from './models/LiveSale.js';
+import Coupon from './models/Coupon.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 
 dotenv.config();
@@ -118,6 +119,43 @@ let memoryProducts = [
 
 let memoryUsers = [];
 let memoryOrders = [];
+let memoryCoupons = [
+  {
+    _id: 'c1',
+    code: 'WELCOME100',
+    discountType: 'fixed',
+    discountAmount: 100,
+    maxDiscountAmount: 0,
+    minOrderAmount: 499,
+    description: 'Get Flat ₹100 OFF on your cart when shopping above ₹499!',
+    isActive: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    _id: 'c2',
+    code: 'FASHION200',
+    discountType: 'fixed',
+    discountAmount: 200,
+    maxDiscountAmount: 0,
+    minOrderAmount: 999,
+    description: 'Save ₹200 Flat on exclusive sarees & salwar suits over ₹999.',
+    isActive: true,
+    createdAt: new Date().toISOString()
+  },
+  {
+    _id: 'c3',
+    code: 'MEGA15',
+    discountType: 'percentage',
+    discountAmount: 15,
+    maxDiscountAmount: 300,
+    minOrderAmount: 1499,
+    description: 'Get 15% OFF up to ₹300 on orders above ₹1,499.',
+    isActive: true,
+    createdAt: new Date().toISOString()
+  }
+];
+
+global.memoryCoupons = memoryCoupons;
 
 const isMongoConnected = () => mongoose.connection.readyState === 1;
 
@@ -650,6 +688,13 @@ app.post(['/api/admin/live-sale', '/admin/live-sale', '/api/live-sale', '/live-s
   }
 });
 
+// --- COUPON API ENDPOINTS ---
+const couponRoutes = require('./routes/couponRoutes');
+app.use('/api/admin/coupons', couponRoutes);
+app.use('/api/coupons', couponRoutes);
+app.use('/coupons', couponRoutes);
+app.use('/admin/coupons', couponRoutes);
+
 // --- ORDER ROUTES ---
 
 app.post(['/api/orders', '/orders'], async (req, res) => {
@@ -659,7 +704,7 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    const { items, totalAmount, shippingAddress, utrNumber, paymentMethod, status, orderId: customOrderId } = req.body;
+    const { items, totalAmount, couponCode, couponDiscount, shippingAddress, utrNumber, paymentMethod, status, orderId: customOrderId } = req.body;
     if (!items || items.length === 0 || !totalAmount || !shippingAddress || !utrNumber) {
       return res.status(400).json({ message: 'Incomplete order details' });
     }
@@ -685,6 +730,8 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
         user: decoded.userId,
         items,
         totalAmount: Number(totalAmount),
+        couponCode: couponCode || '',
+        couponDiscount: Number(couponDiscount || 0),
         shippingAddress,
         paymentMethod: finalPaymentMethod,
         utrNumber,
@@ -712,6 +759,8 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
         shippingAddress,
         items,
         totalAmount: Number(totalAmount),
+        couponCode: couponCode || '',
+        couponDiscount: Number(couponDiscount || 0),
         utrNumber,
         status: finalStatus,
         paymentMethod: finalPaymentMethod,
@@ -793,6 +842,8 @@ app.post([
       razorpay_signature,
       items,
       totalAmount,
+      couponCode,
+      couponDiscount,
       shippingAddress,
       customOrderId
     } = req.body;
@@ -838,6 +889,8 @@ app.post([
         user: userId || undefined,
         items,
         totalAmount: Number(totalAmount),
+        couponCode: couponCode || '',
+        couponDiscount: Number(couponDiscount || 0),
         shippingAddress,
         paymentMethod: 'RAZORPAY',
         utrNumber,
@@ -868,6 +921,8 @@ app.post([
         shippingAddress,
         items,
         totalAmount: Number(totalAmount),
+        couponCode: couponCode || '',
+        couponDiscount: Number(couponDiscount || 0),
         utrNumber,
         status: 'Accepted',
         paymentMethod: 'RAZORPAY',
@@ -1296,6 +1351,24 @@ app.get('/api/admin/billing', async (req, res) => {
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
+});
+
+// --- GLOBAL JSON 404 & ERROR HANDLING MIDDLEWARE ---
+app.use((req, res, next) => {
+  res.status(404).json({
+    success: false,
+    status: 404,
+    message: `Cannot ${req.method} ${req.originalUrl} - Route not found on server`
+  });
+});
+
+app.use((err, req, res, next) => {
+  console.error("Global Express Error:", err);
+  res.status(err.status || 500).json({
+    success: false,
+    status: err.status || 500,
+    message: err.message || "Internal server error"
+  });
 });
 
 const startServer = (portToTry) => {

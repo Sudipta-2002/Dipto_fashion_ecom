@@ -238,7 +238,7 @@ function App() {
   const [lightboxProduct, setLightboxProduct] = useState(null);
   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
-  // Customer Cart State (Persistent across webpage refreshes)
+  // Customer Cart & Coupon State (Persistent across webpage refreshes)
   const [cartItems, setCartItems] = useState(() => {
     try {
       const savedCart = localStorage.getItem('df_cart');
@@ -247,6 +247,8 @@ function App() {
       return [];
     }
   });
+
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
 
   useEffect(() => {
     try {
@@ -519,6 +521,7 @@ function App() {
 
   const handleOrderSuccess = () => {
     setCartItems([]);
+    setAppliedCoupon(null);
     setIsCartOpen(false);
     setIsCheckoutOpen(false);
     try {
@@ -733,6 +736,8 @@ function App() {
         onProceedToCheckout={handleProceedToCheckout}
         user={user}
         onOpenAuth={() => setIsAuthOpen(true)}
+        appliedCoupon={appliedCoupon}
+        setAppliedCoupon={setAppliedCoupon}
       />
 
       {/* Checkout Modal */}
@@ -752,6 +757,7 @@ function App() {
         user={user}
         cartItems={cartItems}
         deliveryAddress={deliveryAddress}
+        appliedCoupon={appliedCoupon}
         onOrderSuccess={handleOrderSuccess}
       />
 

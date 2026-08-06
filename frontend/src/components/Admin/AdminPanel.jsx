@@ -14,7 +14,8 @@ import {
   Eye,
   EyeOff,
   Bell,
-  Zap
+  Zap,
+  Tag
 } from 'lucide-react';
 import { API_URL } from '../../api';
 import { clearCache } from '../../utils/cache';
@@ -27,11 +28,12 @@ import AdminReturns from './AdminReturns';
 import AdminBilling from './AdminBilling';
 import AdminNotifications from './AdminNotifications';
 import AdminLiveSale from './AdminLiveSale';
+import AdminCoupons from './AdminCoupons';
 
 const AdminPanel = ({ onExitAdmin }) => {
   const getInitialAdminTab = () => {
     const hash = window.location.hash.replace('#admin-', '').replace('#', '').trim();
-    const validTabs = ['dashboard', 'products', 'categories', 'orders', 'returns', 'billing', 'notifications', 'live-sale'];
+    const validTabs = ['dashboard', 'products', 'categories', 'orders', 'returns', 'billing', 'notifications', 'live-sale', 'coupons'];
     if (validTabs.includes(hash)) return hash;
     const saved = localStorage.getItem('df_admin_tab');
     if (saved && validTabs.includes(saved)) return saved;
@@ -512,6 +514,19 @@ const AdminPanel = ({ onExitAdmin }) => {
           <Zap size={18} style={{ flexShrink: 0 }} />
           <span>Live Sale Banner</span>
         </button>
+        <button
+          className={`admin-nav-btn btn-outline w-full min-h-[64px] flex items-center justify-center gap-2.5 text-center p-3.5 ${activeTab === 'coupons' ? 'active' : ''}`}
+          onClick={() => setActiveTab('coupons')}
+          style={{
+            background: activeTab === 'coupons' ? '#fdf4ff' : '#ffffff',
+            borderColor: activeTab === 'coupons' ? '#c026d3' : '#cbd5e1',
+            color: activeTab === 'coupons' ? '#c026d3' : '#475569',
+            fontWeight: activeTab === 'coupons' ? '800' : '600'
+          }}
+        >
+          <Tag size={18} style={{ flexShrink: 0 }} />
+          <span>Coupons & Offers</span>
+        </button>
       </div>
 
       {/* Real-time Order Arrival Toast Notification */}
@@ -532,6 +547,7 @@ const AdminPanel = ({ onExitAdmin }) => {
       {activeTab === 'billing' && <AdminBilling />}
       {activeTab === 'notifications' && <AdminNotifications />}
       {activeTab === 'live-sale' && <AdminLiveSale />}
+      {activeTab === 'coupons' && <AdminCoupons />}
     </div>
   );
 };
