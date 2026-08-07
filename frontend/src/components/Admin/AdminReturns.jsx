@@ -340,9 +340,14 @@ const AdminReturns = () => {
                       </button>
                     )}
                     {o.status === 'Cancelled' && (
-                      <span style={{ color: '#15803d', fontSize: '0.78rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        <CheckCircle2 size={14} /> Approved &amp; Refunded
-                      </span>
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+                        <span style={{ color: '#15803d', fontSize: '0.78rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                          <CheckCircle2 size={14} /> Approved &amp; Refunded
+                        </span>
+                        <span style={{ color: '#64748b', fontSize: '0.7rem', fontStyle: 'italic' }}>
+                          (Refund will be credited in 2-3 working days)
+                        </span>
+                      </div>
                     )}
 
                     {/* ── RETURN ACTIONS ── */}

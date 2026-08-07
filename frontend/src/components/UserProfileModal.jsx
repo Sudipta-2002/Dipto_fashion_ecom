@@ -1096,13 +1096,24 @@ const UserProfileModal = ({
                         {/* CONDITIONAL TRACKER OR FINAL STATUS DISPLAY */}
                         {isCancelled ? (
                           /* CANCELLED STATUS */
-                          <div style={{ background: '#fff1f2', border: '1.5px solid #fecdd3', padding: '0.75rem 0.85rem', borderRadius: '10px', color: '#b91c1c', fontSize: '0.88rem', fontWeight: '800', margin: '0.65rem 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <Ban size={20} color="#dc2626" />
-                            <div>
-                              <div>Cancelled</div>
-                              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#dc2626' }}>
-                                Cancelled on {cancelledDateStr}
-                                {order.cancellationDetails?.reason ? ` • ${order.cancellationDetails.reason}` : ''}
+                          <div>
+                            <div style={{ background: '#fff1f2', border: '1.5px solid #fecdd3', padding: '0.75rem 0.85rem', borderRadius: '10px', color: '#b91c1c', fontSize: '0.88rem', fontWeight: '800', margin: '0.65rem 0 0.4rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <Ban size={20} color="#dc2626" />
+                              <div>
+                                <div>Cancelled</div>
+                                <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#dc2626' }}>
+                                  Cancelled on {cancelledDateStr}
+                                  {order.cancellationDetails?.reason ? ` • ${order.cancellationDetails.reason}` : ''}
+                                </div>
+                              </div>
+                            </div>
+                            {/* REFUND NOTICE BANNER */}
+                            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.65rem 0.85rem', marginBottom: '0.65rem', color: '#166534', fontSize: '0.8rem' }}>
+                              <div style={{ fontWeight: '800', display: 'flex', alignItems: 'center', gap: '4px', color: '#15803d' }}>
+                                <CheckCircle2 size={15} /> ✓ Cancellation / Refund Approved
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#166534', marginTop: '2px', lineHeight: '1.35' }}>
+                                Your refund amount will be credited to your original payment source / UPI within 2 to 3 working days.
                               </div>
                             </div>
                           </div>
@@ -1128,11 +1139,22 @@ const UserProfileModal = ({
                           </div>
                         ) : isReturnCompleted ? (
                           /* RETURN COMPLETED STATUS */
-                          <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', padding: '0.75rem 0.85rem', borderRadius: '10px', color: '#15803d', fontSize: '0.88rem', fontWeight: '800', margin: '0.65rem 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                            <CheckCircle2 size={20} color="#16a34a" />
-                            <div>
-                              <div>Returned Successfully</div>
-                              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#16a34a' }}>Completed on {returnCompletedDateStr} • Refund Processed</div>
+                          <div>
+                            <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', padding: '0.75rem 0.85rem', borderRadius: '10px', color: '#15803d', fontSize: '0.88rem', fontWeight: '800', margin: '0.65rem 0 0.4rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <CheckCircle2 size={20} color="#16a34a" />
+                              <div>
+                                <div>Returned Successfully</div>
+                                <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#16a34a' }}>Completed on {returnCompletedDateStr} • Refund Processed</div>
+                              </div>
+                            </div>
+                            {/* REFUND NOTICE BANNER */}
+                            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: '8px', padding: '0.65rem 0.85rem', marginBottom: '0.65rem', color: '#166534', fontSize: '0.8rem' }}>
+                              <div style={{ fontWeight: '800', display: 'flex', alignItems: 'center', gap: '4px', color: '#15803d' }}>
+                                <CheckCircle2 size={15} /> ✓ Cancellation / Refund Approved
+                              </div>
+                              <div style={{ fontSize: '0.74rem', color: '#166534', marginTop: '2px', lineHeight: '1.35' }}>
+                                Your refund amount will be credited to your original payment source / UPI within 2 to 3 working days.
+                              </div>
                             </div>
                           </div>
                         ) : isReturnRequested ? (
