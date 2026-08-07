@@ -758,6 +758,8 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
                     </button>
                   </div>
                   {fieldErrors.confirmNewPassword && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.confirmNewPassword}</span>}
+                </div>
+
                 {/* reCAPTCHA container placed directly above submit button */}
                 <div id="auth-recaptcha-container"></div>
 
@@ -783,11 +785,8 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
                   {loading ? 'SAVING...' : 'SAVE & VERIFY OTP'}
                 </button>
               </form>
-
-            /* ------------------------------------------------------------- */
-            /* MODE 3 & 4: LOGIN & SIGNUP VIEWS */
-            /* ------------------------------------------------------------- */
             ) : (
+              /* MODE 3 & 4: LOGIN & SIGNUP VIEWS */
               <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {mode === 'signup' && (
                   <>
