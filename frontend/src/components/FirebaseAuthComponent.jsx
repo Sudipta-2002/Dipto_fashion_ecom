@@ -1,0 +1,273 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Phone, Lock, CheckCircle2, AlertCircle, RefreshCw, KeyRound, ArrowRight } from 'lucide-react';
+import { auth, RecaptchaVerifier, signInWithPhoneNumber } from './firebase';
+
+const FirebaseAuthComponent = () => {
+  const [phoneNumber, setPhoneNumber] = useState('');
+  const [otpCode, setOtpCode] = useState('');
+  const [confirmationResult, setConfirmationResult] = useState(null);
+  
+  const [otpSent, setOtpSent] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [resendTimer, setResendTimer] = useState(30);
+
+  const recaptchaVerifierRef = useRef(null);
+
+  // Initialize Invisible RecaptchaVerifier on Component Mount
+  useEffect(() => {
+    try {
+      if (!window.recaptchaVerifier) {
+        window.recaptchaVerifier = new RecaptchaVerifier(
+          auth,
+          'recaptcha-container',
+          {
+            size: 'invisible',
+            callback: (response) => {
+              // reCAPTCHA solved - allow signInWithPhoneNumber
+            },
+            'expired-callback': () => {
+              setError('reCAPTCHA expired. Please try sending OTP again.');
+            }
+          }
+        );
+      }
+      recaptchaVerifierRef.current = window.recaptchaVerifier;
+    } catch (err) {
+      console.error('Firebase RecaptchaVerifier Error:', err);
+    }
+  }, []);
+
+  // Timer countdown for resend OTP
+  useEffect(() => {
+    let timer;
+    if (otpSent && resendTimer > 0) {
+      timer = setInterval(() => setResendTimer((prev) => prev - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [otpSent, resendTimer]);
+
+  // Helper: Auto-append +91 country code if missing
+  const formatPhoneNumberWithCountryCode = (number) => {
+    let clean = number.trim().replace(/[^\d+]/g, '');
+    if (!clean.startsWith('+')) {
+      clean = clean.replace(/^0+/, '');
+      if (clean.length === 10) {
+        clean = `+91${clean}`;
+      } else if (!clean.startsWith('91') && clean.length > 0) {
+        clean = `+91${clean}`;
+      } else if (clean.startsWith('91')) {
+        clean = `+${clean}`;
+      }
+    }
+    return clean;
+  };
+
+  // 1. Send OTP Function using Firebase signInWithPhoneNumber
+  const handleSendOtp = async (e) => {
+    if (e) e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    const rawNumber = phoneNumber.trim().replace(/\D/g, '');
+    if (!rawNumber || rawNumber.length < 10) {
+      setError('Please enter a valid 10-digit mobile phone number');
+      return;
+    }
+
+    const formattedPhone = formatPhoneNumberWithCountryCode(phoneNumber);
+    setLoading(true);
+
+    try {
+      const appVerifier = recaptchaVerifierRef.current || window.recaptchaVerifier;
+      if (!appVerifier) {
+        throw new Error('reCAPTCHA verifier not initialized properly.');
+      }
+
+      const result = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
+      setConfirmationResult(result);
+      setOtpSent(true);
+      setResendTimer(30);
+      setSuccess(`OTP sent successfully to ${formattedPhone}!`);
+    } catch (err) {
+      console.error('Send OTP Error:', err);
+      let msg = err.message || 'Failed to send OTP. Please check your phone number.';
+      if (err.code === 'auth/invalid-phone-number') {
+        msg = 'Invalid phone number format. Please enter a valid 10-digit number.';
+      } else if (err.code === 'auth/too-many-requests') {
+        msg = 'Too many requests. Please try again after some time.';
+      }
+      setError(msg);
+      // Reset reCAPTCHA on failure
+      if (window.recaptchaVerifier) {
+        try { window.recaptchaVerifier.render().then((widgetId) => window.grecaptcha.reset(widgetId)); } catch (e) {}
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 2. Verify OTP Function using confirmationResult.confirm(otpCode)
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setError('');
+    setSuccess('');
+
+    const cleanOtp = otpCode.trim();
+    if (!cleanOtp || cleanOtp.length < 6) {
+      setError('Please enter the full 6-digit OTP code');
+      return;
+    }
+
+    if (!confirmationResult) {
+      setError('No active OTP session found. Please click "Send OTP" again.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const userCredential = await confirmationResult.confirm(cleanOtp);
+      const user = userCredential.user;
+      console.log('Firebase Phone Auth User:', user);
+      setSuccess(`Phone verified successfully! Logged in as ${user.phoneNumber || user.uid}`);
+    } catch (err) {
+      console.error('Verify OTP Error:', err);
+      let msg = err.message || 'Invalid OTP code entered.';
+      if (err.code === 'auth/invalid-verification-code') {
+        msg = 'Invalid OTP code. Please check and enter again.';
+      } else if (err.code === 'auth/code-expired') {
+        msg = 'OTP code has expired. Please click "Resend OTP".';
+      }
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div style={{ maxWidth: '420px', width: '100%', margin: '2rem auto', padding: '1.75rem', background: '#ffffff', borderRadius: '16px', border: '1.5px solid #e2e8f0', boxShadow: '0 10px 25px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
+      {/* Invisible reCAPTCHA container required by Firebase */}
+      <div id="recaptcha-container"></div>
+
+      <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
+        <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: '#fdf4ff', color: '#c026d3', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem' }}>
+          {otpSent ? <KeyRound size={26} /> : <Phone size={26} />}
+        </div>
+        <h2 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#0f172a', margin: 0 }}>
+          {otpSent ? 'Enter Verification Code' : 'Firebase Phone Auth'}
+        </h2>
+        <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '0.35rem' }}>
+          {otpSent
+            ? `Enter the 6-digit OTP sent to ${formatPhoneNumberWithCountryCode(phoneNumber)}`
+            : 'Enter your 10-digit mobile number (+91 will be auto-appended)'}
+        </p>
+      </div>
+
+      {/* Error Feedback */}
+      {error && (
+        <div style={{ background: '#fef2f2', border: '1.5px solid #fca5a5', color: '#b91c1c', padding: '0.75rem 0.85rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.82rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <AlertCircle size={16} /> {error}
+        </div>
+      )}
+
+      {/* Success Feedback */}
+      {success && (
+        <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', color: '#15803d', padding: '0.75rem 0.85rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.82rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+          <CheckCircle2 size={16} /> {success}
+        </div>
+      )}
+
+      {!otpSent ? (
+        /* PHONE NUMBER INPUT FORM */
+        <form onSubmit={handleSendOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div>
+            <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
+              Mobile Phone Number *
+            </label>
+            <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div style={{ padding: '0 0.85rem', height: '46px', display: 'flex', alignItems: 'center', background: '#f8fafc', border: '1.5px solid #cbd5e1', borderRadius: '8px', fontSize: '0.88rem', fontWeight: '700', color: '#475569' }}>
+                +91 🇮🇳
+              </div>
+              <div style={{ position: 'relative', flex: 1 }}>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  placeholder="9876543210"
+                  maxLength={10}
+                  value={phoneNumber}
+                  onChange={(e) => setPhoneNumber(e.target.value)}
+                  style={{ width: '100%', height: '46px', padding: '0 1rem 0 2.5rem', fontSize: '0.92rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', outline: 'none', boxSizing: 'border-box' }}
+                  required
+                />
+                <Phone size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+              </div>
+            </div>
+          </div>
+
+          <button
+            type="submit"
+            style={{ width: '100%', height: '46px', background: 'linear-gradient(135deg, #c026d3, #9333ea)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.92rem', fontWeight: '800', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s ease' }}
+            disabled={loading}
+          >
+            {loading ? 'SENDING OTP...' : 'SEND OTP'} <ArrowRight size={16} />
+          </button>
+        </form>
+      ) : (
+        /* OTP VERIFICATION FORM */
+        <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <div>
+            <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
+              6-Digit OTP Code *
+            </label>
+            <div style={{ position: 'relative' }}>
+              <input
+                type="text"
+                inputMode="numeric"
+                placeholder="Enter 6-digit OTP"
+                maxLength={6}
+                value={otpCode}
+                onChange={(e) => setOtpCode(e.target.value)}
+                style={{ width: '100%', height: '46px', padding: '0 1rem 0 2.5rem', fontSize: '1rem', letterSpacing: '2px', borderRadius: '8px', border: '1.5px solid #cbd5e1', outline: 'none', boxSizing: 'border-box' }}
+                required
+              />
+              <KeyRound size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem' }}>
+            {resendTimer > 0 ? (
+              <span style={{ color: '#64748b' }}>Resend in <strong style={{ color: '#c026d3' }}>{resendTimer}s</strong></span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleSendOtp}
+                style={{ background: 'none', border: 'none', color: '#c026d3', fontWeight: '800', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '4px' }}
+              >
+                <RefreshCw size={12} /> Resend OTP
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => { setOtpSent(false); setConfirmationResult(null); setError(''); setSuccess(''); }}
+              style={{ background: 'none', border: 'none', color: '#475569', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline' }}
+            >
+              Change Phone Number
+            </button>
+          </div>
+
+          <button
+            type="submit"
+            style={{ width: '100%', height: '46px', background: 'linear-gradient(135deg, #16a34a, #15803d)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.92rem', fontWeight: '800', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s ease' }}
+            disabled={loading}
+          >
+            {loading ? 'VERIFYING...' : 'VERIFY OTP'} <CheckCircle2 size={16} />
+          </button>
+        </form>
+      )}
+    </div>
+  );
+};
+
+export default FirebaseAuthComponent;
