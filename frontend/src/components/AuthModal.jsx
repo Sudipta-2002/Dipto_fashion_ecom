@@ -175,7 +175,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
 
     setLoading(true);
 
-    const formattedPhone = `${countryCode} ${formData.phone.trim()}`;
+    const formattedPhone = formData.phone.trim();
 
     try {
       if (mode === 'signup') {
@@ -569,36 +569,16 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
                   <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
                     Registered Mobile Number *
                   </label>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <select
-                      value={countryCode}
-                      onChange={(e) => setCountryCode(e.target.value)}
-                      style={{
-                        width: '105px',
-                        height: '46px',
-                        borderRadius: '8px',
-                        border: '1.5px solid #cbd5e1',
-                        background: '#f8fafc',
-                        fontSize: '0.82rem',
-                        fontWeight: '600',
-                        padding: '0 0.4rem'
-                      }}
-                    >
-                      {COUNTRY_CODES.map((c) => (
-                        <option key={c.code} value={c.code}>{c.code} ({c.country})</option>
-                      ))}
-                    </select>
-                    <div style={{ position: 'relative', flex: 1 }}>
-                      <input
-                        type="text"
-                        name="phone"
-                        placeholder="Mobile Number"
-                        value={formData.phone}
-                        onChange={handleChange}
-                        style={{ ...inputStyle(fieldErrors.phone), width: '100%' }}
-                      />
-                      <Phone size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                    </div>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      name="phone"
+                      placeholder="Mobile Number"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      style={inputStyle(fieldErrors.phone)}
+                    />
+                    <Phone size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                   </div>
                   {fieldErrors.phone && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.phone}</span>}
                 </div>
@@ -728,36 +708,16 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
                   <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
                     {mode === 'login' ? 'Enter Registered Mobile Number *' : 'Enter Mobile Number *'}
                   </label>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <select
-                      value={countryCode}
-                      onChange={(e) => setCountryCode(e.target.value)}
-                      style={{
-                        width: '105px',
-                        height: '46px',
-                        borderRadius: '8px',
-                        border: '1.5px solid #cbd5e1',
-                        background: '#f8fafc',
-                        fontSize: '0.82rem',
-                        fontWeight: '600',
-                        padding: '0 0.4rem'
-                      }}
-                    >
-                      {COUNTRY_CODES.map((c) => (
-                        <option key={c.code} value={c.code}>{c.code} ({c.country})</option>
-                      ))}
-                    </select>
-                    <div style={{ position: 'relative', flex: 1 }}>
-                      <input
-                        type="text"
-                        name="phone"
-                        placeholder="Mobile Phone Number"
-                        value={formData.phone}
-                        onChange={handleChange}
-                        style={{ ...inputStyle(fieldErrors.phone), width: '100%' }}
-                      />
-                      <Phone size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                    </div>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="text"
+                      name="phone"
+                      placeholder="Mobile Phone Number"
+                      value={formData.phone}
+                      onChange={handleChange}
+                      style={inputStyle(fieldErrors.phone)}
+                    />
+                    <Phone size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                   </div>
                   {fieldErrors.phone && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.phone}</span>}
                 </div>

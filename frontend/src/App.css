@@ -1117,11 +1117,12 @@ table.admin-table th {
     flex-direction: column !important;
     max-width: 100vw !important;
     width: 100vw !important;
-    height: 100vh !important;
-    max-height: 100vh !important;
+    height: 100dvh !important;
+    max-height: 100dvh !important;
     border-radius: 0 !important;
     margin: 0 !important;
     overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch !important;
   }
 
   .flipkart-auth-modal .auth-left-banner {
@@ -1131,6 +1132,7 @@ table.admin-table th {
     display: flex !important;
     flex-direction: column !important;
     box-sizing: border-box !important;
+    flex-shrink: 0 !important;
   }
 
   .flipkart-auth-modal .auth-left-banner h2 {
@@ -1159,8 +1161,11 @@ table.admin-table th {
 
   .flipkart-auth-modal .auth-right-form {
     width: 100% !important;
-    padding: 1.25rem 1.15rem !important;
+    padding: 1.25rem 1.15rem 2rem 1.15rem !important;
     max-height: none !important;
+    overflow-y: visible !important;
+    box-sizing: border-box !important;
+    padding-bottom: calc(40px + env(safe-area-inset-bottom)) !important;
   }
 
   .flipkart-auth-modal .auth-submit-btn {
