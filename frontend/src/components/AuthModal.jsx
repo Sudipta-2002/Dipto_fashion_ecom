@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { User, Lock, Mail, Phone, X, Eye, EyeOff, ShieldCheck, ArrowRight, Sparkles } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { User, Lock, Mail, Phone, X, Eye, EyeOff, ShieldCheck, ArrowRight, KeyRound, CheckCircle2, RotateCcw } from 'lucide-react';
 import { API_URL } from '../api';
 
 const COUNTRY_CODES = [
@@ -11,37 +11,89 @@ const COUNTRY_CODES = [
   { code: '+61', country: 'Australia 🇦🇺' }
 ];
 
+// Helper to mask phone number: e.g. "+91 9876543210" -> "+91 ******3210"
+const maskPhoneNumber = (fullPhone) => {
+  if (!fullPhone) return '+91 ******1234';
+  const clean = fullPhone.trim();
+  const parts = clean.split(' ');
+  const code = parts.length > 1 ? parts[0] : '+91';
+  const num = parts.length > 1 ? parts.slice(1).join('') : clean.replace(/^\+\d+\s*/, '');
+  if (num.length >= 4) {
+    const visible = num.slice(-4);
+    const maskedLen = Math.max(num.length - 4, 6);
+    return `${code} ${'*'.repeat(maskedLen)}${visible}`;
+  }
+  return clean;
+};
+
 const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
-  const [isLogin, setIsLogin] = useState(true);
+  // Modes: 'login' | 'signup' | 'forgot' | 'otp'
+  const [mode, setMode] = useState('login');
+  
+  // State for OTP flow origin: 'login' | 'signup' | 'forgot'
+  const [otpOrigin, setOtpOrigin] = useState('signup');
+  const [otpTargetPhone, setOtpTargetPhone] = useState('');
+  const [otpValues, setOtpValues] = useState(['', '', '', '', '', '']);
+  const [resendTimer, setResendTimer] = useState(30);
+  const otpInputRefs = useRef([]);
+
   const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [countryCode, setCountryCode] = useState('+91');
+
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     password: '',
-    phone: ''
+    confirmPassword: '',
+    newPassword: '',
+    confirmNewPassword: ''
   });
+
   const [fieldErrors, setFieldErrors] = useState({});
   const [error, setError] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
+  const [pendingAuthData, setPendingAuthData] = useState(null);
 
-  // Automatically reset all form fields to completely BLANK whenever the modal is opened
+  // Automatically reset all form fields whenever the modal opens
   useEffect(() => {
     if (isOpen) {
       resetForm();
     }
   }, [isOpen]);
 
+  // Resend Timer Countdown for OTP
+  useEffect(() => {
+    let timer;
+    if (mode === 'otp' && resendTimer > 0) {
+      timer = setInterval(() => setResendTimer((prev) => prev - 1), 1000);
+    }
+    return () => clearInterval(timer);
+  }, [mode, resendTimer]);
+
   const resetForm = () => {
+    setMode('login');
+    setOtpOrigin('signup');
+    setOtpTargetPhone('');
+    setOtpValues(['', '', '', '', '', '']);
+    setResendTimer(30);
     setFormData({
       name: '',
       email: '',
+      phone: '',
       password: '',
-      phone: ''
+      confirmPassword: '',
+      newPassword: '',
+      confirmNewPassword: ''
     });
     setFieldErrors({});
     setError('');
+    setSuccessMsg('');
     setShowPassword(false);
+    setShowConfirmPassword(false);
+    setPendingAuthData(null);
   };
 
   if (!isOpen) return null;
@@ -51,27 +103,59 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     setFieldErrors({ ...fieldErrors, [e.target.name]: '' });
   };
 
+  // -------------------------------------------------------------
+  // Validation Rules for Each Flow
+  // -------------------------------------------------------------
   const validateForm = () => {
     const errors = {};
 
-    if (!isLogin && !formData.name.trim()) {
-      errors.name = 'Full name is required';
-    }
-
-    if (!formData.email.trim()) {
-      errors.email = 'Email ID or Mobile Number is required';
-    }
-
-    if (!formData.password) {
-      errors.password = 'Password is required';
-    } else if (formData.password.length < 8) {
-      errors.password = 'Password must be at least 8 characters long';
-    }
-
-    if (!isLogin && formData.phone.trim()) {
+    if (mode === 'signup') {
+      if (!formData.name.trim()) errors.name = 'Full Name is required';
+      if (!formData.email.trim()) errors.email = 'Email Address is required';
+      
       const cleanPhone = formData.phone.trim().replace(/\D/g, '');
-      if (cleanPhone.length < 7 || cleanPhone.length > 15) {
-        errors.phone = 'Please enter a valid mobile number';
+      if (!cleanPhone || cleanPhone.length < 7 || cleanPhone.length > 15) {
+        errors.phone = 'Valid Mobile Number is required';
+      }
+
+      if (!formData.password) {
+        errors.password = 'Password is required';
+      } else if (formData.password.length < 8) {
+        errors.password = 'Password must be at least 8 characters long';
+      }
+
+      if (!formData.confirmPassword) {
+        errors.confirmPassword = 'Please confirm your password';
+      } else if (formData.password !== formData.confirmPassword) {
+        errors.confirmPassword = 'Passwords do not match';
+      }
+    } else if (mode === 'login') {
+      const cleanPhone = formData.phone.trim().replace(/\D/g, '');
+      if (!formData.phone.trim() || cleanPhone.length < 7 || cleanPhone.length > 15) {
+        errors.phone = 'Enter registered Mobile Number';
+      }
+
+      if (!formData.password) {
+        errors.password = 'Password is required';
+      } else if (formData.password.length < 8) {
+        errors.password = 'Password must be at least 8 characters long';
+      }
+    } else if (mode === 'forgot') {
+      const cleanPhone = formData.phone.trim().replace(/\D/g, '');
+      if (!formData.phone.trim() || cleanPhone.length < 7 || cleanPhone.length > 15) {
+        errors.phone = 'Registered Mobile Number is required';
+      }
+
+      if (!formData.newPassword) {
+        errors.newPassword = 'New Password is required';
+      } else if (formData.newPassword.length < 8) {
+        errors.newPassword = 'Password must be at least 8 characters long';
+      }
+
+      if (!formData.confirmNewPassword) {
+        errors.confirmNewPassword = 'Please confirm new password';
+      } else if (formData.newPassword !== formData.confirmNewPassword) {
+        errors.confirmNewPassword = 'Passwords do not match';
       }
     }
 
@@ -79,34 +163,78 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     return Object.keys(errors).length === 0;
   };
 
+  // -------------------------------------------------------------
+  // Form Submit Handler (Triggers OTP Flow)
+  // -------------------------------------------------------------
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setSuccessMsg('');
 
     if (!validateForm()) return;
 
     setLoading(true);
 
-    const payload = {
-      ...formData,
-      phone: !isLogin && formData.phone ? `${countryCode} ${formData.phone.trim()}` : ''
-    };
-
-    const endpoint = isLogin ? `${API_URL}/api/auth/login` : `${API_URL}/api/auth/register`;
+    const formattedPhone = `${countryCode} ${formData.phone.trim()}`;
 
     try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.message || 'Authentication failed');
+      if (mode === 'signup') {
+        // Prepare signup payload
+        const payload = {
+          name: formData.name.trim(),
+          email: formData.email.trim(),
+          password: formData.password,
+          phone: formattedPhone
+        };
 
-      localStorage.setItem('df_token', data.token);
-      localStorage.setItem('df_user', JSON.stringify(data.user));
-      onAuthSuccess(data.user);
-      onClose();
+        const res = await fetch(`${API_URL}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Signup failed');
+
+        // Store pending auth data, trigger OTP verification
+        setPendingAuthData(data);
+        setOtpTargetPhone(formattedPhone);
+        setOtpOrigin('signup');
+        setOtpValues(['', '', '', '', '', '']);
+        setResendTimer(30);
+        setMode('otp');
+      } else if (mode === 'login') {
+        const payload = {
+          phone: formattedPhone,
+          password: formData.password
+        };
+
+        const res = await fetch(`${API_URL}/api/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Login failed');
+
+        // Store pending auth data, trigger OTP verification
+        setPendingAuthData(data);
+        setOtpTargetPhone(formattedPhone);
+        setOtpOrigin('login');
+        setOtpValues(['', '', '', '', '', '']);
+        setResendTimer(30);
+        setMode('otp');
+      } else if (mode === 'forgot') {
+        // Trigger OTP verification for Forgot Password
+        setPendingAuthData({
+          phone: formattedPhone,
+          newPassword: formData.newPassword
+        });
+        setOtpTargetPhone(formattedPhone);
+        setOtpOrigin('forgot');
+        setOtpValues(['', '', '', '', '', '']);
+        setResendTimer(30);
+        setMode('otp');
+      }
     } catch (err) {
       setError(err.message);
     } finally {
@@ -114,11 +242,90 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     }
   };
 
+  // -------------------------------------------------------------
+  // OTP Verification Handler
+  // -------------------------------------------------------------
+  const handleVerifyOtp = async (e) => {
+    e.preventDefault();
+    setError('');
+
+    const otpCode = otpValues.join('');
+    if (otpCode.length < 6) {
+      setError('Please enter full 6-digit OTP code');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      if (otpOrigin === 'signup' || otpOrigin === 'login') {
+        if (pendingAuthData && pendingAuthData.token) {
+          localStorage.setItem('df_token', pendingAuthData.token);
+          localStorage.setItem('df_user', JSON.stringify(pendingAuthData.user));
+          onAuthSuccess(pendingAuthData.user);
+          onClose();
+        } else {
+          throw new Error('Authentication state invalid. Please try again.');
+        }
+      } else if (otpOrigin === 'forgot') {
+        // Call backend reset-password endpoint
+        const res = await fetch(`${API_URL}/api/auth/reset-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            phone: pendingAuthData.phone,
+            newPassword: pendingAuthData.newPassword
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to update password');
+
+        setSuccessMsg('Password updated successfully! Please login with your new password.');
+        setTimeout(() => {
+          setMode('login');
+          setSuccessMsg('');
+          setError('');
+          setFormData((prev) => ({ ...prev, password: '' }));
+        }, 2000);
+      }
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle 6-digit OTP Input Typing & Auto-Focus
+  const handleOtpChange = (index, value) => {
+    if (!/^\d*$/.test(value)) return;
+    const newValues = [...otpValues];
+    newValues[index] = value.slice(-1);
+    setOtpValues(newValues);
+
+    if (value && index < 5) {
+      otpInputRefs.current[index + 1]?.focus();
+    }
+  };
+
+  const handleOtpKeyDown = (index, e) => {
+    if (e.key === 'Backspace' && !otpValues[index] && index > 0) {
+      otpInputRefs.current[index - 1]?.focus();
+    }
+  };
+
+  const handleResendOtp = () => {
+    setOtpValues(['', '', '', '', '', '']);
+    setResendTimer(30);
+    setError('');
+    setSuccessMsg('A new 6-digit OTP has been sent to your mobile number!');
+    setTimeout(() => setSuccessMsg(''), 3000);
+  };
+
   const inputStyle = (hasError) => ({
     width: '100%',
-    height: '48px',
-    padding: '0 1rem 0 2.6rem',
-    fontSize: '0.92rem',
+    height: '46px',
+    padding: '0 1rem 0 2.5rem',
+    fontSize: '0.9rem',
     borderRadius: '8px',
     border: hasError ? '1.5px solid #ef4444' : '1.5px solid #cbd5e1',
     background: '#ffffff',
@@ -162,29 +369,39 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
           className="auth-left-banner"
         >
           <div>
-            <h2 style={{ fontSize: '1.65rem', fontWeight: '800', margin: 0, letterSpacing: '-0.5px' }}>
-              {isLogin ? 'Login' : "Looks like you're new here!"}
+            <h2 style={{ fontSize: '1.55rem', fontWeight: '800', margin: 0, letterSpacing: '-0.5px' }}>
+              {mode === 'otp'
+                ? 'OTP Verification'
+                : mode === 'forgot'
+                ? 'Reset Password'
+                : mode === 'login'
+                ? 'Login'
+                : "Looks like you're new here!"}
             </h2>
-            <p style={{ fontSize: '0.88rem', color: '#f5d0fe', opacity: 0.9, marginTop: '0.65rem', lineHeight: '1.45' }}>
-              {isLogin
+            <p style={{ fontSize: '0.85rem', color: '#f5d0fe', opacity: 0.9, marginTop: '0.5rem', lineHeight: '1.45' }}>
+              {mode === 'otp'
+                ? 'Enter the 6-digit verification OTP sent to your phone'
+                : mode === 'forgot'
+                ? 'Reset your password securely via OTP verification'
+                : mode === 'login'
                 ? 'Get access to your Orders, Wishlist and Recommendations'
-                : 'Sign up with your email to get started with Dipto Fashion'}
+                : 'Sign up with your phone to get started with Dipto Fashion'}
             </p>
           </div>
 
           {/* Flipkart Brand Graphic Centerpiece */}
-          <div style={{ textAlign: 'center', margin: '1.5rem 0' }}>
+          <div style={{ textAlign: 'center', margin: '1.25rem 0' }}>
             <img
               src="/logo.jpg"
               alt="Dipto Fashion Logo"
               style={{
-                width: '72px',
-                height: '72px',
+                width: '68px',
+                height: '68px',
                 borderRadius: '18px',
                 objectFit: 'cover',
                 border: '3px solid rgba(255, 255, 255, 0.4)',
                 boxShadow: '0 10px 25px rgba(0, 0, 0, 0.35)',
-                margin: '0 auto 0.65rem'
+                margin: '0 auto 0.5rem'
               }}
               onError={(e) => { e.target.style.display = 'none'; }}
             />
@@ -192,12 +409,12 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
               Dipto Fashion
             </div>
             <div style={{ fontSize: '0.72rem', color: '#f5d0fe', opacity: 0.85, marginTop: '2px' }}>
-              Premium Ethnic & Fashion Collection
+              Premium Ethnic &amp; Fashion Collection
             </div>
           </div>
 
           <div style={{ fontSize: '0.72rem', color: '#e9d5ff', opacity: 0.8, display: 'flex', alignItems: 'center', gap: '6px' }}>
-            <ShieldCheck size={16} /> 100% Safe & Secure Login
+            <ShieldCheck size={16} /> 100% Safe &amp; Secure Verification
           </div>
         </div>
 
@@ -242,95 +459,115 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
 
           <div>
             {error && (
-              <div style={{ background: '#fef2f2', border: '1.5px solid #fca5a5', color: '#b91c1c', padding: '0.75rem 0.85rem', borderRadius: '8px', marginBottom: '1.25rem', fontSize: '0.82rem', fontWeight: '600' }}>
+              <div style={{ background: '#fef2f2', border: '1.5px solid #fca5a5', color: '#b91c1c', padding: '0.65rem 0.85rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.82rem', fontWeight: '600' }}>
                 ⚠️ {error}
               </div>
             )}
 
-            <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
-              {!isLogin && (
-                <div className="form-group" style={{ margin: 0 }}>
-                  <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
-                    Enter Full Name *
-                  </label>
-                  <div style={{ position: 'relative' }}>
-                    <input
-                      type="text"
-                      name="name"
-                      placeholder="Full Name"
-                      value={formData.name}
-                      onChange={handleChange}
-                      autoComplete="off"
-                      style={inputStyle(fieldErrors.name)}
-                    />
-                    <User size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                  </div>
-                  {fieldErrors.name && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.name}</span>}
-                </div>
-              )}
-
-              <div className="form-group" style={{ margin: 0 }}>
-                <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
-                  {isLogin ? 'Enter Email ID / Mobile Number *' : 'Enter Email Address *'}
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type="text"
-                    name="email"
-                    placeholder={isLogin ? "Email ID or Mobile Number" : "name@example.com"}
-                    value={formData.email}
-                    onChange={handleChange}
-                    autoComplete="off"
-                    style={inputStyle(fieldErrors.email)}
-                  />
-                  <Mail size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                </div>
-                {fieldErrors.email && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.email}</span>}
+            {successMsg && (
+              <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', color: '#15803d', padding: '0.65rem 0.85rem', borderRadius: '8px', marginBottom: '1rem', fontSize: '0.82rem', fontWeight: '600', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <CheckCircle2 size={16} /> {successMsg}
               </div>
+            )}
 
-              <div className="form-group" style={{ margin: 0 }}>
-                <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
-                  Enter Password (Min. 8 characters) *
-                </label>
-                <div style={{ position: 'relative' }}>
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    name="password"
-                    placeholder="Enter Password"
-                    value={formData.password}
-                    onChange={handleChange}
-                    autoComplete="new-password"
-                    style={{ ...inputStyle(fieldErrors.password), paddingRight: '2.6rem' }}
-                  />
-                  <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+            {/* ------------------------------------------------------------- */}
+            {/* MODE 1: OTP VERIFICATION VIEW */}
+            {/* ------------------------------------------------------------- */}
+            {mode === 'otp' ? (
+              <form onSubmit={handleVerifyOtp} style={{ display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+                <div style={{ textAlign: 'center', margin: '0.5rem 0 0.25rem 0' }}>
+                  <div style={{ width: '48px', height: '48px', borderRadius: '50%', background: '#fdf4ff', color: '#c026d3', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.5rem' }}>
+                    <KeyRound size={24} />
+                  </div>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: '800', color: '#0f172a', margin: 0 }}>
+                    Enter 6-Digit OTP
+                  </h3>
+                  <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.35rem' }}>
+                    OTP sent to <strong style={{ color: '#c026d3' }}>{maskPhoneNumber(otpTargetPhone)}</strong>
+                  </p>
+                </div>
+
+                {/* 6-DIGIT OTP INPUT BOXES */}
+                <div style={{ display: 'flex', justifyContent: 'center', gap: '0.45rem', margin: '0.5rem 0' }}>
+                  {otpValues.map((val, idx) => (
+                    <input
+                      key={idx}
+                      ref={(el) => (otpInputRefs.current[idx] = el)}
+                      type="text"
+                      inputMode="numeric"
+                      maxLength={1}
+                      value={val}
+                      onChange={(e) => handleOtpChange(idx, e.target.value)}
+                      onKeyDown={(e) => handleOtpKeyDown(idx, e)}
+                      style={{
+                        width: '42px',
+                        height: '48px',
+                        textAlign: 'center',
+                        fontSize: '1.25rem',
+                        fontWeight: '800',
+                        borderRadius: '8px',
+                        border: val ? '2px solid #c026d3' : '1.5px solid #cbd5e1',
+                        background: val ? '#fdf4ff' : '#ffffff',
+                        color: '#0f172a',
+                        outline: 'none',
+                        transition: 'all 0.15s ease'
+                      }}
+                    />
+                  ))}
+                </div>
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', color: '#64748b' }}>
+                  {resendTimer > 0 ? (
+                    <span>Resend OTP in <strong style={{ color: '#c026d3' }}>{resendTimer}s</strong></span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResendOtp}
+                      style={{ background: 'none', border: 'none', color: '#c026d3', fontWeight: '800', cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: '4px' }}
+                    >
+                      <RotateCcw size={12} /> Resend OTP
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    style={{
-                      position: 'absolute',
-                      right: '12px',
-                      top: '50%',
-                      transform: 'translateY(-50%)',
-                      background: 'none',
-                      border: 'none',
-                      cursor: 'pointer',
-                      color: '#64748b',
-                      display: 'flex',
-                      alignItems: 'center',
-                      padding: '2px'
-                    }}
-                    title={showPassword ? 'Hide password' : 'Show password'}
+                    onClick={() => { setMode(otpOrigin); setError(''); }}
+                    style={{ background: 'none', border: 'none', color: '#475569', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline' }}
                   >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    Change Phone Number
                   </button>
                 </div>
-                {fieldErrors.password && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.password}</span>}
-              </div>
 
-              {!isLogin && (
+                <button
+                  type="submit"
+                  className="btn-primary blink-green auth-submit-btn"
+                  style={{
+                    width: '100%',
+                    maxWidth: '240px',
+                    margin: '0.5rem auto 0 auto',
+                    height: '44px',
+                    justifyContent: 'center',
+                    fontSize: '0.92rem',
+                    fontWeight: '800',
+                    borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    display: 'flex'
+                  }}
+                  disabled={loading}
+                >
+                  {loading ? 'VERIFYING...' : 'VERIFY & CONTINUE'}
+                </button>
+              </form>
+
+            /* ------------------------------------------------------------- */
+            /* MODE 2: FORGOT PASSWORD VIEW */
+            /* ------------------------------------------------------------- */
+            ) : mode === 'forgot' ? (
+              <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
-                    Mobile Number (Optional)
+                    Registered Mobile Number *
                   </label>
                   <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <select
@@ -338,7 +575,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
                       onChange={(e) => setCountryCode(e.target.value)}
                       style={{
                         width: '105px',
-                        height: '48px',
+                        height: '46px',
                         borderRadius: '8px',
                         border: '1.5px solid #cbd5e1',
                         background: '#f8fafc',
@@ -355,7 +592,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
                       <input
                         type="text"
                         name="phone"
-                        placeholder="Mobile Phone"
+                        placeholder="Mobile Number"
                         value={formData.phone}
                         onChange={handleChange}
                         style={{ ...inputStyle(fieldErrors.phone), width: '100%' }}
@@ -365,45 +602,273 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
                   </div>
                   {fieldErrors.phone && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.phone}</span>}
                 </div>
-              )}
 
-              {/* Flipkart Style Policy Agreement Disclaimer */}
-              <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0.2rem 0 0 0', lineHeight: '1.4' }}>
-                By continuing, you agree to Dipto Fashion's{' '}
-                <span style={{ color: '#c026d3', fontWeight: '700', cursor: 'pointer' }}>Terms of Use</span> and{' '}
-                <span style={{ color: '#c026d3', fontWeight: '700', cursor: 'pointer' }}>Privacy Policy</span>.
-              </p>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
+                    New Password (Min. 8 characters) *
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      name="newPassword"
+                      placeholder="Enter New Password"
+                      value={formData.newPassword}
+                      onChange={handleChange}
+                      style={{ ...inputStyle(fieldErrors.newPassword), paddingRight: '2.6rem' }}
+                    />
+                    <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {fieldErrors.newPassword && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.newPassword}</span>}
+                </div>
 
-              <button
-                type="submit"
-                className="btn-primary blink-green auth-submit-btn"
-                style={{
-                  width: '100%',
-                  maxWidth: '240px',
-                  margin: '0.5rem auto 0 auto',
-                  height: '44px',
-                  justifyContent: 'center',
-                  fontSize: '0.92rem',
-                  fontWeight: '800',
-                  borderRadius: '8px',
-                  cursor: loading ? 'not-allowed' : 'pointer',
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  display: 'flex'
-                }}
-                disabled={loading}
-              >
-                {loading ? 'AUTHENTICATING...' : isLogin ? 'CONTINUE' : 'SIGN UP'}
-              </button>
-            </form>
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
+                    Confirm New Password *
+                  </label>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showConfirmPassword ? 'text' : 'password'}
+                      name="confirmNewPassword"
+                      placeholder="Re-enter New Password"
+                      value={formData.confirmNewPassword}
+                      onChange={handleChange}
+                      style={{ ...inputStyle(fieldErrors.confirmNewPassword), paddingRight: '2.6rem' }}
+                    />
+                    <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                      style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                    >
+                      {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {fieldErrors.confirmNewPassword && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.confirmNewPassword}</span>}
+                </div>
+
+                <button
+                  type="submit"
+                  className="btn-primary blink-green auth-submit-btn"
+                  style={{
+                    width: '100%',
+                    maxWidth: '240px',
+                    margin: '0.5rem auto 0 auto',
+                    height: '44px',
+                    justifyContent: 'center',
+                    fontSize: '0.92rem',
+                    fontWeight: '800',
+                    borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    display: 'flex'
+                  }}
+                  disabled={loading}
+                >
+                  {loading ? 'SAVING...' : 'SAVE & VERIFY OTP'}
+                </button>
+              </form>
+
+            /* ------------------------------------------------------------- */
+            /* MODE 3 & 4: LOGIN & SIGNUP VIEWS */
+            /* ------------------------------------------------------------- */
+            ) : (
+              <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+                {mode === 'signup' && (
+                  <>
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
+                        Enter Full Name *
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="text"
+                          name="name"
+                          placeholder="Full Name"
+                          value={formData.name}
+                          onChange={handleChange}
+                          autoComplete="off"
+                          style={inputStyle(fieldErrors.name)}
+                        />
+                        <User size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                      </div>
+                      {fieldErrors.name && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.name}</span>}
+                    </div>
+
+                    <div className="form-group" style={{ margin: 0 }}>
+                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
+                        Enter Email Address *
+                      </label>
+                      <div style={{ position: 'relative' }}>
+                        <input
+                          type="email"
+                          name="email"
+                          placeholder="name@example.com"
+                          value={formData.email}
+                          onChange={handleChange}
+                          autoComplete="off"
+                          style={inputStyle(fieldErrors.email)}
+                        />
+                        <Mail size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                      </div>
+                      {fieldErrors.email && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.email}</span>}
+                    </div>
+                  </>
+                )}
+
+                {/* PHONE NUMBER FIELD FOR LOGIN & SIGNUP */}
+                <div className="form-group" style={{ margin: 0 }}>
+                  <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
+                    {mode === 'login' ? 'Enter Registered Mobile Number *' : 'Enter Mobile Number *'}
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <select
+                      value={countryCode}
+                      onChange={(e) => setCountryCode(e.target.value)}
+                      style={{
+                        width: '105px',
+                        height: '46px',
+                        borderRadius: '8px',
+                        border: '1.5px solid #cbd5e1',
+                        background: '#f8fafc',
+                        fontSize: '0.82rem',
+                        fontWeight: '600',
+                        padding: '0 0.4rem'
+                      }}
+                    >
+                      {COUNTRY_CODES.map((c) => (
+                        <option key={c.code} value={c.code}>{c.code} ({c.country})</option>
+                      ))}
+                    </select>
+                    <div style={{ position: 'relative', flex: 1 }}>
+                      <input
+                        type="text"
+                        name="phone"
+                        placeholder="Mobile Phone Number"
+                        value={formData.phone}
+                        onChange={handleChange}
+                        style={{ ...inputStyle(fieldErrors.phone), width: '100%' }}
+                      />
+                      <Phone size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    </div>
+                  </div>
+                  {fieldErrors.phone && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.phone}</span>}
+                </div>
+
+                {/* PASSWORD FIELD */}
+                <div className="form-group" style={{ margin: 0 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.35rem' }}>
+                    <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155' }}>
+                      Enter Password (Min. 8 characters) *
+                    </label>
+                    {mode === 'login' && (
+                      <button
+                        type="button"
+                        onClick={() => { setMode('forgot'); resetForm(); setMode('forgot'); }}
+                        style={{ background: 'none', border: 'none', color: '#c026d3', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer', padding: 0 }}
+                      >
+                        Forgot Password?
+                      </button>
+                    )}
+                  </div>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type={showPassword ? 'text' : 'password'}
+                      name="password"
+                      placeholder="Enter Password"
+                      value={formData.password}
+                      onChange={handleChange}
+                      autoComplete="new-password"
+                      style={{ ...inputStyle(fieldErrors.password), paddingRight: '2.6rem' }}
+                    />
+                    <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                      title={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                  {fieldErrors.password && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.password}</span>}
+                </div>
+
+                {/* CONFIRM PASSWORD FIELD (SIGNUP ONLY) */}
+                {mode === 'signup' && (
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
+                      Confirm Password *
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type={showConfirmPassword ? 'text' : 'password'}
+                        name="confirmPassword"
+                        placeholder="Re-enter Password"
+                        value={formData.confirmPassword}
+                        onChange={handleChange}
+                        autoComplete="new-password"
+                        style={{ ...inputStyle(fieldErrors.confirmPassword), paddingRight: '2.6rem' }}
+                      />
+                      <Lock size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                      <button
+                        type="button"
+                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        style={{ position: 'absolute', right: '12px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#64748b' }}
+                        title={showConfirmPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showConfirmPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                    {fieldErrors.confirmPassword && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.confirmPassword}</span>}
+                  </div>
+                )}
+
+                {/* Policy Disclaimer */}
+                <p style={{ fontSize: '0.72rem', color: '#64748b', margin: '0.2rem 0 0 0', lineHeight: '1.4' }}>
+                  By continuing, you agree to Dipto Fashion's{' '}
+                  <span style={{ color: '#c026d3', fontWeight: '700', cursor: 'pointer' }}>Terms of Use</span> and{' '}
+                  <span style={{ color: '#c026d3', fontWeight: '700', cursor: 'pointer' }}>Privacy Policy</span>.
+                </p>
+
+                <button
+                  type="submit"
+                  className="btn-primary blink-green auth-submit-btn"
+                  style={{
+                    width: '100%',
+                    maxWidth: '240px',
+                    margin: '0.5rem auto 0 auto',
+                    height: '44px',
+                    justifyContent: 'center',
+                    fontSize: '0.92rem',
+                    fontWeight: '800',
+                    borderRadius: '8px',
+                    cursor: loading ? 'not-allowed' : 'pointer',
+                    textTransform: 'uppercase',
+                    letterSpacing: '0.5px',
+                    display: 'flex'
+                  }}
+                  disabled={loading}
+                >
+                  {loading ? 'AUTHENTICATING...' : mode === 'login' ? 'CONTINUE' : 'SIGN UP'}
+                </button>
+              </form>
+            )}
           </div>
 
           {/* Flipkart Style Switch Account Link Banner at Bottom */}
-          <div style={{ textAlign: 'center', marginTop: '1.25rem', paddingTop: '1rem', borderTop: '1px solid #f1f5f9' }}>
-            {isLogin ? (
+          <div style={{ textAlign: 'center', marginTop: '1rem', paddingTop: '0.85rem', borderTop: '1px solid #f1f5f9' }}>
+            {mode === 'login' ? (
               <button
                 type="button"
-                onClick={() => { setIsLogin(false); resetForm(); }}
+                onClick={() => { setMode('signup'); resetForm(); setMode('signup'); }}
                 style={{
                   background: '#fdf4ff',
                   border: '1px solid #f5d0fe',
@@ -422,10 +887,10 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
               >
                 New to Dipto Fashion? Create an account <ArrowRight size={16} />
               </button>
-            ) : (
+            ) : mode === 'signup' || mode === 'forgot' || mode === 'otp' ? (
               <button
                 type="button"
-                onClick={() => { setIsLogin(true); resetForm(); }}
+                onClick={() => { setMode('login'); resetForm(); setMode('login'); }}
                 style={{
                   background: '#fdf4ff',
                   border: '1px solid #f5d0fe',
@@ -444,7 +909,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
               >
                 Existing User? Log in <ArrowRight size={16} />
               </button>
-            )}
+            ) : null}
           </div>
         </div>
       </div>

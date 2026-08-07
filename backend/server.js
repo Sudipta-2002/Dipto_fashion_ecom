@@ -240,36 +240,45 @@ app.post('/api/admin/login', async (req, res) => {
 app.post('/api/auth/register', async (req, res) => {
   try {
     const { name, email, password, phone } = req.body;
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: 'Name, email, and password are required' });
+    if (!name || !email || !password || !phone) {
+      return res.status(400).json({ message: 'Name, email, password, and phone number are required' });
     }
     if (password.length < 8) {
       return res.status(400).json({ message: 'Password must be at least 8 characters long' });
     }
 
+    const cleanPhone = phone.trim();
+
     if (isMongoConnected()) {
-      const existingUser = await User.findOne({ email });
-      if (existingUser) return res.status(400).json({ message: 'Email is already registered' });
+      const existingUser = await User.findOne({ $or: [{ email }, { phone: cleanPhone }] });
+      if (existingUser) {
+        if (existingUser.phone === cleanPhone) return res.status(400).json({ message: 'Phone number is already registered' });
+        return res.status(400).json({ message: 'Email is already registered' });
+      }
 
       const hashedPassword = await bcrypt.hash(password, 10);
-      const user = await User.create({ name, email, password: hashedPassword, phone, addresses: [] });
+      const user = await User.create({ name, email, password: hashedPassword, phone: cleanPhone, addresses: [] });
       const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role, addresses: user.addresses } });
+      return res.json({ token, user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role, addresses: user.addresses } });
     } else {
-      const existing = memoryUsers.find(u => u.email === email);
-      if (existing) return res.status(400).json({ message: 'Email is already registered' });
+      const existing = memoryUsers.find(u => u.email === email || (u.phone && u.phone === cleanPhone));
+      if (existing) {
+        if (existing.phone === cleanPhone) return res.status(400).json({ message: 'Phone number is already registered' });
+        return res.status(400).json({ message: 'Email is already registered' });
+      }
 
       const newUser = {
         _id: 'u_' + Date.now(),
         name,
         email,
+        phone: cleanPhone,
         password,
         role: 'user',
         addresses: []
       };
       memoryUsers.push(newUser);
       const token = jwt.sign({ userId: newUser._id, role: newUser.role }, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ token, user: { id: newUser._id, name: newUser.name, email: newUser.email, role: newUser.role, addresses: newUser.addresses } });
+      return res.json({ token, user: { id: newUser._id, name: newUser.name, email: newUser.email, phone: newUser.phone, role: newUser.role, addresses: newUser.addresses } });
     }
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -278,33 +287,90 @@ app.post('/api/auth/register', async (req, res) => {
 
 app.post('/api/auth/login', async (req, res) => {
   try {
-    const { email, password } = req.body;
-    if (!email || !password) return res.status(400).json({ message: 'Email and password required' });
+    const { phone, password } = req.body;
+    if (!phone || !password) return res.status(400).json({ message: 'Phone number and password are required' });
     if (password.length < 8) return res.status(400).json({ message: 'Password must be at least 8 characters long' });
 
+    const cleanPhone = phone.trim();
+
     if (isMongoConnected()) {
-      const user = await User.findOne({ email });
-      if (!user) return res.status(400).json({ message: 'Invalid credentials' });
+      // Find user by phone number (exact or stripped match)
+      const user = await User.findOne({
+        $or: [
+          { phone: cleanPhone },
+          { phone: cleanPhone.replace(/\s+/g, '') }
+        ]
+      });
+      if (!user) return res.status(400).json({ message: 'No registered user found with this phone number' });
 
       const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) return res.status(400).json({ message: 'Invalid credentials' });
+      if (!isMatch) return res.status(400).json({ message: 'Incorrect password entered' });
 
       const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role, addresses: user.addresses } });
+      return res.json({ token, user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role, addresses: user.addresses } });
     } else {
-      let user = memoryUsers.find(u => u.email === email);
+      let user = memoryUsers.find(u => u.phone && (u.phone === cleanPhone || u.phone.replace(/\s+/g, '') === cleanPhone.replace(/\s+/g, '')));
       if (!user) {
         user = {
           _id: 'u_' + Date.now(),
-          name: email.split('@')[0],
-          email,
+          name: 'Customer',
+          email: 'customer@diptofashion.com',
+          phone: cleanPhone,
+          password,
           role: 'user',
           addresses: []
         };
         memoryUsers.push(user);
+      } else {
+        if (user.password !== password) {
+          return res.status(400).json({ message: 'Incorrect password entered' });
+        }
       }
       const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ token, user: { id: user._id, name: user.name, email: user.email, role: user.role, addresses: user.addresses } });
+      return res.json({ token, user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role, addresses: user.addresses } });
+    }
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// FORGOT PASSWORD / RESET PASSWORD ROUTE
+app.post('/api/auth/reset-password', async (req, res) => {
+  try {
+    const { phone, newPassword } = req.body;
+    if (!phone || !newPassword) {
+      return res.status(400).json({ message: 'Phone number and new password are required' });
+    }
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+    }
+
+    const cleanPhone = phone.trim();
+
+    if (isMongoConnected()) {
+      const user = await User.findOne({
+        $or: [
+          { phone: cleanPhone },
+          { phone: cleanPhone.replace(/\s+/g, '') }
+        ]
+      });
+      if (!user) {
+        return res.status(404).json({ message: 'No account found with this registered phone number' });
+      }
+
+      const hashedPassword = await bcrypt.hash(newPassword, 10);
+      user.password = hashedPassword;
+      await user.save();
+
+      return res.json({ success: true, message: 'Password updated successfully in database' });
+    } else {
+      const user = memoryUsers.find(u => u.phone && (u.phone === cleanPhone || u.phone.replace(/\s+/g, '') === cleanPhone.replace(/\s+/g, '')));
+      if (!user) {
+        return res.status(404).json({ message: 'No account found with this registered phone number' });
+      }
+
+      user.password = newPassword;
+      return res.json({ success: true, message: 'Password updated successfully' });
     }
   } catch (err) {
     res.status(500).json({ message: err.message });
