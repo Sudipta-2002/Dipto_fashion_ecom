@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { RotateCcw, CheckCircle2, Clock, Truck, Landmark, RefreshCw, Calendar, AlertCircle, Ban, CreditCard, Smartphone, Building2 } from 'lucide-react';
 import TableSkeleton from '../Skeletons/TableSkeleton';
 import { API_URL } from '../../api';
-import { clearCache } from '../../utils/cache';
+import { fetchWithCache, clearCache } from '../../utils/cache';
 
 // ─────────────────────────────────────────────────────────────
 // Helper: group both return AND cancellation requests by date
@@ -122,10 +122,23 @@ const AdminReturns = () => {
 
   const fetchRequests = async (forceRefresh = false) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/returns`);
-      if (res.ok) {
-        const data = await res.json();
+      const { data } = await fetchWithCache(
+        'admin_returns',
+        async () => {
+          const res = await fetch(`${API_URL}/api/admin/returns`);
+          if (res.ok) {
+            return await res.json();
+          }
+          return [];
+        },
+        { forceRefresh }
+      );
+
+      if (data) {
         setAllRequests(Array.isArray(data) ? data : []);
+        setLoading(false);
+      } else if (!allRequests.length) {
+        setLoading(true);
       }
     } catch (e) {
       console.error('Error fetching returns/cancellations:', e);

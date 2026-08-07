@@ -21,7 +21,9 @@ const productSchema = new mongoose.Schema({
   reviews: [reviewSchema],
   availableSizes: [{ type: String }],
   description: { type: String, default: '' },
-  isFeatured: { type: Boolean, default: false }
 }, { timestamps: true });
+
+productSchema.index({ createdAt: -1, category: 1 });
+productSchema.index({ isFeatured: 1, createdAt: -1 });
 
 export default mongoose.model('Product', productSchema);

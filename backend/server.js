@@ -610,12 +610,13 @@ app.get(['/api/products', '/products'], async (req, res) => {
           query.category = category;
         }
       }
-      let prods = await Product.find(query).sort({ createdAt: -1 });
+      let prods = await Product.find(query).sort({ createdAt: -1 }).lean();
       if (prods.length === 0 && !category && !search) {
-        prods = await Product.insertMany(memoryProducts.map(p => {
+        const inserted = await Product.insertMany(memoryProducts.map(p => {
           const { _id, ...rest } = p;
           return rest;
         }));
+        prods = inserted.map(doc => doc.toObject());
       }
       return res.json(prods);
     } else {
@@ -1574,7 +1575,10 @@ app.get(['/api/orders', '/orders', '/api/admin/orders', '/admin/orders'], async 
       const totalCount = await Order.countDocuments();
       res.setHeader('X-Total-Count', totalCount);
 
-      let mongoQuery = Order.find().sort({ createdAt: -1 });
+      let mongoQuery = Order.find()
+        .select('orderId user userName userEmail email shippingAddress items totalAmount couponCode couponDiscount utrNumber paymentMethod status cancellationDetails returnDetails createdAt updatedAt')
+        .sort({ createdAt: -1 })
+        .lean();
       if (limit > 0) {
         const skip = (page - 1) * limit;
         mongoQuery = mongoQuery.skip(skip).limit(limit);
@@ -2016,7 +2020,10 @@ app.get('/api/admin/returns', async (req, res) => {
           { status: { $in: ['Return Requested', 'Return Approved', 'Refund Completed', 'Cancellation Requested'] } },
           { status: 'Cancelled', 'cancellationDetails.requestedAt': { $exists: true, $ne: null } }
         ]
-      }).sort({ updatedAt: -1 });
+      })
+        .select('orderId user userName userEmail email shippingAddress items totalAmount paymentMethod status cancellationDetails returnDetails createdAt updatedAt')
+        .sort({ updatedAt: -1 })
+        .lean();
       return res.json(returns);
     } else {
       const returns = memoryOrders.filter(o =>
@@ -2036,19 +2043,27 @@ app.get('/api/admin/analytics', async (req, res) => {
   try {
     let ordersList = [];
     if (isMongoConnected()) {
-      ordersList = await Order.find();
+      let filter = {};
+      if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        filter = { createdAt: { $gte: start, $lte: end } };
+      }
+      ordersList = await Order.find(filter)
+        .select('orderId user userName userEmail email items totalAmount paymentMethod status createdAt updatedAt')
+        .lean();
     } else {
       ordersList = memoryOrders;
-    }
-
-    if (startDate && endDate) {
-      const start = new Date(startDate);
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
-      ordersList = ordersList.filter(o => {
-        const d = new Date(o.createdAt);
-        return d >= start && d <= end;
-      });
+      if (startDate && endDate) {
+        const start = new Date(startDate);
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        ordersList = ordersList.filter(o => {
+          const d = new Date(o.createdAt);
+          return d >= start && d <= end;
+        });
+      }
     }
 
     const pendingOrdersCount = ordersList.filter(o => o.status === 'Pending Verification' || !o.status).length;
@@ -2140,7 +2155,10 @@ app.get('/api/admin/billing', async (req, res) => {
   try {
     let ordersList = [];
     if (isMongoConnected()) {
-      ordersList = await Order.find().sort({ createdAt: -1 });
+      ordersList = await Order.find()
+        .select('orderId user userName userEmail email items totalAmount paymentMethod status utrNumber createdAt updatedAt')
+        .sort({ createdAt: -1 })
+        .lean();
     } else {
       ordersList = [...memoryOrders];
     }

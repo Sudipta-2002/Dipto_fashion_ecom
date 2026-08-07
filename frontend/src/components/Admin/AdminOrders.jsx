@@ -51,9 +51,31 @@ const AdminOrders = ({ realtimeOrderUpdate }) => {
   const [selectedUtrModal, setSelectedUtrModal] = useState(null);
   const [shippingDocketOrder, setShippingDocketOrder] = useState(null);
 
-  const fetchOrders = async (pageNum = 1, isAppend = false) => {
+  const fetchOrders = async (pageNum = 1, isAppend = false, forceRefresh = false) => {
+    const cacheKey = `admin_orders_page_${pageNum}`;
+
     if (pageNum === 1 && !isAppend) {
-      setLoading(true);
+      const { data: cached } = await fetchWithCache(
+        cacheKey,
+        async () => {
+          const res = await fetch(`${API_URL}/api/orders?page=${pageNum}&limit=15`);
+          const totalHeader = res.headers.get('X-Total-Count');
+          const total = totalHeader ? parseInt(totalHeader, 10) : 0;
+          const data = await res.json();
+          return { data: Array.isArray(data) ? data : [], total };
+        },
+        { forceRefresh }
+      );
+
+      if (cached && cached.data) {
+        setOrders(cached.data);
+        const totalNum = cached.total || cached.data.length;
+        setTotalCount(totalNum);
+        setPage(1);
+        setHasMore(cached.data.length === 15 && totalNum > cached.data.length);
+        setLoading(false);
+        return;
+      }
     } else {
       setLoadingMore(true);
     }
