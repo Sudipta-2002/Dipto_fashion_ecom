@@ -46,8 +46,8 @@ io.on('connection', (socket) => {
 });
 
 // Razorpay Payment Gateway Configuration (Test Mode & Live Approval Ready)
-const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_test_TMAyEYZpYPApGL';
-const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'dOPa9ZjrEFIXJxv2xQwQ839f';
+const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || 'rzp_live_TMnf64UYjTg87s';
+const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || 'x1sgc3Fi1nuHyxMonvN8VS7H';
 
 const razorpayInstance = new Razorpay({
   key_id: RAZORPAY_KEY_ID,
