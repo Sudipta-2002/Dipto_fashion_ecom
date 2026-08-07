@@ -94,21 +94,30 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
     <div className="modal-overlay" style={{ zIndex: 450 }}>
       <div
         className="modal-card"
-        style={{ maxWidth: '500px', width: '93%', borderRadius: '18px', overflow: 'hidden', boxShadow: '0 24px 60px rgba(0,0,0,0.22)', maxHeight: '90vh', overflowY: 'auto' }}
+        style={{
+          maxWidth: '500px',
+          width: 'min(93%, calc(100vw - 1.5rem))',
+          borderRadius: '18px',
+          overflow: 'hidden',
+          boxShadow: '0 24px 60px rgba(0,0,0,0.22)',
+          maxHeight: '92dvh',
+          overflowY: 'auto',
+          WebkitOverflowScrolling: 'touch'
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ background: 'linear-gradient(135deg, #fff1f2, #fdf4ff)', borderBottom: '1px solid #fecdd3', padding: '1rem 1.25rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-            <div style={{ width: '38px', height: '38px', borderRadius: '50%', background: '#ffe4e6', color: '#e11d48', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Ban size={20} />
+        <div style={{ background: 'linear-gradient(135deg, #fff1f2, #fdf4ff)', borderBottom: '1px solid #fecdd3', padding: '0.85rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0, flex: 1 }}>
+            <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#ffe4e6', color: '#e11d48', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+              <Ban size={18} />
             </div>
-            <div>
-              <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#be123c', margin: 0 }}>Request Order Cancellation</h3>
-              <p style={{ fontSize: '0.73rem', color: '#e11d48', margin: 0 }}>Order: <strong>{order.orderId}</strong> • ₹{order.totalAmount?.toLocaleString('en-IN')}</p>
+            <div style={{ minWidth: 0 }}>
+              <h3 style={{ fontSize: '0.98rem', fontWeight: '800', color: '#be123c', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Request Order Cancellation</h3>
+              <p style={{ fontSize: '0.72rem', color: '#e11d48', margin: 0, wordBreak: 'break-all' }}>Order: <strong>{order.orderId}</strong> &nbsp;•&nbsp; ₹{order.totalAmount?.toLocaleString('en-IN')}</p>
             </div>
           </div>
-          <button className="close-btn" onClick={onClose} style={{ background: 'none', border: 'none' }}>
+          <button className="close-btn" onClick={onClose} style={{ background: 'none', border: 'none', flexShrink: 0 }}>
             <X size={20} color="#be123c" />
           </button>
         </div>
@@ -128,7 +137,7 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
             </p>
           </div>
         ) : (
-          <form onSubmit={handleConfirmCancel} style={{ padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1.1rem' }}>
+          <form onSubmit={handleConfirmCancel} style={{ padding: 'clamp(0.85rem, 4vw, 1.25rem)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {error && (
               <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', padding: '0.65rem 0.85rem', borderRadius: '8px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <AlertCircle size={16} /> {error}
@@ -143,7 +152,7 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
               <select
                 value={selectedReason}
                 onChange={(e) => setSelectedReason(e.target.value)}
-                style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.88rem', outline: 'none', background: 'white' }}
+                style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.88rem', outline: 'none', background: 'white', boxSizing: 'border-box' }}
               >
                 {CANCELLATION_REASONS.map((reason, idx) => (
                   <option key={idx} value={reason}>{reason}</option>
@@ -160,7 +169,7 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
                 value={customNotes}
                 onChange={(e) => setCustomNotes(e.target.value)}
                 rows={2}
-                style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.85rem', outline: 'none', resize: 'vertical' }}
+                style={{ width: '100%', padding: '0.65rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '16px', outline: 'none', resize: 'vertical', maxHeight: '80px', boxSizing: 'border-box' }}
               />
             </div>
 
@@ -176,9 +185,9 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
                     onClick={() => setRefundMethod(opt.id)}
                     style={{
                       display: 'flex',
-                      alignItems: 'center',
-                      gap: '0.75rem',
-                      padding: '0.75rem 0.9rem',
+                      alignItems: 'flex-start',
+                      gap: '0.65rem',
+                      padding: '0.7rem 0.85rem',
                       borderRadius: '10px',
                       border: `2px solid ${refundMethod === opt.id ? '#c026d3' : '#e2e8f0'}`,
                       background: refundMethod === opt.id ? '#fdf4ff' : 'white',
@@ -191,14 +200,14 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
                       border: `2px solid ${refundMethod === opt.id ? '#c026d3' : '#94a3b8'}`,
                       background: refundMethod === opt.id ? '#c026d3' : 'transparent',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      flexShrink: 0, transition: 'all 0.15s ease'
+                      flexShrink: 0, transition: 'all 0.15s ease', marginTop: '2px'
                     }}>
                       {refundMethod === opt.id && <div style={{ width: '7px', height: '7px', borderRadius: '50%', background: 'white' }} />}
                     </div>
-                    <div style={{ color: refundMethod === opt.id ? '#c026d3' : '#334155', flexShrink: 0 }}>{opt.icon}</div>
-                    <div>
-                      <div style={{ fontSize: '0.88rem', fontWeight: '700', color: refundMethod === opt.id ? '#7e22ce' : '#0f172a' }}>{opt.label}</div>
-                      <div style={{ fontSize: '0.73rem', color: '#64748b' }}>{opt.sub}</div>
+                    <div style={{ color: refundMethod === opt.id ? '#c026d3' : '#334155', flexShrink: 0, marginTop: '1px' }}>{opt.icon}</div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontSize: '0.85rem', fontWeight: '700', color: refundMethod === opt.id ? '#7e22ce' : '#0f172a', lineHeight: '1.3' }}>{opt.label}</div>
+                      <div style={{ fontSize: '0.72rem', color: '#64748b', marginTop: '2px', lineHeight: '1.3' }}>{opt.sub}</div>
                     </div>
                   </label>
                 ))}
@@ -207,7 +216,7 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
 
             {/* UPI Details */}
             {refundMethod === 'upi' && (
-              <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '0.9rem' }}>
+              <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '0.85rem' }}>
                 <label style={{ fontSize: '0.8rem', fontWeight: '800', color: '#334155', display: 'block', marginBottom: '0.4rem' }}>
                   UPI ID for Refund *
                 </label>
@@ -216,7 +225,7 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
                   placeholder="e.g. name@upi or 9876543210@ybl"
                   value={upiId}
                   onChange={(e) => setUpiId(e.target.value)}
-                  style={{ width: '100%', padding: '0.65rem', border: '1.5px solid #cbd5e1', borderRadius: '8px', fontSize: '0.88rem', outline: 'none' }}
+                  style={{ width: '100%', padding: '0.65rem', border: '1.5px solid #cbd5e1', borderRadius: '8px', fontSize: '16px', outline: 'none', boxSizing: 'border-box' }}
                   required={refundMethod === 'upi'}
                 />
               </div>
@@ -224,9 +233,9 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
 
             {/* Bank Account Details */}
             {refundMethod === 'bank' && (
-              <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '0.9rem', display: 'flex', flexDirection: 'column', gap: '0.65rem' }}>
+              <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '0.85rem', display: 'flex', flexDirection: 'column', gap: '0.6rem' }}>
                 <div style={{ fontSize: '0.82rem', fontWeight: '800', color: '#334155' }}>Bank Account Details *</div>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '0.5rem' }}>
                   <div>
                     <label style={{ fontSize: '0.73rem', fontWeight: '700', color: '#475569' }}>Account Holder Name *</label>
                     <input
@@ -234,7 +243,7 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
                       placeholder="Full name as in bank"
                       value={accountHolder}
                       onChange={(e) => setAccountHolder(e.target.value)}
-                      style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem', marginTop: '0.25rem', outline: 'none' }}
+                      style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '16px', marginTop: '0.25rem', outline: 'none', boxSizing: 'border-box' }}
                     />
                   </div>
                   <div>
@@ -244,17 +253,18 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
                       placeholder="e.g. SBI, HDFC"
                       value={bankName}
                       onChange={(e) => setBankName(e.target.value)}
-                      style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem', marginTop: '0.25rem', outline: 'none' }}
+                      style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '16px', marginTop: '0.25rem', outline: 'none', boxSizing: 'border-box' }}
                     />
                   </div>
                   <div>
                     <label style={{ fontSize: '0.73rem', fontWeight: '700', color: '#475569' }}>Account Number *</label>
                     <input
                       type="text"
+                      inputMode="numeric"
                       placeholder="Bank Account No."
                       value={accountNumber}
                       onChange={(e) => setAccountNumber(e.target.value)}
-                      style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem', marginTop: '0.25rem', outline: 'none' }}
+                      style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '16px', marginTop: '0.25rem', outline: 'none', boxSizing: 'border-box' }}
                     />
                   </div>
                   <div>
@@ -264,7 +274,7 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
                       placeholder="e.g. SBIN0001234"
                       value={ifscCode}
                       onChange={(e) => setIfscCode(e.target.value)}
-                      style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem', marginTop: '0.25rem', outline: 'none' }}
+                      style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '16px', marginTop: '0.25rem', outline: 'none', boxSizing: 'border-box' }}
                     />
                   </div>
                 </div>
@@ -272,23 +282,23 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
             )}
 
             {/* Notice */}
-            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.65rem 0.85rem', fontSize: '0.77rem', color: '#92400e', lineHeight: '1.4' }}>
+            <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: '8px', padding: '0.65rem 0.85rem', fontSize: '0.77rem', color: '#92400e', lineHeight: '1.5' }}>
               ⚠️ Your cancellation request will be reviewed by our admin team. Once approved, the order will be cancelled and your refund will be initiated within 24–48 hours.
             </div>
 
-            <div style={{ display: 'flex', gap: '0.75rem' }}>
+            <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
               <button
                 type="button"
                 className="btn-outline"
                 onClick={onClose}
-                style={{ flex: 1, justifyContent: 'center' }}
+                style={{ flex: '1 1 120px', justifyContent: 'center', minWidth: '100px' }}
               >
                 Keep Order
               </button>
               <button
                 type="submit"
                 className="btn-primary"
-                style={{ flex: 1, justifyContent: 'center', background: '#dc2626', borderColor: '#b91c1c' }}
+                style={{ flex: '1 1 150px', justifyContent: 'center', background: '#dc2626', borderColor: '#b91c1c', minWidth: '130px' }}
                 disabled={loading}
               >
                 {loading ? 'Submitting...' : 'Request Cancellation'}
