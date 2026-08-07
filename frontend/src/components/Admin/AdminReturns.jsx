@@ -171,10 +171,12 @@ const AdminReturns = () => {
     const orderId = order._id || order.orderId;
     let previousRequests = [];
 
-    // Optimistic update: mark as Cancelled immediately
+    // Optimistic update: mark as Cancelled in-place (do not remove)
     setAllRequests((prev) => {
       previousRequests = prev;
-      return prev.filter((o) => (o._id !== orderId && o.orderId !== orderId));
+      return prev.map((o) =>
+        (o._id === orderId || o.orderId === orderId) ? { ...o, status: 'Cancelled' } : o
+      );
     });
     showSuccess(`Cancellation approved for ${order.orderId} ✅ — Stock restored.`);
 
@@ -204,12 +206,12 @@ const AdminReturns = () => {
 
   // ── Filter ──
   const filteredRequests = allRequests.filter((o) => {
-    if (activeFilter === 'cancellation') return o.status === 'Cancellation Requested';
+    if (activeFilter === 'cancellation') return ['Cancellation Requested', 'Cancelled'].includes(o.status);
     if (activeFilter === 'return') return ['Return Requested', 'Return Approved', 'Refund Completed'].includes(o.status);
     return true;
   });
 
-  const cancellationCount = allRequests.filter(o => o.status === 'Cancellation Requested').length;
+  const cancellationCount = allRequests.filter(o => ['Cancellation Requested', 'Cancelled'].includes(o.status)).length;
   const returnCount = allRequests.filter(o => ['Return Requested', 'Return Approved', 'Refund Completed'].includes(o.status)).length;
 
   const { today, yesterday, olderGroups } = groupRequestsByDate(filteredRequests);
@@ -231,15 +233,17 @@ const AdminReturns = () => {
         </thead>
         <tbody>
           {itemsList.map((o) => {
+            const isCancellationType = ['Cancellation Requested', 'Cancelled'].includes(o.status);
             const isCancellationReq = o.status === 'Cancellation Requested';
+            const isCancelled = o.status === 'Cancelled';
             return (
               <tr key={o._id || o.orderId}>
                 {/* Order ID */}
                 <td>
-                  <strong style={{ color: isCancellationReq ? '#d97706' : '#c026d3' }}>{o.orderId}</strong>
+                  <strong style={{ color: isCancellationType ? '#d97706' : '#c026d3' }}>{o.orderId}</strong>
                   <div style={{ fontSize: '0.73rem', color: '#94a3b8', marginTop: '2px' }}>
                     {new Date(
-                      isCancellationReq
+                      isCancellationType
                         ? (o.cancellationDetails?.requestedAt || o.updatedAt)
                         : (o.returnDetails?.requestedAt || o.updatedAt)
                     ).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
@@ -254,9 +258,9 @@ const AdminReturns = () => {
 
                 {/* Type + Reason */}
                 <td style={{ maxWidth: '180px' }}>
-                  {isCancellationReq ? (
+                  {isCancellationType ? (
                     <>
-                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: '900', color: '#d97706', background: '#fffbeb', border: '1px solid #fde68a', padding: '2px 7px', borderRadius: '8px', marginBottom: '4px' }}>
+                      <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: '900', color: isCancelled ? '#15803d' : '#d97706', background: isCancelled ? '#dcfce7' : '#fffbeb', border: `1px solid ${isCancelled ? '#86efac' : '#fde68a'}`, padding: '2px 7px', borderRadius: '8px', marginBottom: '4px' }}>
                         <Ban size={11} /> CANCELLATION
                       </span>
                       <div style={{ fontSize: '0.82rem', color: '#92400e', fontWeight: '600' }}>
@@ -282,7 +286,7 @@ const AdminReturns = () => {
 
                 {/* Refund Details */}
                 <td>
-                  {isCancellationReq ? (
+                  {isCancellationType ? (
                     <CancellationRefundBadge order={o} />
                   ) : (
                     <button
@@ -309,16 +313,16 @@ const AdminReturns = () => {
                     borderRadius: '12px',
                     fontWeight: '800',
                     fontSize: '0.73rem',
-                    background: o.status === 'Refund Completed' ? '#dcfce7'
+                    background: (o.status === 'Refund Completed' || o.status === 'Cancelled') ? '#dcfce7'
                       : o.status === 'Return Approved' ? '#eff6ff'
                       : o.status === 'Cancellation Requested' ? '#fffbeb'
                       : '#fef2f2',
-                    color: o.status === 'Refund Completed' ? '#15803d'
+                    color: (o.status === 'Refund Completed' || o.status === 'Cancelled') ? '#15803d'
                       : o.status === 'Return Approved' ? '#1d4ed8'
                       : o.status === 'Cancellation Requested' ? '#92400e'
                       : '#b91c1c'
                   }}>
-                    {o.status === 'Cancellation Requested' ? '⏳ Cancellation Requested' : o.status}
+                    {o.status === 'Cancellation Requested' ? '⏳ Cancellation Requested' : o.status === 'Cancelled' ? 'Cancellation Approved' : o.status}
                   </span>
                 </td>
 
@@ -335,6 +339,11 @@ const AdminReturns = () => {
                         <CheckCircle2 size={13} /> Approve Cancellation
                       </button>
                     )}
+                    {o.status === 'Cancelled' && (
+                      <span style={{ color: '#15803d', fontSize: '0.78rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        <CheckCircle2 size={14} /> Approved &amp; Refunded
+                      </span>
+                    )}
 
                     {/* ── RETURN ACTIONS ── */}
                     {o.status === 'Return Requested' && (
@@ -347,7 +356,7 @@ const AdminReturns = () => {
                     )}
                     {o.status === 'Return Approved' && (
                       <button
-                        style={{ background: '#16a34a', color: 'white', padding: '0.4rem 0.75rem', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '800', cursor: 'pointer', border: 'none' }}
+                        style={{ background: '#16a34a', color: 'white', padding: '0.4rem 0.75rem', borderRadius: '6px', fontSize: '0.78rem', fontWeight: '700', cursor: 'pointer', border: 'none' }}
                         onClick={() => handleUpdateReturnStatus(o._id || o.orderId, 'Refund Completed')}
                       >
                         Complete Refund

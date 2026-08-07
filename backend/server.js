@@ -1945,12 +1945,22 @@ app.post('/api/products/:id/review', async (req, res) => {
 // GET RETURNS & CANCELLATION REQUESTS FOR ADMIN PANEL
 app.get('/api/admin/returns', async (req, res) => {
   try {
-    const relevantStatuses = ['Return Requested', 'Return Approved', 'Refund Completed', 'Cancellation Requested'];
+    const relevantStatuses = ['Return Requested', 'Return Approved', 'Refund Completed', 'Cancellation Requested', 'Cancelled'];
     if (isMongoConnected()) {
-      const returns = await Order.find({ status: { $in: relevantStatuses } }).sort({ updatedAt: -1 });
+      // Fetch Cancelled only if it had a cancellation request (has requestedAt), to avoid
+      // polluting the list with orders that were rejected/admin-cancelled without a user request.
+      const returns = await Order.find({
+        $or: [
+          { status: { $in: ['Return Requested', 'Return Approved', 'Refund Completed', 'Cancellation Requested'] } },
+          { status: 'Cancelled', 'cancellationDetails.requestedAt': { $exists: true, $ne: null } }
+        ]
+      }).sort({ updatedAt: -1 });
       return res.json(returns);
     } else {
-      const returns = memoryOrders.filter(o => relevantStatuses.includes(o.status));
+      const returns = memoryOrders.filter(o =>
+        ['Return Requested', 'Return Approved', 'Refund Completed', 'Cancellation Requested'].includes(o.status) ||
+        (o.status === 'Cancelled' && o.cancellationDetails?.requestedAt)
+      );
       return res.json(returns);
     }
   } catch (err) {
