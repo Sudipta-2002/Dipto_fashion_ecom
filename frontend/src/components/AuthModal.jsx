@@ -68,29 +68,41 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
   const [confirmationResult, setConfirmationResult] = useState(null);
   const recaptchaVerifierRef = useRef(null);
 
-  // Initialize Firebase Invisible RecaptchaVerifier when Modal opens
-  useEffect(() => {
-    if (isOpen) {
-      try {
-        if (!window.authRecaptchaVerifier) {
-          window.authRecaptchaVerifier = new RecaptchaVerifier(
-            auth,
-            'auth-recaptcha-container',
-            {
-              size: 'invisible',
-              callback: (response) => {},
-              'expired-callback': () => {
-                setError('reCAPTCHA expired. Please try sending OTP again.');
-              }
+  // Dynamic initialization of RecaptchaVerifier right before sending OTP
+  const getRecaptchaVerifier = () => {
+    try {
+      if (!window.authRecaptchaVerifier) {
+        window.authRecaptchaVerifier = new RecaptchaVerifier(
+          auth,
+          'auth-recaptcha-container',
+          {
+            size: 'invisible',
+            callback: (response) => {},
+            'expired-callback': () => {
+              setError('reCAPTCHA expired. Please try sending OTP again.');
             }
-          );
-        }
-        recaptchaVerifierRef.current = window.authRecaptchaVerifier;
-      } catch (err) {
-        console.error('Firebase Recaptcha error:', err);
+          }
+        );
       }
+      recaptchaVerifierRef.current = window.authRecaptchaVerifier;
+      return window.authRecaptchaVerifier;
+    } catch (err) {
+      console.error('Firebase Auth Error:', err.code, err.message);
+      return null;
     }
-  }, [isOpen]);
+  };
+
+  // Helper to reset reCAPTCHA widget on error
+  const resetRecaptcha = async () => {
+    try {
+      if (window.grecaptcha && window.authRecaptchaVerifier) {
+        const widgetId = await window.authRecaptchaVerifier.render();
+        window.grecaptcha.reset(widgetId);
+      }
+    } catch (e) {
+      console.warn('reCAPTCHA reset notice:', e);
+    }
+  };
 
   // Resend Timer Countdown for OTP
   useEffect(() => {
@@ -227,14 +239,14 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         if (!res.ok) throw new Error(data.message || 'Signup validation failed');
 
         // Send OTP via Firebase signInWithPhoneNumber
-        const appVerifier = recaptchaVerifierRef.current || window.authRecaptchaVerifier;
-        let firebaseConfirm = null;
+        const appVerifier = getRecaptchaVerifier();
         if (appVerifier) {
           try {
-            firebaseConfirm = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
+            const firebaseConfirm = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
             setConfirmationResult(firebaseConfirm);
           } catch (fbErr) {
-            console.warn('Firebase SMS OTP trigger warning (falling back if dev mode):', fbErr);
+            console.error("Firebase Auth Error:", fbErr.code, fbErr.message);
+            resetRecaptcha();
           }
         }
 
@@ -259,13 +271,14 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         if (!res.ok) throw new Error(data.message || 'Login failed');
 
         // Send OTP via Firebase signInWithPhoneNumber
-        const appVerifier = recaptchaVerifierRef.current || window.authRecaptchaVerifier;
+        const appVerifier = getRecaptchaVerifier();
         if (appVerifier) {
           try {
             const firebaseConfirm = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
             setConfirmationResult(firebaseConfirm);
           } catch (fbErr) {
-            console.warn('Firebase SMS OTP trigger warning:', fbErr);
+            console.error("Firebase Auth Error:", fbErr.code, fbErr.message);
+            resetRecaptcha();
           }
         }
 
@@ -277,13 +290,14 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         setMode('otp');
       } else if (mode === 'forgot') {
         // Send OTP via Firebase signInWithPhoneNumber
-        const appVerifier = recaptchaVerifierRef.current || window.authRecaptchaVerifier;
+        const appVerifier = getRecaptchaVerifier();
         if (appVerifier) {
           try {
             const firebaseConfirm = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
             setConfirmationResult(firebaseConfirm);
           } catch (fbErr) {
-            console.warn('Firebase SMS OTP trigger warning:', fbErr);
+            console.error("Firebase Auth Error:", fbErr.code, fbErr.message);
+            resetRecaptcha();
           }
         }
 
@@ -299,7 +313,9 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         setMode('otp');
       }
     } catch (err) {
+      console.error("Firebase Auth Error:", err.code, err.message);
       setError(err.message);
+      resetRecaptcha();
     } finally {
       setLoading(false);
     }
@@ -523,8 +539,6 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
           }}
           className="auth-right-form"
         >
-          {/* Invisible reCAPTCHA container required for Firebase Phone Auth */}
-          <div id="auth-recaptcha-container"></div>
           {/* Close Button at top right */}
           <button
             className="close-btn"
@@ -744,7 +758,8 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
                     </button>
                   </div>
                   {fieldErrors.confirmNewPassword && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.confirmNewPassword}</span>}
-                </div>
+                {/* reCAPTCHA container placed directly above submit button */}
+                <div id="auth-recaptcha-container"></div>
 
                 <button
                   type="submit"
@@ -931,6 +946,9 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
                   <span style={{ color: '#c026d3', fontWeight: '700', cursor: 'pointer' }}>Terms of Use</span> and{' '}
                   <span style={{ color: '#c026d3', fontWeight: '700', cursor: 'pointer' }}>Privacy Policy</span>.
                 </p>
+
+                {/* reCAPTCHA container placed directly above submit button */}
+                <div id="auth-recaptcha-container"></div>
 
                 <button
                   type="submit"

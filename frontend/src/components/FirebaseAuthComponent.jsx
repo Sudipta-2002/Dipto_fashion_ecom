@@ -15,8 +15,8 @@ const FirebaseAuthComponent = () => {
 
   const recaptchaVerifierRef = useRef(null);
 
-  // Initialize Invisible RecaptchaVerifier on Component Mount
-  useEffect(() => {
+  // Helper: Get or initialize RecaptchaVerifier dynamically right before sending OTP
+  const getRecaptchaVerifier = () => {
     try {
       if (!window.recaptchaVerifier) {
         window.recaptchaVerifier = new RecaptchaVerifier(
@@ -25,7 +25,7 @@ const FirebaseAuthComponent = () => {
           {
             size: 'invisible',
             callback: (response) => {
-              // reCAPTCHA solved - allow signInWithPhoneNumber
+              // reCAPTCHA solved
             },
             'expired-callback': () => {
               setError('reCAPTCHA expired. Please try sending OTP again.');
@@ -34,10 +34,12 @@ const FirebaseAuthComponent = () => {
         );
       }
       recaptchaVerifierRef.current = window.recaptchaVerifier;
+      return window.recaptchaVerifier;
     } catch (err) {
-      console.error('Firebase RecaptchaVerifier Error:', err);
+      console.error('Firebase RecaptchaVerifier Initialization Error:', err);
+      return null;
     }
-  }, []);
+  };
 
   // Timer countdown for resend OTP
   useEffect(() => {
@@ -64,7 +66,7 @@ const FirebaseAuthComponent = () => {
     return clean;
   };
 
-  // 1. Send OTP Function using Firebase signInWithPhoneNumber
+  // 1. Send OTP Function using Firebase signInWithPhoneNumber with error reset
   const handleSendOtp = async (e) => {
     if (e) e.preventDefault();
     setError('');
@@ -80,7 +82,7 @@ const FirebaseAuthComponent = () => {
     setLoading(true);
 
     try {
-      const appVerifier = recaptchaVerifierRef.current || window.recaptchaVerifier;
+      const appVerifier = getRecaptchaVerifier();
       if (!appVerifier) {
         throw new Error('reCAPTCHA verifier not initialized properly.');
       }
@@ -91,7 +93,7 @@ const FirebaseAuthComponent = () => {
       setResendTimer(30);
       setSuccess(`OTP sent successfully to ${formattedPhone}!`);
     } catch (err) {
-      console.error('Send OTP Error:', err);
+      console.error("Firebase Auth Error:", err.code, err.message);
       let msg = err.message || 'Failed to send OTP. Please check your phone number.';
       if (err.code === 'auth/invalid-phone-number') {
         msg = 'Invalid phone number format. Please enter a valid 10-digit number.';
@@ -99,9 +101,15 @@ const FirebaseAuthComponent = () => {
         msg = 'Too many requests. Please try again after some time.';
       }
       setError(msg);
-      // Reset reCAPTCHA on failure
-      if (window.recaptchaVerifier) {
-        try { window.recaptchaVerifier.render().then((widgetId) => window.grecaptcha.reset(widgetId)); } catch (e) {}
+
+      // Reset reCAPTCHA on failure using grecaptcha.reset() so user can try again
+      try {
+        if (window.grecaptcha && window.recaptchaVerifier) {
+          const widgetId = await window.recaptchaVerifier.render();
+          window.grecaptcha.reset(widgetId);
+        }
+      } catch (resetErr) {
+        console.warn('reCAPTCHA reset notice:', resetErr);
       }
     } finally {
       setLoading(false);
@@ -133,7 +141,7 @@ const FirebaseAuthComponent = () => {
       console.log('Firebase Phone Auth User:', user);
       setSuccess(`Phone verified successfully! Logged in as ${user.phoneNumber || user.uid}`);
     } catch (err) {
-      console.error('Verify OTP Error:', err);
+      console.error("Firebase Auth Error:", err.code, err.message);
       let msg = err.message || 'Invalid OTP code entered.';
       if (err.code === 'auth/invalid-verification-code') {
         msg = 'Invalid OTP code. Please check and enter again.';
@@ -148,9 +156,6 @@ const FirebaseAuthComponent = () => {
 
   return (
     <div style={{ maxWidth: '420px', width: '100%', margin: '2rem auto', padding: '1.75rem', background: '#ffffff', borderRadius: '16px', border: '1.5px solid #e2e8f0', boxShadow: '0 10px 25px rgba(0,0,0,0.06)', boxSizing: 'border-box' }}>
-      {/* Invisible reCAPTCHA container required by Firebase */}
-      <div id="recaptcha-container"></div>
-
       <div style={{ textAlign: 'center', marginBottom: '1.5rem' }}>
         <div style={{ width: '52px', height: '52px', borderRadius: '50%', background: '#fdf4ff', color: '#c026d3', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 0.75rem' }}>
           {otpSent ? <KeyRound size={26} /> : <Phone size={26} />}
@@ -205,6 +210,9 @@ const FirebaseAuthComponent = () => {
               </div>
             </div>
           </div>
+
+          {/* reCAPTCHA container placed directly above the action button */}
+          <div id="recaptcha-container"></div>
 
           <button
             type="submit"
