@@ -179,7 +179,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
 
     try {
       if (mode === 'signup') {
-        // Prepare signup payload
+        // Pre-check signup credentials (email/phone uniqueness) WITHOUT creating database record
         const payload = {
           name: formData.name.trim(),
           email: formData.email.trim(),
@@ -187,16 +187,16 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
           phone: formattedPhone
         };
 
-        const res = await fetch(`${API_URL}/api/auth/register`, {
+        const res = await fetch(`${API_URL}/api/auth/pre-check-signup`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Signup failed');
+        if (!res.ok) throw new Error(data.message || 'Signup validation failed');
 
-        // Store pending auth data, trigger OTP verification
-        setPendingAuthData(data);
+        // Store payload temporarily; do NOT register in database until OTP is verified
+        setPendingAuthData({ type: 'signup', payload });
         setOtpTargetPhone(formattedPhone);
         setOtpOrigin('signup');
         setOtpValues(['', '', '', '', '', '']);
@@ -216,8 +216,8 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Login failed');
 
-        // Store pending auth data, trigger OTP verification
-        setPendingAuthData(data);
+        // Store auth response, trigger OTP verification
+        setPendingAuthData({ type: 'login', data });
         setOtpTargetPhone(formattedPhone);
         setOtpOrigin('login');
         setOtpValues(['', '', '', '', '', '']);
@@ -226,6 +226,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
       } else if (mode === 'forgot') {
         // Trigger OTP verification for Forgot Password
         setPendingAuthData({
+          type: 'forgot',
           phone: formattedPhone,
           newPassword: formData.newPassword
         });
@@ -258,11 +259,25 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     setLoading(true);
 
     try {
-      if (otpOrigin === 'signup' || otpOrigin === 'login') {
-        if (pendingAuthData && pendingAuthData.token) {
-          localStorage.setItem('df_token', pendingAuthData.token);
-          localStorage.setItem('df_user', JSON.stringify(pendingAuthData.user));
-          onAuthSuccess(pendingAuthData.user);
+      if (otpOrigin === 'signup') {
+        // ONLY AFTER OTP VERIFICATION: Register user and save to database
+        const res = await fetch(`${API_URL}/api/auth/register`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(pendingAuthData.payload)
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Registration failed');
+
+        localStorage.setItem('df_token', data.token);
+        localStorage.setItem('df_user', JSON.stringify(data.user));
+        onAuthSuccess(data.user);
+        onClose();
+      } else if (otpOrigin === 'login') {
+        if (pendingAuthData && pendingAuthData.data && pendingAuthData.data.token) {
+          localStorage.setItem('df_token', pendingAuthData.data.token);
+          localStorage.setItem('df_user', JSON.stringify(pendingAuthData.data.user));
+          onAuthSuccess(pendingAuthData.data.user);
           onClose();
         } else {
           throw new Error('Authentication state invalid. Please try again.');

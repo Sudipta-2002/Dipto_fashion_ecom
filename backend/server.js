@@ -237,7 +237,8 @@ app.post('/api/admin/login', async (req, res) => {
 
 // --- USER AUTH ROUTES ---
 
-app.post('/api/auth/register', async (req, res) => {
+// PRE-CHECK SIGNUP: Validates uniqueness of Email & Phone BEFORE OTP verification (without creating user)
+app.post('/api/auth/pre-check-signup', async (req, res) => {
   try {
     const { name, email, password, phone } = req.body;
     if (!name || !email || !password || !phone) {
@@ -250,18 +251,52 @@ app.post('/api/auth/register', async (req, res) => {
     const cleanPhone = phone.trim();
 
     if (isMongoConnected()) {
-      const existingUser = await User.findOne({ $or: [{ email }, { phone: cleanPhone }] });
+      const existingUser = await User.findOne({ $or: [{ email: email.trim() }, { phone: cleanPhone }] });
+      if (existingUser) {
+        if (existingUser.phone === cleanPhone) return res.status(400).json({ message: 'Phone number is already registered' });
+        return res.status(400).json({ message: 'Email is already registered' });
+      }
+    } else {
+      const existing = memoryUsers.find(u => u.email === email.trim() || (u.phone && u.phone === cleanPhone));
+      if (existing) {
+        if (existing.phone === cleanPhone) return res.status(400).json({ message: 'Phone number is already registered' });
+        return res.status(400).json({ message: 'Email is already registered' });
+      }
+    }
+
+    return res.json({ success: true, message: 'Signup details validated. Ready for OTP verification.' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// REGISTER USER: Executed ONLY AFTER OTP verification is successful
+app.post('/api/auth/register', async (req, res) => {
+  try {
+    const { name, email, password, phone } = req.body;
+    if (!name || !email || !password || !phone) {
+      return res.status(400).json({ message: 'Name, email, password, and phone number are required' });
+    }
+    if (password.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+    }
+
+    const cleanPhone = phone.trim();
+    const cleanEmail = email.trim();
+
+    if (isMongoConnected()) {
+      const existingUser = await User.findOne({ $or: [{ email: cleanEmail }, { phone: cleanPhone }] });
       if (existingUser) {
         if (existingUser.phone === cleanPhone) return res.status(400).json({ message: 'Phone number is already registered' });
         return res.status(400).json({ message: 'Email is already registered' });
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
-      const user = await User.create({ name, email, password: hashedPassword, phone: cleanPhone, addresses: [] });
+      const user = await User.create({ name: name.trim(), email: cleanEmail, password: hashedPassword, phone: cleanPhone, addresses: [] });
       const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
       return res.json({ token, user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role, addresses: user.addresses } });
     } else {
-      const existing = memoryUsers.find(u => u.email === email || (u.phone && u.phone === cleanPhone));
+      const existing = memoryUsers.find(u => u.email === cleanEmail || (u.phone && u.phone === cleanPhone));
       if (existing) {
         if (existing.phone === cleanPhone) return res.status(400).json({ message: 'Phone number is already registered' });
         return res.status(400).json({ message: 'Email is already registered' });
@@ -269,8 +304,8 @@ app.post('/api/auth/register', async (req, res) => {
 
       const newUser = {
         _id: 'u_' + Date.now(),
-        name,
-        email,
+        name: name.trim(),
+        email: cleanEmail,
         phone: cleanPhone,
         password,
         role: 'user',
