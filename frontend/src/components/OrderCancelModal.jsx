@@ -91,18 +91,20 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
   ];
 
   return (
-    <div className="modal-overlay" style={{ zIndex: 450 }}>
+    <div className="modal-overlay" style={{ zIndex: 9999 }}>
       <div
         className="modal-card"
         style={{
           maxWidth: '500px',
           width: 'min(93%, calc(100vw - 1.5rem))',
           borderRadius: '18px',
-          overflow: 'hidden',
+          overflow: 'visible',
           boxShadow: '0 24px 60px rgba(0,0,0,0.22)',
-          maxHeight: '92dvh',
+          maxHeight: '80dvh',
           overflowY: 'auto',
-          WebkitOverflowScrolling: 'touch'
+          WebkitOverflowScrolling: 'touch',
+          display: 'flex',
+          flexDirection: 'column'
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -137,7 +139,7 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
             </p>
           </div>
         ) : (
-          <form onSubmit={handleConfirmCancel} style={{ padding: 'clamp(0.85rem, 4vw, 1.25rem)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <form onSubmit={handleConfirmCancel} style={{ padding: 'clamp(0.85rem, 4vw, 1.25rem)', paddingBottom: 'calc(env(safe-area-inset-bottom) + 80px)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
             {error && (
               <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', padding: '0.65rem 0.85rem', borderRadius: '8px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <AlertCircle size={16} /> {error}
