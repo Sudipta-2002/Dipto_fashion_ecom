@@ -1749,7 +1749,23 @@ app.post('/api/orders/:id/cancel', async (req, res) => {
   }
 });
 
-// POST ADMIN APPROVE CANCELLATION (Finalizes cancellation, restores stock, triggers socket)
+// Helper to perform Razorpay refund if order was paid online
+const processRazorpayRefundIfNeeded = async (order) => {
+  const paymentId = order.razorpayPaymentId || order.paymentDetails?.paymentId || (order.paymentMethod === 'Online' && order.utrNumber?.startsWith('pay_') ? order.utrNumber : null);
+  const isOnlinePayment = order.paymentMethod === 'Online' || order.paymentMethod === 'Razorpay' || !!paymentId;
+
+  if (isOnlinePayment && paymentId && paymentId.startsWith('pay_')) {
+    console.log(`[RAZORPAY REFUND] Attempting refund for Payment ID: ${paymentId}, Amount: ₹${order.totalAmount}`);
+    const refund = await razorpayInstance.payments.refund(paymentId, {
+      amount: Math.round(Number(order.totalAmount) * 100)
+    });
+    console.log(`[RAZORPAY REFUND SUCCESS] Refund ID: ${refund.id} for Order: ${order.orderId}`);
+    return refund.id;
+  }
+  return null;
+};
+
+// POST ADMIN APPROVE CANCELLATION (Finalizes cancellation, restores stock, triggers socket, processes auto-refund if online)
 app.post('/api/orders/:id/approve-cancellation', async (req, res) => {
   try {
     const { id } = req.params;
@@ -1762,8 +1778,18 @@ app.post('/api/orders/:id/approve-cancellation', async (req, res) => {
         return res.status(400).json({ message: 'Order is not in Cancellation Requested state.' });
       }
 
+      // Trigger Razorpay auto-refund if online payment
+      let refundId = null;
+      try {
+        refundId = await processRazorpayRefundIfNeeded(order);
+      } catch (refundErr) {
+        console.error('[RAZORPAY REFUND ERROR]', refundErr);
+        return res.status(400).json({ message: `Razorpay Auto-Refund Failed: ${refundErr.error?.description || refundErr.message || 'Refund processing error'}` });
+      }
+
       const prevStatus = order.status;
       order.status = 'Cancelled';
+      if (refundId) order.refundId = refundId;
       if (!order.cancellationDetails) order.cancellationDetails = {};
       order.cancellationDetails.cancelledAt = new Date();
       await order.save();
@@ -1784,8 +1810,18 @@ app.post('/api/orders/:id/approve-cancellation', async (req, res) => {
         return res.status(400).json({ message: 'Order is not in Cancellation Requested state.' });
       }
 
+      // Trigger Razorpay auto-refund if online payment
+      let refundId = null;
+      try {
+        refundId = await processRazorpayRefundIfNeeded(order);
+      } catch (refundErr) {
+        console.error('[RAZORPAY REFUND ERROR]', refundErr);
+        return res.status(400).json({ message: `Razorpay Auto-Refund Failed: ${refundErr.error?.description || refundErr.message || 'Refund processing error'}` });
+      }
+
       const prevStatus = order.status;
       order.status = 'Cancelled';
+      if (refundId) order.refundId = refundId;
       if (!order.cancellationDetails) order.cancellationDetails = {};
       order.cancellationDetails.cancelledAt = new Date();
 
@@ -1815,10 +1851,21 @@ app.put('/api/orders/:id/status', async (req, res) => {
     if (isMongoConnected()) {
       const existingOrder = await Order.findById(id);
       if (!existingOrder) return res.status(404).json({ message: 'Order not found' });
-      const previousStatus = existingOrder.status;
+
+      // If transition to Refund Completed or Cancelled from Return/Cancellation, trigger auto-refund if online
+      let refundId = null;
+      if (status === 'Refund Completed' || (status === 'Cancelled' && existingOrder.status === 'Cancellation Requested')) {
+        try {
+          refundId = await processRazorpayRefundIfNeeded(existingOrder);
+        } catch (refundErr) {
+          console.error('[RAZORPAY REFUND ERROR]', refundErr);
+          return res.status(400).json({ message: `Razorpay Auto-Refund Failed: ${refundErr.error?.description || refundErr.message || 'Refund processing error'}` });
+        }
+      }
 
       existingOrder.status = status;
       if (rejectionReason) existingOrder.rejectionReason = rejectionReason;
+      if (refundId) existingOrder.refundId = refundId;
       const updated = await existingOrder.save();
 
       // Trigger stock deduction upon Order Confirmation (Accepted / Shipped / Out for Delivery / Delivered)
@@ -1835,9 +1882,19 @@ app.put('/api/orders/:id/status', async (req, res) => {
     } else {
       const order = memoryOrders.find(o => o._id === id || o.orderId === id);
       if (order) {
-        const previousStatus = order.status;
+        let refundId = null;
+        if (status === 'Refund Completed' || (status === 'Cancelled' && order.status === 'Cancellation Requested')) {
+          try {
+            refundId = await processRazorpayRefundIfNeeded(order);
+          } catch (refundErr) {
+            console.error('[RAZORPAY REFUND ERROR]', refundErr);
+            return res.status(400).json({ message: `Razorpay Auto-Refund Failed: ${refundErr.error?.description || refundErr.message || 'Refund processing error'}` });
+          }
+        }
+
         order.status = status;
         if (rejectionReason) order.rejectionReason = rejectionReason;
+        if (refundId) order.refundId = refundId;
 
         if (['Accepted', 'Shipped', 'Out for Delivery', 'Delivered'].includes(status)) {
           await deductRemainingStock(order, order.items);
@@ -1856,6 +1913,7 @@ app.put('/api/orders/:id/status', async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 });
+
 
 // SUBMIT PRODUCT RETURN REQUEST
 app.post('/api/orders/:id/return', async (req, res) => {
