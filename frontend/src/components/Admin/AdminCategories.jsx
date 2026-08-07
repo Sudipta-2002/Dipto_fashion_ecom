@@ -1,7 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, Edit, X, CheckCircle2, AlertCircle } from 'lucide-react';
 import { API_URL } from '../../api';
-import { fetchWithCache, clearCache } from '../../utils/cache';
+import { clearCache } from '../../utils/cache';
 
 const AdminCategories = () => {
   const [categories, setCategories] = useState([]);
@@ -9,26 +9,48 @@ const AdminCategories = () => {
   const [description, setDescription] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Inline status messages
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+
   // Edit State
   const [editingCategory, setEditingCategory] = useState(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
 
+  // Auto-refresh interval ref
+  const refreshIntervalRef = useRef(null);
+
+  const showSuccess = (msg) => {
+    setSuccessMsg(msg);
+    setErrorMsg('');
+    setTimeout(() => setSuccessMsg(''), 3500);
+  };
+
+  const showError = (msg) => {
+    setErrorMsg(msg);
+    setSuccessMsg('');
+    setTimeout(() => setErrorMsg(''), 4000);
+  };
+
   useEffect(() => {
     fetchCategories();
+
+    // Auto-refresh every 30 seconds
+    refreshIntervalRef.current = setInterval(() => {
+      fetchCategories(true);
+    }, 30000);
+
+    return () => {
+      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
+    };
   }, []);
 
   const fetchCategories = async (forceRefresh = false) => {
     try {
-      const { data } = await fetchWithCache(
-        'categories',
-        async () => {
-          const res = await fetch(`${API_URL}/api/categories`);
-          return await res.json();
-        },
-        { forceRefresh }
-      );
-      if (data) setCategories(data);
+      const res = await fetch(`${API_URL}/api/categories`);
+      const data = await res.json();
+      if (Array.isArray(data)) setCategories(data);
     } catch (e) {
       console.error(e);
     }
@@ -38,19 +60,39 @@ const AdminCategories = () => {
     e.preventDefault();
     if (!name.trim()) return;
     setLoading(true);
+
+    // OPTIMISTIC UI: Immediately add category to list
+    const tempCat = {
+      _id: 'temp_' + Date.now(),
+      name: name.trim(),
+      description: description.trim()
+    };
+    setCategories(prev => [...prev, tempCat]);
+    const savedName = name.trim();
+    const savedDesc = description.trim();
+    setName('');
+    setDescription('');
+
     try {
       const res = await fetch(`${API_URL}/api/categories`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: name.trim(), description })
+        body: JSON.stringify({ name: savedName, description: savedDesc })
       });
       if (res.ok) {
-        setName('');
-        setDescription('');
-        fetchCategories();
+        showSuccess(`✅ Category "${savedName}" added successfully!`);
+        clearCache('categories');
+        // Refresh to get actual server IDs
+        fetchCategories(true);
+      } else {
+        // Rollback
+        setCategories(prev => prev.filter(c => c._id !== tempCat._id));
+        showError('Failed to add category on server.');
       }
     } catch (e) {
-      alert('Error adding category');
+      // Rollback
+      setCategories(prev => prev.filter(c => c._id !== tempCat._id));
+      showError('Network error adding category.');
     } finally {
       setLoading(false);
     }
@@ -65,33 +107,76 @@ const AdminCategories = () => {
   const handleUpdateCategory = async (e) => {
     e.preventDefault();
     if (!editName.trim() || !editingCategory) return;
+
+    const catId = editingCategory._id;
+    const newName = editName.trim();
+    const newDesc = editDescription.trim();
+
+    // OPTIMISTIC UI: Immediately update list
+    setCategories(prev =>
+      prev.map(c => c._id === catId ? { ...c, name: newName, description: newDesc } : c)
+    );
+    setEditingCategory(null);
+    showSuccess(`✅ Category "${newName}" updated successfully!`);
+
     try {
-      const res = await fetch(`${API_URL}/api/categories/${editingCategory._id}`, {
+      const res = await fetch(`${API_URL}/api/categories/${catId}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: editName.trim(), description: editDescription })
+        body: JSON.stringify({ name: newName, description: newDesc })
       });
       if (res.ok) {
-        setEditingCategory(null);
-        fetchCategories();
+        clearCache('categories');
+        fetchCategories(true);
+      } else {
+        showError('Failed to update category on server. Reverting.');
+        fetchCategories(true); // Revert by re-fetching
       }
     } catch (e) {
-      alert('Error updating category');
+      showError('Network error updating category. Reverting.');
+      fetchCategories(true);
     }
   };
 
-  const handleDeleteCategory = async (id) => {
-    if (!window.confirm('Delete category?')) return;
+  const handleDeleteCategory = async (id, catName) => {
+    if (!window.confirm(`Delete category "${catName}"?`)) return;
+
+    // OPTIMISTIC UI: Immediately remove from list
+    let previousCategories = [];
+    setCategories(prev => {
+      previousCategories = prev;
+      return prev.filter(c => c._id !== id);
+    });
+    showSuccess(`🗑️ Category "${catName}" deleted successfully!`);
+
     try {
-      await fetch(`${API_URL}/api/categories/${id}`, { method: 'DELETE' });
-      fetchCategories();
+      const res = await fetch(`${API_URL}/api/categories/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        clearCache('categories');
+      } else {
+        setCategories(previousCategories);
+        showError('Failed to delete category on server. Reverting.');
+      }
     } catch (e) {
-      alert('Error deleting category');
+      setCategories(previousCategories);
+      showError('Network error deleting category. Reverting.');
     }
   };
 
   return (
     <div>
+      {/* Inline status messages */}
+      {successMsg && (
+        <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', color: '#15803d', padding: '0.75rem 1rem', borderRadius: '10px', marginBottom: '1rem', fontSize: '0.88rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <CheckCircle2 size={16} /> {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div style={{ background: '#fef2f2', border: '1.5px solid #fca5a5', color: '#b91c1c', padding: '0.75rem 1rem', borderRadius: '10px', marginBottom: '1rem', fontSize: '0.88rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <AlertCircle size={16} /> {errorMsg}
+        </div>
+      )}
+
       <div style={{ background: 'white', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', marginBottom: '1.5rem' }}>
         <h4 style={{ fontSize: '1.1rem', fontWeight: '700', marginBottom: '1rem', color: '#c026d3' }}>
           Add New Product Category
@@ -117,7 +202,7 @@ const AdminCategories = () => {
             />
           </div>
           <button type="submit" className="btn-primary" disabled={loading}>
-            <Plus size={16} /> Save Category
+            <Plus size={16} /> {loading ? 'Saving...' : 'Save Category'}
           </button>
         </form>
       </div>
@@ -194,7 +279,7 @@ const AdminCategories = () => {
                     </button>
                     {c.name !== 'Saree' && c.name !== 'Punjabi' && (
                       <button
-                        onClick={() => handleDeleteCategory(c._id)}
+                        onClick={() => handleDeleteCategory(c._id, c.name)}
                         style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fca5a5', padding: '0.35rem 0.6rem', borderRadius: '6px' }}
                         title="Delete Category"
                       >

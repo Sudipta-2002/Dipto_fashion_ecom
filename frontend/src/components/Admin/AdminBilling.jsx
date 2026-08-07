@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Receipt,
   Download,
@@ -33,8 +33,25 @@ const AdminBilling = () => {
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
 
+  // Auto-refresh interval ref
+  const refreshIntervalRef = useRef(null);
+
   useEffect(() => {
     fetchBillingLedger();
+
+    // Auto-refresh every 30 seconds so ledger stays live
+    refreshIntervalRef.current = setInterval(() => {
+      fetchBillingLedger(true);
+    }, 30000);
+
+    // Also listen for new order events to refresh billing immediately
+    const handleNewOrder = () => fetchBillingLedger(true);
+    window.addEventListener('df_new_order_placed', handleNewOrder);
+
+    return () => {
+      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
+      window.removeEventListener('df_new_order_placed', handleNewOrder);
+    };
   }, []);
 
   const fetchBillingLedger = async (forceRefresh = false) => {

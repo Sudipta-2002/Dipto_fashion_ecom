@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   HelpCircle,
   MessageSquare,
@@ -33,6 +33,9 @@ const AdminReports = () => {
   const [replying, setReplying] = useState(false);
   const [toast, setToast] = useState(null);
 
+  // Auto-refresh interval ref
+  const refreshIntervalRef = useRef(null);
+
   const fetchReports = async () => {
     setLoading(true);
     setError('');
@@ -54,6 +57,15 @@ const AdminReports = () => {
 
   useEffect(() => {
     fetchReports();
+
+    // Auto-refresh every 30 seconds to catch new tickets
+    refreshIntervalRef.current = setInterval(() => {
+      fetchReports();
+    }, 30000);
+
+    return () => {
+      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
+    };
   }, []);
 
   const handleOpenReplyModal = (report) => {
@@ -66,27 +78,44 @@ const AdminReports = () => {
     e.preventDefault();
     if (!selectedReport || !replyText.trim()) return;
 
+    const reportId = selectedReport._id;
+    const savedReply = replyText.trim();
+    const savedStatus = updateStatus;
+    let previousReports = [];
+
+    // OPTIMISTIC UI: Instantly update the report in the list
+    setReports((prev) => {
+      previousReports = prev;
+      return prev.map((r) =>
+        r._id === reportId
+          ? { ...r, status: savedStatus, adminReply: savedReply }
+          : r
+      );
+    });
+    setSelectedReport(null);
+    setToast({ type: 'success', message: 'Reply sent and status updated successfully!' });
+
     setReplying(true);
     try {
-      const res = await fetch(`${API_URL}/api/admin/reports/${selectedReport._id}/reply`, {
+      const res = await fetch(`${API_URL}/api/admin/reports/${reportId}/reply`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          adminReply: replyText.trim(),
-          status: updateStatus
+          adminReply: savedReply,
+          status: savedStatus
         })
       });
 
       const data = await res.json();
-      if (res.ok && data.success) {
-        setToast({ type: 'success', message: 'Reply sent and report status updated successfully!' });
-        setSelectedReport(null);
-        fetchReports();
-      } else {
-        setToast({ type: 'error', message: data.message || 'Failed to update report' });
+      if (!res.ok || !data.success) {
+        // Rollback if API fails
+        setReports(previousReports);
+        setToast({ type: 'error', message: data.message || 'Failed to update report. Reverting.' });
       }
     } catch (err) {
-      setToast({ type: 'error', message: 'Network error submitting reply' });
+      // Rollback on network error
+      setReports(previousReports);
+      setToast({ type: 'error', message: 'Network error submitting reply. Reverting.' });
     } finally {
       setReplying(false);
     }
@@ -95,19 +124,29 @@ const AdminReports = () => {
   const handleDeleteReport = async (reportId) => {
     if (!window.confirm('Are you sure you want to delete this support report ticket?')) return;
 
+    let previousReports = [];
+
+    // OPTIMISTIC UI: Instantly remove from list
+    setReports((prev) => {
+      previousReports = prev;
+      return prev.filter((r) => r._id !== reportId);
+    });
+    setToast({ type: 'success', message: '🗑️ Report deleted successfully!' });
+
     try {
       const res = await fetch(`${API_URL}/api/admin/reports/${reportId}`, {
         method: 'DELETE'
       });
       const data = await res.json();
-      if (res.ok && data.success) {
-        setToast({ type: 'success', message: 'Report deleted successfully' });
-        fetchReports();
-      } else {
-        setToast({ type: 'error', message: data.message || 'Failed to delete report' });
+      if (!res.ok || !data.success) {
+        // Rollback on failure
+        setReports(previousReports);
+        setToast({ type: 'error', message: data.message || 'Failed to delete report. Reverting.' });
       }
     } catch (err) {
-      setToast({ type: 'error', message: 'Network error deleting report' });
+      // Rollback on network error
+      setReports(previousReports);
+      setToast({ type: 'error', message: 'Network error deleting report. Reverting.' });
     }
   };
 

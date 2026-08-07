@@ -1084,6 +1084,11 @@ function App() {
         onClose={() => setIsProfileOpen(false)}
         user={user}
         onLogout={handleLogout}
+        onUpdateUser={(updatedUser) => {
+          const merged = { ...user, ...updatedUser };
+          setUser(merged);
+          try { localStorage.setItem('df_user', JSON.stringify(merged)); } catch (e) {}
+        }}
         wishlist={wishlist}
         onToggleWishlist={handleToggleWishlist}
         onSelectProduct={(p) => {

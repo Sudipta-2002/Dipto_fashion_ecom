@@ -37,7 +37,7 @@ const orderSchema = new mongoose.Schema({
   razorpaySignature: { type: String, default: '' },
   status: { 
     type: String, 
-    enum: ['Pending Verification', 'Accepted', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Rejected', 'Return Requested', 'Return Approved', 'Refund Completed'], 
+    enum: ['Pending Verification', 'Accepted', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Rejected', 'Return Requested', 'Return Approved', 'Refund Completed', 'Cancellation Requested'], 
     default: 'Pending Verification' 
   },
   stockDeducted: { type: Boolean, default: false },
@@ -46,7 +46,14 @@ const orderSchema = new mongoose.Schema({
   rejectionReason: { type: String, default: '' },
   cancellationDetails: {
     reason: { type: String, default: '' },
-    cancelledAt: { type: Date }
+    cancelledAt: { type: Date },
+    refundToSource: { type: Boolean, default: false },
+    upiId: { type: String, default: '' },
+    accountHolder: { type: String, default: '' },
+    bankName: { type: String, default: '' },
+    accountNumber: { type: String, default: '' },
+    ifscCode: { type: String, default: '' },
+    requestedAt: { type: Date }
   },
   returnDetails: {
     reason: { type: String, default: '' },

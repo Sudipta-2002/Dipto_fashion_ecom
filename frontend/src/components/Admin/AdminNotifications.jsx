@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Bell, Send, Trash2, Megaphone, Tag, Sparkles, CheckCircle2, AlertCircle, RefreshCw } from 'lucide-react';
 import { API_URL, apiFetch, parseResponseSafely } from '../../api';
 
@@ -14,8 +14,20 @@ const AdminNotifications = () => {
   const [message, setMessage] = useState('');
   const [category, setCategory] = useState('sale');
 
+  // Auto-refresh interval ref
+  const refreshIntervalRef = useRef(null);
+
   useEffect(() => {
     fetchNotifications();
+
+    // Auto-refresh every 30 seconds to stay in sync
+    refreshIntervalRef.current = setInterval(() => {
+      fetchNotifications();
+    }, 30000);
+
+    return () => {
+      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
+    };
   }, []);
 
   const fetchNotifications = async () => {

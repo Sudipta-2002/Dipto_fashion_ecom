@@ -1,13 +1,17 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, Edit, Upload, X, Image as ImageIcon } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Trash2, Edit, Upload, X, Image as ImageIcon, CheckCircle2, AlertCircle } from 'lucide-react';
 import { API_URL } from '../../api';
-import { fetchWithCache } from '../../utils/cache';
+import { fetchWithCache, clearCache } from '../../utils/cache';
 
 const AdminProducts = () => {
   const [products, setProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
+
+  // Inline status messages (replaces alert())
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
 
   // Form State
   const [formData, setFormData] = useState({
@@ -24,9 +28,33 @@ const AdminProducts = () => {
   const [uploadError, setUploadError] = useState('');
   const [loading, setLoading] = useState(false);
 
+  // Auto-refresh interval ref
+  const refreshIntervalRef = useRef(null);
+
+  const showSuccess = (msg) => {
+    setSuccessMsg(msg);
+    setErrorMsg('');
+    setTimeout(() => setSuccessMsg(''), 3500);
+  };
+
+  const showError = (msg) => {
+    setErrorMsg(msg);
+    setSuccessMsg('');
+    setTimeout(() => setErrorMsg(''), 4000);
+  };
+
   useEffect(() => {
     fetchProducts();
     fetchCategories();
+
+    // Auto-refresh every 30 seconds to keep data fresh
+    refreshIntervalRef.current = setInterval(() => {
+      fetchProducts(true);
+    }, 30000);
+
+    return () => {
+      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
+    };
   }, []);
 
   const fetchProducts = async (forceRefresh = false) => {
@@ -153,7 +181,7 @@ const AdminProducts = () => {
     setUploadError('');
 
     if (!formData.name || !formData.mrp || !formData.price) {
-      alert('Please fill in Name, MRP, and Discount Offer Price.');
+      setUploadError('Please fill in Name, MRP, and Discount Offer Price.');
       return;
     }
 
@@ -179,9 +207,25 @@ const AdminProducts = () => {
       availableSizes: selectedSizes
     };
 
+    // OPTIMISTIC UI: Immediately update the list
+    let previousProducts = [...products];
+    if (editingProduct) {
+      setProducts(prev => prev.map(p =>
+        p._id === editingProduct._id ? { ...p, ...payload, _id: editingProduct._id } : p
+      ));
+    } else {
+      // For new product, add a temporary entry at top
+      const tempProduct = { ...payload, _id: 'temp_' + Date.now(), images: uploadedImages };
+      setProducts(prev => [tempProduct, ...prev]);
+    }
+
+    const isEditing = !!editingProduct;
+    const editingProductId = editingProduct ? editingProduct._id : null;
+    resetForm();
+
     try {
-      const endpoint = editingProduct ? `${API_URL}/api/products/${editingProduct._id}` : `${API_URL}/api/products`;
-      const method = editingProduct ? 'PUT' : 'POST';
+      const endpoint = isEditing ? `${API_URL}/api/products/${editingProductId}` : `${API_URL}/api/products`;
+      const method = isEditing ? 'PUT' : 'POST';
 
       const res = await fetch(endpoint, {
         method,
@@ -190,15 +234,21 @@ const AdminProducts = () => {
       });
 
       if (res.ok) {
-        alert(editingProduct ? 'Product updated successfully!' : 'Product added successfully!');
-        resetForm();
-        fetchProducts();
+        showSuccess(isEditing ? '✅ Product updated successfully!' : '✅ Product added successfully!');
+        clearCache('admin_products');
+        // Refresh to get actual server data (replaces temp ID etc.)
+        fetchProducts(true);
       } else {
         const errData = await res.json();
+        // Rollback on failure
+        setProducts(previousProducts);
         setUploadError(errData.message || 'Failed to save product');
+        showError('Failed to save product. Please try again.');
       }
     } catch (e) {
-      setUploadError('Error saving product: ' + e.message);
+      // Rollback on error
+      setProducts(previousProducts);
+      showError('Network error saving product: ' + e.message);
     } finally {
       setLoading(false);
     }
@@ -216,6 +266,8 @@ const AdminProducts = () => {
       return prevProducts.filter(p => (p._id || p.id) !== id);
     });
 
+    showSuccess('🗑️ Product deleted successfully!');
+
     // 2. Execute background API call
     try {
       const res = await fetch(`${API_URL}/api/products/${id}`, {
@@ -223,16 +275,30 @@ const AdminProducts = () => {
       });
       if (!res.ok) {
         setProducts(previousProducts);
-        alert('Failed to delete product on server. Reverting change.');
+        showError('Failed to delete product on server. Change reverted.');
+      } else {
+        clearCache('admin_products');
       }
     } catch (e) {
       setProducts(previousProducts);
-      alert('Network error deleting product. Reverting change.');
+      showError('Network error deleting product. Change reverted.');
     }
   };
 
   return (
     <div>
+      {/* Inline status messages */}
+      {successMsg && (
+        <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', color: '#15803d', padding: '0.75rem 1rem', borderRadius: '10px', marginBottom: '1rem', fontSize: '0.88rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <CheckCircle2 size={16} /> {successMsg}
+        </div>
+      )}
+      {errorMsg && (
+        <div style={{ background: '#fef2f2', border: '1.5px solid #fca5a5', color: '#b91c1c', padding: '0.75rem 1rem', borderRadius: '10px', marginBottom: '1rem', fontSize: '0.88rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+          <AlertCircle size={16} /> {errorMsg}
+        </div>
+      )}
+
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
         <h3 style={{ fontSize: '1.25rem', fontWeight: '800' }}>Product Inventory Management</h3>
         <button

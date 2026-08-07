@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   User,
@@ -25,7 +25,11 @@ import {
   Sparkles,
   Ban,
   Heart,
-  Plus
+  Plus,
+  Pencil,
+  Camera,
+  Save,
+  ArrowLeft
 } from 'lucide-react';
 import TermsPrivacyModal from './TermsPrivacyModal';
 import AiChatbotModal from './AiChatbotModal';
@@ -41,6 +45,7 @@ const UserProfileModal = ({
   onClose,
   user,
   onLogout,
+  onUpdateUser,
   wishlist = [],
   onToggleWishlist,
   onSelectProduct,
@@ -48,7 +53,7 @@ const UserProfileModal = ({
   cartItems = [],
   onOpenCart
 }) => {
-  const [activeTab, setActiveTab] = useState('menu'); // 'menu', 'orders', 'addresses', 'support'
+  const [activeTab, setActiveTab] = useState('menu'); // 'menu', 'orders', 'addresses', 'support', 'editProfile'
   const [userOrders, setUserOrders] = useState([]);
   const [userAddresses, setUserAddresses] = useState(user?.addresses || []);
   const [loadingOrders, setLoadingOrders] = useState(false);
@@ -83,12 +88,33 @@ const UserProfileModal = ({
   const [loadingReports, setLoadingReports] = useState(false);
   const [reportToast, setReportToast] = useState(null);
 
+  // ──────────────────────────────────────
+  // EDIT PROFILE STATE
+  // ──────────────────────────────────────
+  const [editForm, setEditForm] = useState({
+    name: '',
+    gender: '',
+    avatar: ''
+  });
+  const [editSaving, setEditSaving] = useState(false);
+  const [editSuccess, setEditSuccess] = useState('');
+  const [editError, setEditError] = useState('');
+  const avatarInputRef = useRef(null);
+
   useEffect(() => {
     if (isOpen && user) {
       fetchUserOrders();
       fetchUserAddresses();
       fetchUserReports();
       setActiveTab('menu');
+      // Pre-fill the edit form with current user data
+      setEditForm({
+        name: user.name || '',
+        gender: user.gender || '',
+        avatar: user.avatar || ''
+      });
+      setEditSuccess('');
+      setEditError('');
     }
   }, [isOpen, user]);
 
@@ -327,6 +353,88 @@ const UserProfileModal = ({
     }
   };
 
+  // ── EDIT PROFILE HANDLERS ──────────────────────────────
+  const handleAvatarFileChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      setEditForm((prev) => ({ ...prev, avatar: ev.target.result }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleEditSubmit = async (e) => {
+    e.preventDefault();
+    setEditError('');
+    setEditSuccess('');
+
+    if (!editForm.name.trim()) {
+      setEditError('Name cannot be empty.');
+      return;
+    }
+
+    setEditSaving(true);
+
+    const token = localStorage.getItem('df_token');
+    const userEmail = user?.email || '';
+
+    // ── OPTIMISTIC UI: Apply update instantly before API returns ──
+    const optimisticUser = {
+      ...user,
+      name: editForm.name.trim(),
+      gender: editForm.gender,
+      avatar: editForm.avatar
+    };
+    if (onUpdateUser) onUpdateUser(optimisticUser);
+
+    try {
+      const res = await fetch(`${API_URL}/api/user/profile`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({
+          name: editForm.name.trim(),
+          gender: editForm.gender,
+          avatar: editForm.avatar,
+          email: userEmail // fallback identifier for in-memory mode
+        })
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        // Confirm the server-returned user (may differ slightly)
+        const confirmedUser = data.user || optimisticUser;
+        if (onUpdateUser) onUpdateUser(confirmedUser);
+
+        // Also dispatch socket-compatible DOM event for any other listeners
+        window.dispatchEvent(new CustomEvent('df_user_profile_updated', {
+          detail: confirmedUser
+        }));
+
+        setEditSuccess('✅ Profile updated successfully!');
+        setTimeout(() => {
+          setEditSuccess('');
+          setActiveTab('menu');
+        }, 1800);
+      } else {
+        // Rollback optimistic update
+        if (onUpdateUser) onUpdateUser(user);
+        setEditError(data.message || 'Failed to update profile. Please try again.');
+      }
+    } catch (err) {
+      // Rollback optimistic update
+      if (onUpdateUser) onUpdateUser(user);
+      setEditError('Network error. Please check your connection.');
+    } finally {
+      setEditSaving(false);
+    }
+  };
+  // ──────────────────────────────────────────────────────
+
   if (!isOpen || !user) return null;
 
   const getUserInitial = () => {
@@ -438,9 +546,9 @@ const UserProfileModal = ({
             {activeTab !== 'menu' ? (
               <button
                 onClick={() => setActiveTab('menu')}
-                style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', padding: '4px 10px', borderRadius: '16px', fontSize: '0.78rem', fontWeight: '700', cursor: 'pointer' }}
+                style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', padding: '4px 10px', borderRadius: '16px', fontSize: '0.78rem', fontWeight: '700', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
               >
-                ← Back
+                <ArrowLeft size={13} /> Back
               </button>
             ) : (
               <div style={{ fontSize: '0.75rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '1px', opacity: 0.9 }}>
@@ -448,6 +556,34 @@ const UserProfileModal = ({
               </div>
             )}
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              {/* Edit Profile Icon — only shown on menu tab */}
+              {activeTab === 'menu' && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setEditForm({ name: user.name || '', gender: user.gender || '', avatar: user.avatar || '' });
+                    setEditSuccess('');
+                    setEditError('');
+                    setActiveTab('editProfile');
+                  }}
+                  style={{
+                    background: 'rgba(255,255,255,0.15)',
+                    border: '1px solid rgba(255,255,255,0.3)',
+                    color: 'white',
+                    padding: '4px 10px',
+                    borderRadius: '14px',
+                    fontSize: '0.75rem',
+                    fontWeight: '800',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px'
+                  }}
+                  title="Edit your profile details"
+                >
+                  <Pencil size={13} /> Edit Profile
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => {
@@ -479,15 +615,24 @@ const UserProfileModal = ({
 
           {/* Compact User Banner */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
-            <div style={{ width: '44px', height: '44px', borderRadius: '50%', background: 'linear-gradient(135deg, #c026d3 0%, #e879f9 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', fontWeight: '900', color: 'white', border: '2px solid rgba(255,255,255,0.4)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)' }}>
-              {getUserInitial()}
+            {/* Avatar — shows uploaded photo or initials */}
+            <div
+              style={{ width: '46px', height: '46px', borderRadius: '50%', background: user.avatar ? 'transparent' : 'linear-gradient(135deg, #c026d3 0%, #e879f9 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '1.25rem', fontWeight: '900', color: 'white', border: '2px solid rgba(255,255,255,0.4)', boxShadow: '0 2px 8px rgba(0,0,0,0.15)', overflow: 'hidden', flexShrink: 0 }}
+            >
+              {user.avatar
+                ? <img src={user.avatar} alt="Profile" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                : getUserInitial()
+              }
             </div>
-            <div style={{ flex: 1 }}>
+            <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: '800', margin: 0 }}>{user.name}</h3>
-                <Crown size={16} color="#facc15" fill="#facc15" />
+                <h3 style={{ fontSize: '1.05rem', fontWeight: '800', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.name}</h3>
+                <Crown size={15} color="#facc15" fill="#facc15" style={{ flexShrink: 0 }} />
               </div>
-              <p style={{ fontSize: '0.75rem', opacity: 0.9, margin: 0 }}>{user.email || user.phone || 'Dipto Fashion VIP Customer'}</p>
+              <p style={{ fontSize: '0.72rem', opacity: 0.9, margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {user.email || user.phone || 'Dipto Fashion VIP Customer'}
+                {user.gender ? <span style={{ marginLeft: '6px', opacity: 0.75 }}>• {user.gender}</span> : null}
+              </p>
             </div>
           </div>
         </div>
@@ -533,10 +678,214 @@ const UserProfileModal = ({
 
         {/* BODY CONTAINER */}
         <div className="profile-scroll-body" style={{ flex: 1, overflowY: 'auto', padding: '1.1rem', paddingBottom: 'calc(100px + env(safe-area-inset-bottom))' }}>
+
+          {/* ── EDIT PROFILE TAB ─────────────────────────────── */}
+          {activeTab === 'editProfile' && (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+              <h4 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#0f172a', margin: 0, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <Pencil size={18} color="#c026d3" /> Edit Profile
+              </h4>
+
+              {/* Status Messages */}
+              {editSuccess && (
+                <div style={{ background: '#f0fdf4', border: '1.5px solid #86efac', color: '#15803d', padding: '0.75rem 1rem', borderRadius: '10px', fontSize: '0.88rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <CheckCircle2 size={16} /> {editSuccess}
+                </div>
+              )}
+              {editError && (
+                <div style={{ background: '#fef2f2', border: '1.5px solid #fca5a5', color: '#b91c1c', padding: '0.75rem 1rem', borderRadius: '10px', fontSize: '0.88rem', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <AlertCircle size={16} /> {editError}
+                </div>
+              )}
+
+              {/* Avatar Upload Section */}
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '0.75rem', background: 'white', border: '1.5px solid #f5d0fe', borderRadius: '14px', padding: '1.25rem' }}>
+                <div
+                  style={{ width: '80px', height: '80px', borderRadius: '50%', background: editForm.avatar ? 'transparent' : 'linear-gradient(135deg, #c026d3 0%, #e879f9 100%)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '2rem', fontWeight: '900', color: 'white', border: '3px solid #f5d0fe', overflow: 'hidden', cursor: 'pointer', position: 'relative' }}
+                  onClick={() => avatarInputRef.current?.click()}
+                  title="Click to change profile photo"
+                >
+                  {editForm.avatar
+                    ? <img src={editForm.avatar} alt="Profile Preview" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    : (editForm.name?.charAt(0)?.toUpperCase() || 'U')
+                  }
+                  {/* Camera overlay */}
+                  <div style={{ position: 'absolute', bottom: 0, right: 0, width: '24px', height: '24px', background: '#c026d3', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid white' }}>
+                    <Camera size={12} color="white" />
+                  </div>
+                </div>
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  style={{ display: 'none' }}
+                  onChange={handleAvatarFileChange}
+                />
+                <div style={{ textAlign: 'center' }}>
+                  <div style={{ fontSize: '0.85rem', fontWeight: '700', color: '#334155' }}>Profile Photo</div>
+                  <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>Click avatar to upload (JPG, PNG, WebP)</div>
+                </div>
+                {editForm.avatar && (
+                  <button
+                    type="button"
+                    onClick={() => setEditForm((prev) => ({ ...prev, avatar: '' }))}
+                    style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#dc2626', padding: '4px 10px', borderRadius: '8px', fontSize: '0.75rem', fontWeight: '700', cursor: 'pointer' }}
+                  >
+                    Remove Photo
+                  </button>
+                )}
+              </div>
+
+              {/* Edit Form */}
+              <form onSubmit={handleEditSubmit} style={{ background: 'white', border: '1.5px solid #e2e8f0', borderRadius: '14px', padding: '1.25rem', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+
+                {/* Full Name */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.3rem' }}>
+                    Full Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={editForm.name}
+                    onChange={(e) => setEditForm((prev) => ({ ...prev, name: e.target.value }))}
+                    placeholder="Your full name"
+                    required
+                    style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1.5px solid #c026d3', borderRadius: '8px', fontSize: '0.9rem', fontWeight: '600', boxSizing: 'border-box' }}
+                  />
+                </div>
+
+                {/* Gender */}
+                <div>
+                  <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.3rem' }}>
+                    Gender
+                  </label>
+                  <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    {['Male', 'Female', 'Other', 'Prefer not to say'].map((g) => (
+                      <button
+                        key={g}
+                        type="button"
+                        onClick={() => setEditForm((prev) => ({ ...prev, gender: prev.gender === g ? '' : g }))}
+                        style={{
+                          padding: '6px 14px',
+                          borderRadius: '20px',
+                          fontSize: '0.82rem',
+                          fontWeight: '700',
+                          cursor: 'pointer',
+                          background: editForm.gender === g ? '#c026d3' : 'white',
+                          color: editForm.gender === g ? 'white' : '#475569',
+                          border: editForm.gender === g ? '1.5px solid #c026d3' : '1.5px solid #cbd5e1',
+                          transition: 'all 0.15s ease'
+                        }}
+                      >
+                        {g}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Divider */}
+                <div style={{ borderTop: '1px dashed #e2e8f0', paddingTop: '0.75rem' }}>
+                  <div style={{ fontSize: '0.72rem', fontWeight: '800', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '0.75rem' }}>
+                    🔒 Account Credentials (Read-only)
+                  </div>
+
+                  {/* Email — DISABLED/READ-ONLY */}
+                  <div style={{ marginBottom: '0.65rem' }}>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '800', color: '#94a3b8', marginBottom: '0.3rem' }}>
+                      Email Address (Cannot be changed)
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="email"
+                        value={user.email || ''}
+                        readOnly
+                        disabled
+                        style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '0.88rem', background: '#f8fafc', color: '#94a3b8', cursor: 'not-allowed', boxSizing: 'border-box' }}
+                      />
+                      <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)' }}>
+                        <ShieldCheck size={15} color="#cbd5e1" />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Phone — DISABLED/READ-ONLY */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: '800', color: '#94a3b8', marginBottom: '0.3rem' }}>
+                      Phone Number (Cannot be changed)
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="text"
+                        value={user.phone || 'Not provided'}
+                        readOnly
+                        disabled
+                        style={{ width: '100%', padding: '0.6rem 0.75rem', border: '1.5px solid #e2e8f0', borderRadius: '8px', fontSize: '0.88rem', background: '#f8fafc', color: '#94a3b8', cursor: 'not-allowed', boxSizing: 'border-box' }}
+                      />
+                      <div style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)' }}>
+                        <ShieldCheck size={15} color="#cbd5e1" />
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <button
+                  type="submit"
+                  disabled={editSaving || !editForm.name.trim()}
+                  style={{
+                    width: '100%',
+                    background: editSaving ? '#d1d5db' : 'linear-gradient(135deg, #c026d3 0%, #701a75 100%)',
+                    color: 'white',
+                    border: 'none',
+                    padding: '0.8rem',
+                    borderRadius: '10px',
+                    fontWeight: '800',
+                    fontSize: '0.95rem',
+                    cursor: editSaving ? 'not-allowed' : 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    boxShadow: editSaving ? 'none' : '0 4px 12px rgba(192,38,211,0.3)',
+                    transition: 'all 0.2s ease'
+                  }}
+                >
+                  <Save size={17} />
+                  {editSaving ? 'Saving Changes...' : 'Save Profile Changes'}
+                </button>
+              </form>
+            </div>
+          )}
+
           {activeTab === 'menu' && (
             <div style={{ display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
               <div style={{ fontSize: '0.75rem', fontWeight: '800', color: '#64748b', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                 Account Settings
+              </div>
+
+              {/* Edit Profile Option — shown at top of menu */}
+              <div
+                onClick={() => {
+                  setEditForm({ name: user.name || '', gender: user.gender || '', avatar: user.avatar || '' });
+                  setEditSuccess('');
+                  setEditError('');
+                  setActiveTab('editProfile');
+                }}
+                style={{ background: 'linear-gradient(135deg, #fdf4ff, #faf5ff)', border: '1.5px solid #e9d5ff', borderRadius: '12px', padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', boxShadow: '0 2px 4px rgba(192,38,211,0.08)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#fdf4ff', border: '1px solid #f5d0fe', color: '#c026d3', display: 'flex', alignItems: 'center', justifyContent: 'center', position: 'relative', overflow: 'hidden' }}>
+                    {user.avatar
+                      ? <img src={user.avatar} alt="Avatar" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      : <User size={20} />
+                    }
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.92rem', fontWeight: '800', color: '#701a75' }}>Edit My Profile</div>
+                    <div style={{ fontSize: '0.75rem', color: '#a855f7' }}>Update name, gender & profile photo</div>
+                  </div>
+                </div>
+                <Pencil size={16} color="#c026d3" />
               </div>
 
               {/* My Orders Option */}
@@ -700,6 +1049,7 @@ const UserProfileModal = ({
                     const estDeliveryDateStr = new Date(new Date(order.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
                     const isDelivered = order.status === 'Delivered';
                     const isCancelled = order.status === 'Cancelled';
+                    const isCancellationRequested = order.status === 'Cancellation Requested';
                     const isReturnRequested = order.status === 'Return Requested' || order.status === 'Return Approved';
                     const isReturnCompleted = order.status === 'Refund Completed' || order.status === 'Returned Successfully';
                     const canReturn = isDelivered && isWithin7Days(order.updatedAt || order.createdAt);
@@ -719,6 +1069,10 @@ const UserProfileModal = ({
                           {isCancelled ? (
                             <span style={{ fontSize: '0.78rem', color: '#b91c1c', fontWeight: '800', background: '#fee2e2', padding: '2px 8px', borderRadius: '10px' }}>
                               Cancelled
+                            </span>
+                          ) : isCancellationRequested ? (
+                            <span style={{ fontSize: '0.78rem', color: '#b45309', fontWeight: '800', background: '#fffbeb', padding: '2px 8px', borderRadius: '10px', border: '1px solid #fde68a' }}>
+                              ⏳ Cancellation Pending
                             </span>
                           ) : isReturnCompleted ? (
                             <span style={{ fontSize: '0.78rem', color: '#15803d', fontWeight: '800', background: '#dcfce7', padding: '2px 8px', borderRadius: '10px' }}>
@@ -741,7 +1095,7 @@ const UserProfileModal = ({
 
                         {/* CONDITIONAL TRACKER OR FINAL STATUS DISPLAY */}
                         {isCancelled ? (
-                          /* CANCELLED STATUS - ONLY DISPLAYS CANCELLED DATE AND REASON */
+                          /* CANCELLED STATUS */
                           <div style={{ background: '#fff1f2', border: '1.5px solid #fecdd3', padding: '0.75rem 0.85rem', borderRadius: '10px', color: '#b91c1c', fontSize: '0.88rem', fontWeight: '800', margin: '0.65rem 0', display: 'flex', alignItems: 'center', gap: '8px' }}>
                             <Ban size={20} color="#dc2626" />
                             <div>
@@ -750,6 +1104,26 @@ const UserProfileModal = ({
                                 Cancelled on {cancelledDateStr}
                                 {order.cancellationDetails?.reason ? ` • ${order.cancellationDetails.reason}` : ''}
                               </div>
+                            </div>
+                          </div>
+                        ) : isCancellationRequested ? (
+                          /* CANCELLATION REQUESTED — PENDING ADMIN APPROVAL */
+                          <div style={{ background: '#fffbeb', border: '1.5px solid #fde68a', padding: '0.75rem 0.85rem', borderRadius: '10px', color: '#92400e', fontSize: '0.85rem', fontWeight: '700', margin: '0.65rem 0' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '0.25rem' }}>
+                              <Ban size={18} color="#d97706" />
+                              <span style={{ fontWeight: '800', color: '#92400e' }}>Cancellation Request Submitted</span>
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#b45309', paddingLeft: '26px' }}>
+                              ⏳ Awaiting admin review — your refund will be initiated once approved.
+                              {order.cancellationDetails?.refundToSource && (
+                                <div style={{ marginTop: '2px' }}>Refund Method: Auto-refund to original payment source</div>
+                              )}
+                              {order.cancellationDetails?.upiId && (
+                                <div style={{ marginTop: '2px' }}>Refund UPI: <strong>{order.cancellationDetails.upiId}</strong></div>
+                              )}
+                              {order.cancellationDetails?.accountNumber && (
+                                <div style={{ marginTop: '2px' }}>Refund Account: <strong>••••{order.cancellationDetails.accountNumber.slice(-4)}</strong> (IFSC: {order.cancellationDetails.ifscCode})</div>
+                              )}
                             </div>
                           </div>
                         ) : isReturnCompleted ? (
@@ -821,8 +1195,8 @@ const UserProfileModal = ({
                           </div>
                         </div>
 
-                        {/* PRE-SHIPMENT CANCEL BUTTON (Only visible UNTIL Order becomes 'Shipped') */}
-                        {canCancel && !isCancelled && !isDelivered && (
+                        {/* PRE-SHIPMENT CANCEL BUTTON — hide if already Cancellation Requested or Cancelled */}
+                        {canCancel && !isCancelled && !isCancellationRequested && !isDelivered && (
                           <div style={{ marginTop: '0.75rem', borderTop: '1px dashed #cbd5e1', paddingTop: '0.65rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                             <span style={{ fontSize: '0.75rem', color: '#64748b', fontWeight: '600' }}>
                               Pre-Shipment Order Cancellation
@@ -1238,7 +1612,21 @@ const UserProfileModal = ({
         isOpen={!!cancelOrder}
         onClose={() => setCancelOrder(null)}
         order={cancelOrder}
-        onCancelSuccess={() => fetchUserOrders()}
+        onCancelSuccess={(updatedOrder) => {
+          // Immediately merge the returned order into local state (optimistic UI)
+          if (updatedOrder) {
+            setUserOrders((prev) =>
+              prev.map((o) =>
+                (o._id === updatedOrder._id || o.orderId === updatedOrder.orderId)
+                  ? { ...o, ...updatedOrder }
+                  : o
+              )
+            );
+          } else {
+            fetchUserOrders();
+          }
+          setCancelOrder(null);
+        }}
       />
     </div>
   );

@@ -304,6 +304,92 @@ app.post('/api/auth/login', async (req, res) => {
   }
 });
 
+// --- UPDATE USER PROFILE (name, gender, avatar — email/phone immutable) ---
+app.put(['/api/user/profile', '/api/users/profile'], async (req, res) => {
+  let userId = null;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.verify(token, JWT_SECRET);
+      userId = decoded.userId;
+    } catch (e) {}
+  }
+
+  const emailParam = req.query.email || req.body.email;
+
+  try {
+    // Only allow updating these safe fields — email and phone are immutable
+    const { name, gender, avatar } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ success: false, message: 'Name is required' });
+    }
+
+    const updates = {
+      ...(name && { name: name.trim() }),
+      ...(gender !== undefined && { gender }),
+      ...(avatar !== undefined && { avatar })
+    };
+
+    if (isMongoConnected()) {
+      let user = null;
+      if (userId) user = await User.findByIdAndUpdate(userId, updates, { new: true });
+      else if (emailParam) user = await User.findOneAndUpdate(
+        { email: new RegExp(`^${emailParam.trim()}$`, 'i') },
+        updates,
+        { new: true }
+      );
+
+      if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+      const safeUser = {
+        id: user._id,
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || '',
+        gender: user.gender || '',
+        avatar: user.avatar || '',
+        role: user.role,
+        addresses: user.addresses || []
+      };
+
+      // Broadcast profile update via Socket.io for real-time cross-device sync
+      emitUserProfileUpdated(safeUser);
+
+      return res.json({ success: true, user: safeUser });
+    } else {
+      // In-memory fallback
+      let user = null;
+      if (userId) user = memoryUsers.find(u => u._id === userId);
+      else if (emailParam) user = memoryUsers.find(u => u.email.toLowerCase() === emailParam.trim().toLowerCase());
+
+      if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+      Object.assign(user, updates);
+
+      const safeUser = {
+        id: user._id,
+        _id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || '',
+        gender: user.gender || '',
+        avatar: user.avatar || '',
+        role: user.role,
+        addresses: user.addresses || []
+      };
+
+      emitUserProfileUpdated(safeUser);
+      return res.json({ success: true, user: safeUser });
+    }
+  } catch (e) {
+    console.error('Profile update error:', e);
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // --- ADDRESS ROUTES ---
 
 import Report from './models/Report.js';
@@ -1610,52 +1696,106 @@ app.post('/api/user/address', async (req, res) => {
   }
 });
 
-// POST PRE-SHIPMENT CANCEL ORDER BY USER
+// POST PRE-SHIPMENT CANCEL ORDER BY USER (Sets status to 'Cancellation Requested' pending admin approval)
 app.post('/api/orders/:id/cancel', async (req, res) => {
   try {
     const { id } = req.params;
-    const { reason } = req.body;
+    const { reason, refundToSource, upiId, accountHolder, bankName, accountNumber, ifscCode } = req.body;
 
     const cancellationData = {
       reason: reason || 'Customer requested cancellation',
-      cancelledAt: new Date()
+      requestedAt: new Date(),
+      refundToSource: !!refundToSource,
+      upiId: upiId || '',
+      accountHolder: accountHolder || '',
+      bankName: bankName || '',
+      accountNumber: accountNumber || '',
+      ifscCode: ifscCode || ''
     };
 
     if (isMongoConnected()) {
       const order = await Order.findById(id);
       if (!order) return res.status(404).json({ message: 'Order not found' });
 
-      if (['Shipped', 'Out for Delivery', 'Delivered', 'Cancelled'].includes(order.status)) {
-        return res.status(400).json({ message: 'Cannot cancel order once it has been shipped or delivered!' });
+      if (['Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Cancellation Requested'].includes(order.status)) {
+        return res.status(400).json({ message: 'Cannot cancel order once it has been shipped, delivered, or a cancellation request is already pending!' });
+      }
+
+      order.status = 'Cancellation Requested';
+      order.cancellationDetails = cancellationData;
+      await order.save();
+
+      // Notify admin in real-time
+      try { io.emit('order_status_updated', order.toObject()); } catch (e) {}
+
+      return res.json({ message: 'Cancellation request submitted. Awaiting admin approval.', order });
+    } else {
+      const order = memoryOrders.find(o => o._id === id || o.orderId === id);
+      if (!order) return res.status(404).json({ message: 'Order not found' });
+
+      if (['Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Cancellation Requested'].includes(order.status)) {
+        return res.status(400).json({ message: 'Cannot cancel order once it has been shipped, delivered, or a cancellation request is already pending!' });
+      }
+
+      order.status = 'Cancellation Requested';
+      order.cancellationDetails = cancellationData;
+
+      try { io.emit('order_status_updated', order); } catch (e) {}
+
+      return res.json({ message: 'Cancellation request submitted. Awaiting admin approval.', order });
+    }
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// POST ADMIN APPROVE CANCELLATION (Finalizes cancellation, restores stock, triggers socket)
+app.post('/api/orders/:id/approve-cancellation', async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (isMongoConnected()) {
+      const order = await Order.findById(id);
+      if (!order) return res.status(404).json({ message: 'Order not found' });
+
+      if (order.status !== 'Cancellation Requested') {
+        return res.status(400).json({ message: 'Order is not in Cancellation Requested state.' });
       }
 
       const prevStatus = order.status;
       order.status = 'Cancelled';
-      order.cancellationDetails = cancellationData;
+      if (!order.cancellationDetails) order.cancellationDetails = {};
+      order.cancellationDetails.cancelledAt = new Date();
       await order.save();
 
       if (prevStatus !== 'Cancelled') {
         await restoreRemainingStock(order, order.items, 'Cancellation');
       }
 
-      return res.json({ message: 'Cancelled Confirmed', order });
+      // Emit socket event for real-time UI update on user side
+      try { io.emit('order_status_updated', order.toObject()); } catch (e) {}
+
+      return res.json({ message: 'Cancellation approved. Order cancelled and stock restored.', order });
     } else {
       const order = memoryOrders.find(o => o._id === id || o.orderId === id);
       if (!order) return res.status(404).json({ message: 'Order not found' });
 
-      if (['Shipped', 'Out for Delivery', 'Delivered', 'Cancelled'].includes(order.status)) {
-        return res.status(400).json({ message: 'Cannot cancel order once it has been shipped or delivered!' });
+      if (order.status !== 'Cancellation Requested') {
+        return res.status(400).json({ message: 'Order is not in Cancellation Requested state.' });
       }
 
       const prevStatus = order.status;
       order.status = 'Cancelled';
-      order.cancellationDetails = cancellationData;
+      if (!order.cancellationDetails) order.cancellationDetails = {};
+      order.cancellationDetails.cancelledAt = new Date();
 
       if (prevStatus !== 'Cancelled') {
         await restoreRemainingStock(order, order.items, 'Cancellation');
       }
 
-      return res.json({ message: 'Cancelled Confirmed', order });
+      try { io.emit('order_status_updated', order); } catch (e) {}
+
+      return res.json({ message: 'Cancellation approved. Order cancelled and stock restored.', order });
     }
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -1667,7 +1807,7 @@ app.put('/api/orders/:id/status', async (req, res) => {
   try {
     const { id } = req.params;
     const { status, rejectionReason } = req.body;
-    const allowedStatuses = ['Pending Verification', 'Accepted', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Rejected', 'Return Requested', 'Return Approved', 'Refund Completed'];
+    const allowedStatuses = ['Pending Verification', 'Accepted', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Rejected', 'Return Requested', 'Return Approved', 'Refund Completed', 'Cancellation Requested'];
     if (!allowedStatuses.includes(status)) {
       return res.status(400).json({ message: 'Invalid status' });
     }
@@ -1802,14 +1942,15 @@ app.post('/api/products/:id/review', async (req, res) => {
   }
 });
 
-// GET RETURNS FOR ADMIN PANEL
+// GET RETURNS & CANCELLATION REQUESTS FOR ADMIN PANEL
 app.get('/api/admin/returns', async (req, res) => {
   try {
+    const relevantStatuses = ['Return Requested', 'Return Approved', 'Refund Completed', 'Cancellation Requested'];
     if (isMongoConnected()) {
-      const returns = await Order.find({ status: { $in: ['Return Requested', 'Return Approved', 'Refund Completed'] } }).sort({ updatedAt: -1 });
+      const returns = await Order.find({ status: { $in: relevantStatuses } }).sort({ updatedAt: -1 });
       return res.json(returns);
     } else {
-      const returns = memoryOrders.filter(o => ['Return Requested', 'Return Approved', 'Refund Completed'].includes(o.status));
+      const returns = memoryOrders.filter(o => relevantStatuses.includes(o.status));
       return res.json(returns);
     }
   } catch (err) {

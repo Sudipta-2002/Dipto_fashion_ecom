@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { DollarSign, Calendar, TrendingUp, ShoppingBag, Filter, Bell, ArrowRight, RotateCcw, AlertTriangle } from 'lucide-react';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip, CartesianGrid, BarChart, Bar } from 'recharts';
 import { API_URL } from '../../api';
@@ -48,8 +48,25 @@ const AdminDashboard = ({ onNavigateToOrders, onNavigateToReturns, realtimeOrder
     }
   };
 
+  // Auto-refresh interval ref
+  const refreshIntervalRef = useRef(null);
+
   useEffect(() => {
     fetchAnalytics();
+
+    // Auto-refresh analytics every 60 seconds
+    refreshIntervalRef.current = setInterval(() => {
+      fetchAnalytics(true);
+    }, 60000);
+
+    // Also refresh immediately when a new order comes in
+    const handleNewOrder = () => fetchAnalytics(true);
+    window.addEventListener('df_new_order_placed', handleNewOrder);
+
+    return () => {
+      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
+      window.removeEventListener('df_new_order_placed', handleNewOrder);
+    };
   }, [startDate, endDate]);
 
   // Real-time Order Arrival Listener

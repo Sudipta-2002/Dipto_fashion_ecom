@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Tag, Plus, Edit2, Trash2, CheckCircle2, XCircle, Copy, Check, ArrowLeft, Save, RefreshCw } from 'lucide-react';
 import { API_URL, apiFetch, parseResponseSafely } from '../../api';
 
@@ -22,8 +22,20 @@ const AdminCoupons = () => {
   const [formError, setFormError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
+  // Auto-refresh interval ref
+  const refreshIntervalRef = useRef(null);
+
   useEffect(() => {
     fetchCoupons();
+
+    // Auto-refresh every 30 seconds
+    refreshIntervalRef.current = setInterval(() => {
+      fetchCoupons();
+    }, 30000);
+
+    return () => {
+      if (refreshIntervalRef.current) clearInterval(refreshIntervalRef.current);
+    };
   }, []);
 
   const fetchCoupons = async () => {
