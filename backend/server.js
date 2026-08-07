@@ -10,6 +10,9 @@ import crypto from 'crypto';
 import http from 'http';
 import { Server as SocketIOServer } from 'socket.io';
 
+import compression from 'compression';
+import NodeCache from 'node-cache';
+
 import connectDB from './config/db.js';
 import User from './models/User.js';
 import Category from './models/Category.js';
@@ -54,7 +57,11 @@ const razorpayInstance = new Razorpay({
   key_secret: RAZORPAY_KEY_SECRET
 });
 
+// In-memory cache instance (TTL: 300 seconds / 5 minutes)
+export const apiCache = new NodeCache({ stdTTL: 300, checkperiod: 60 });
+
 // Top-Level Middlewares (Placed at VERY TOP)
+app.use(compression());
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
@@ -519,14 +526,20 @@ app.delete(['/api/user/addresses/:id', '/api/user/address/:id', '/api/addresses/
 // --- CATEGORY ROUTES ---
 
 app.get(['/api/categories', '/categories'], async (req, res) => {
+  const cacheKey = 'categories_all';
+  const cached = apiCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
   try {
     if (isMongoConnected()) {
-      let categories = await Category.find();
+      let categories = await Category.find().lean();
       if (categories.length === 0) {
         categories = await Category.insertMany(memoryCategories.map(({ _id, ...c }) => c));
       }
+      apiCache.set(cacheKey, categories);
       return res.json(categories);
     } else {
+      apiCache.set(cacheKey, memoryCategories);
       return res.json(memoryCategories);
     }
   } catch (err) {
@@ -534,10 +547,21 @@ app.get(['/api/categories', '/categories'], async (req, res) => {
   }
 });
 
+// Helper to clear product and category caches on mutations
+export const clearProductCache = () => {
+  apiCache.keys().forEach((key) => {
+    if (key.startsWith('products_') || key.startsWith('categories_')) {
+      apiCache.del(key);
+    }
+  });
+};
+
 app.post(['/api/categories', '/categories'], async (req, res) => {
   try {
     const { name, description } = req.body;
     if (!name) return res.status(400).json({ message: 'Category name is required' });
+
+    clearProductCache();
 
     if (isMongoConnected()) {
       const cat = await Category.create({ name, description });
@@ -593,6 +617,10 @@ app.delete(['/api/categories/:id', '/categories/:id'], async (req, res) => {
 
 app.get(['/api/products', '/products'], async (req, res) => {
   const { category, search } = req.query;
+  const cacheKey = `products_${category || 'all'}_${search || 'none'}`;
+  const cached = apiCache.get(cacheKey);
+  if (cached) return res.json(cached);
+
   try {
     if (isMongoConnected()) {
       let query = {};
@@ -618,6 +646,7 @@ app.get(['/api/products', '/products'], async (req, res) => {
         }));
         prods = inserted.map(doc => doc.toObject());
       }
+      apiCache.set(cacheKey, prods);
       return res.json(prods);
     } else {
       let filtered = [...memoryProducts];
@@ -632,6 +661,7 @@ app.get(['/api/products', '/products'], async (req, res) => {
           (p.description && p.description.toLowerCase().includes(s))
         );
       }
+      apiCache.set(cacheKey, filtered);
       return res.json(filtered);
     }
   } catch (err) {
@@ -645,6 +675,8 @@ app.post(['/api/products', '/products'], async (req, res) => {
     if (!name || !category || !mrp || !price || !images || images.length === 0) {
       return res.status(400).json({ message: 'Product title, category, MRP, offer price, and at least 1 image are required' });
     }
+
+    clearProductCache();
 
     const enteredQty = Number(quantity) || 10;
 
@@ -695,6 +727,8 @@ app.put(['/api/products/:id', '/products/:id'], async (req, res) => {
     if (!name || !category || !mrp || !price || !images || images.length === 0) {
       return res.status(400).json({ message: 'At least 1 image is required for product update' });
     }
+
+    clearProductCache();
 
     const enteredQty = Number(quantity) || 10;
 
@@ -758,6 +792,7 @@ app.put(['/api/products/:id', '/products/:id'], async (req, res) => {
 app.delete(['/api/products/:id', '/products/:id'], async (req, res) => {
   try {
     const { id } = req.params;
+    clearProductCache();
     if (isMongoConnected()) {
       await Product.findByIdAndDelete(id);
     } else {

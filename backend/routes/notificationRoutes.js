@@ -23,7 +23,7 @@ router.get(['/', '/notifications', '/api/notifications'], async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   try {
     if (isMongoConnected()) {
-      const list = await Notification.find().sort({ createdAt: -1 });
+      const list = await Notification.find().sort({ createdAt: -1 }).lean();
       return res.json(list);
     } else {
       return res.json(memoryNotifications);

@@ -120,7 +120,7 @@ router.get(['/my-reports', '/user', '/user/:email', '/my-reports/:email'], async
     if (orConditions.length > 0) filter = { $or: orConditions };
 
     if (isMongoConnected()) {
-      const reports = await Report.find(filter).sort({ createdAt: -1 });
+      const reports = await Report.find(filter).sort({ createdAt: -1 }).lean();
       return res.json(reports);
     } else {
       const userReports = (global.memoryReports || []).filter(r => {
@@ -140,7 +140,7 @@ router.get(['/my-reports', '/user', '/user/:email', '/my-reports/:email'], async
 router.get(['/admin/all', '/admin/reports', '/all', '/admin', '/'], async (req, res) => {
   try {
     if (isMongoConnected()) {
-      const reports = await Report.find().sort({ createdAt: -1 });
+      const reports = await Report.find().sort({ createdAt: -1 }).lean();
       return res.json(reports);
     } else {
       return res.json(global.memoryReports || []);

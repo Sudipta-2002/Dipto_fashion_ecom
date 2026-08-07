@@ -17,7 +17,7 @@ const isMongoConnected = () => {
 router.get(['/', '/all', '/admin'], async (req, res) => {
   try {
     if (isMongoConnected()) {
-      const coupons = await Coupon.find().sort({ createdAt: -1 });
+      const coupons = await Coupon.find().sort({ createdAt: -1 }).lean();
       return res.json(coupons);
     } else {
       const memoryCoupons = global.memoryCoupons || [];
@@ -32,7 +32,7 @@ router.get(['/', '/all', '/admin'], async (req, res) => {
 router.get(['/active', '/public'], async (req, res) => {
   try {
     if (isMongoConnected()) {
-      const activeCoupons = await Coupon.find({ isActive: true }).sort({ createdAt: -1 });
+      const activeCoupons = await Coupon.find({ isActive: true }).sort({ createdAt: -1 }).lean();
       return res.json(activeCoupons);
     } else {
       const memoryCoupons = global.memoryCoupons || [];
