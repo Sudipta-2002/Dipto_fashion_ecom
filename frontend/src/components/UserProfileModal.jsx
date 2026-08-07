@@ -39,6 +39,7 @@ import OrderCancelModal from './OrderCancelModal';
 import ProductCard from './ProductCard';
 import ToastNotification from './ToastNotification';
 import { API_URL } from '../api';
+import { getCache, setCache } from '../utils/cache';
 
 const UserProfileModal = ({
   isOpen,
@@ -278,18 +279,27 @@ const UserProfileModal = ({
     }
   };
 
-  const fetchUserOrders = async () => {
-    setLoadingOrders(true);
+  const fetchUserOrders = async (forceRefresh = false) => {
+    let userEmail = user?.email || '';
+    if (!userEmail) {
+      try {
+        const savedUser = localStorage.getItem('df_user');
+        if (savedUser) userEmail = JSON.parse(savedUser).email || '';
+      } catch (e) {}
+    }
+    const cacheKey = `user_orders_${user?._id || userEmail || 'guest'}`;
+
+    // Stale-While-Revalidate: load cached orders instantly if available
+    const cachedOrders = getCache(cacheKey);
+    if (cachedOrders && Array.isArray(cachedOrders)) {
+      setUserOrders(cachedOrders);
+      setLoadingOrders(false);
+    } else if (!userOrders.length) {
+      setLoadingOrders(true);
+    }
+
     try {
       const token = localStorage.getItem('df_token');
-      let userEmail = user?.email || '';
-      if (!userEmail) {
-        try {
-          const savedUser = localStorage.getItem('df_user');
-          if (savedUser) userEmail = JSON.parse(savedUser).email || '';
-        } catch (e) {}
-      }
-      
       let url = `${API_URL}/api/user/my-orders`;
       if (userEmail) {
         url += `?email=${encodeURIComponent(userEmail)}&userEmail=${encodeURIComponent(userEmail)}`;
@@ -302,14 +312,14 @@ const UserProfileModal = ({
       if (res.ok) {
         const data = await res.json();
         const ordersArray = Array.isArray(data) ? data : (data.orders || []);
-        console.log("Fetched orders for user:", ordersArray.length);
         setUserOrders(ordersArray);
-      } else {
+        setCache(cacheKey, ordersArray, 5 * 60 * 1000);
+      } else if (!cachedOrders) {
         setUserOrders([]);
       }
     } catch (e) {
       console.error('Error fetching user orders:', e);
-      setUserOrders([]);
+      if (!cachedOrders) setUserOrders([]);
     } finally {
       setLoadingOrders(false);
     }

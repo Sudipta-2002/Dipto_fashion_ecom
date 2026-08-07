@@ -1644,7 +1644,11 @@ app.get([
     }
 
     if (isMongoConnected()) {
-      const userOrders = await Order.find(filter).sort({ createdAt: -1 });
+      const userOrders = await Order.find(filter)
+        .select('orderId user userName userEmail email shippingAddress items totalAmount couponCode couponDiscount utrNumber paymentMethod status cancellationDetails returnDetails createdAt updatedAt')
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean();
       console.log(`Fetched orders for user (${userId || emailParam || 'filter'}):`, userOrders.length);
       return res.json(userOrders);
     } else {
