@@ -1101,8 +1101,7 @@ const UserProfileModal = ({
                             <div>
                               <div>Cancelled</div>
                               <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#dc2626' }}>
-                                Cancelled on {cancelledDateStr}
-                                {order.cancellationDetails?.reason ? ` • ${order.cancellationDetails.reason}` : ''}
+                                Cancelled on {cancelledDateStr} • Money refund within 24-48hrs
                               </div>
                             </div>
                           </div>
@@ -1132,7 +1131,7 @@ const UserProfileModal = ({
                             <CheckCircle2 size={20} color="#16a34a" />
                             <div>
                               <div>Returned Successfully</div>
-                              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#16a34a' }}>Completed on {returnCompletedDateStr} • Refund Processed</div>
+                              <div style={{ fontSize: '0.75rem', fontWeight: '600', color: '#16a34a' }}>Completed on {returnCompletedDateStr} • Money refund within 24-48hrs</div>
                             </div>
                           </div>
                         ) : isReturnRequested ? (
