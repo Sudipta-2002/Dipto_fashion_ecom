@@ -508,6 +508,66 @@ app.put(['/api/user/profile', '/api/users/profile', '/api/auth/profile'], async 
   }
 });
 
+// --- WISHLIST BACKEND ROUTES ---
+app.get(['/api/user/wishlist', '/api/wishlist'], async (req, res) => {
+  let userId = null;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.verify(token, JWT_SECRET);
+      userId = decoded.userId;
+    } catch (e) {}
+  }
+  const emailParam = req.query.email || req.query.userEmail;
+
+  try {
+    if (isMongoConnected()) {
+      let user = null;
+      if (userId) user = await User.findById(userId).populate('wishlist');
+      else if (emailParam) user = await User.findOne({ email: new RegExp(`^${emailParam.trim()}$`, 'i') }).populate('wishlist');
+
+      return res.json({ success: true, wishlist: user ? user.wishlist || [] : [] });
+    } else {
+      return res.json({ success: true, wishlist: [] });
+    }
+  } catch (e) {
+    return res.json({ success: false, wishlist: [], message: e.message });
+  }
+});
+
+app.post(['/api/user/wishlist', '/api/wishlist'], async (req, res) => {
+  let userId = null;
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.split(' ')[1];
+      const decoded = jwt.verify(token, JWT_SECRET);
+      userId = decoded.userId;
+    } catch (e) {}
+  }
+  const emailParam = req.query.email || req.body.email;
+  const { wishlistIds } = req.body;
+
+  try {
+    if (isMongoConnected() && Array.isArray(wishlistIds)) {
+      let user = null;
+      if (userId) user = await User.findById(userId);
+      else if (emailParam) user = await User.findOne({ email: new RegExp(`^${emailParam.trim()}$`, 'i') });
+
+      if (user) {
+        user.wishlist = wishlistIds.filter(id => mongoose.Types.ObjectId.isValid(id));
+        await user.save();
+        await user.populate('wishlist');
+        return res.json({ success: true, wishlist: user.wishlist });
+      }
+    }
+    return res.json({ success: true });
+  } catch (e) {
+    return res.status(500).json({ success: false, message: e.message });
+  }
+});
+
 // --- ADDRESS ROUTES ---
 
 import Report from './models/Report.js';

@@ -18,6 +18,7 @@ const userSchema = new mongoose.Schema({
   avatar: { type: String, default: '' }, // Base64 or URL
   profilePicture: { type: String, default: '' }, // Alias for avatar
   addresses: [addressSchema],
+  wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
   role: { type: String, enum: ['user', 'admin'], default: 'user' }
 }, { timestamps: true });
 

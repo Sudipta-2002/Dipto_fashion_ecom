@@ -474,24 +474,91 @@ function App() {
   const [deliveryAddress, setDeliveryAddress] = useState(null);
 
   // Customer Wishlist State (Persistent)
+  // Safely parse initial state from localStorage (which stores only product ID strings or legacy product objects)
   const [wishlist, setWishlist] = useState(() => {
-    const saved = localStorage.getItem('df_wishlist');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('df_wishlist');
+      if (!saved) return [];
+      const parsed = JSON.parse(saved);
+      // If array contains full objects from legacy cache, convert to array of IDs or objects
+      if (Array.isArray(parsed)) return parsed;
+      return [];
+    } catch (e) {
+      console.warn('LocalStorage wishlist read error:', e);
+      return [];
+    }
   });
 
+  // Hydrate full wishlist products when allProducts loads or when user logs in
   useEffect(() => {
-    localStorage.setItem('df_wishlist', JSON.stringify(wishlist));
-  }, [wishlist]);
+    const fetchUserWishlist = async () => {
+      const token = localStorage.getItem('df_token');
+      const userEmail = user?.email;
+      if (!token && !userEmail) return;
+
+      try {
+        let url = `${API_URL}/api/user/wishlist`;
+        if (userEmail) url += `?email=${encodeURIComponent(userEmail)}`;
+        const res = await apiFetch(url, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {}
+        });
+        const data = await parseResponseSafely(res);
+        if (data && data.success && Array.isArray(data.wishlist) && data.wishlist.length > 0) {
+          setWishlist(data.wishlist);
+        }
+      } catch (err) {
+        console.warn('Failed to hydrate wishlist from backend:', err);
+      }
+    };
+    fetchUserWishlist();
+  }, [user]);
+
+  // Safely persist ONLY Product IDs in LocalStorage inside a try-catch safeguard to prevent QuotaExceededError
+  useEffect(() => {
+    try {
+      // Extract ONLY string Product IDs to prevent QuotaExceededError
+      const wishlistIds = (wishlist || []).map((item) =>
+        typeof item === 'string' ? item : item?._id || item?.id
+      ).filter(Boolean);
+
+      localStorage.setItem('df_wishlist', JSON.stringify(wishlistIds));
+
+      // Sync backend if user logged in
+      const token = localStorage.getItem('df_token');
+      const userEmail = user?.email;
+      if (token || userEmail) {
+        apiFetch('/api/user/wishlist', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {})
+          },
+          body: JSON.stringify({ wishlistIds, email: userEmail })
+        }).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('LocalStorage limit reached, relying on React state and backend persistence.', e);
+    }
+  }, [wishlist, user]);
 
   const handleToggleWishlist = (prod) => {
     if (!prod) return;
-    const prodId = prod._id || prod.id;
+    const prodId = typeof prod === 'string' ? prod : prod._id || prod.id;
+    
     setWishlist((prev) => {
-      const exists = prev.some((item) => (item._id || item.id) === prodId);
+      const prevList = Array.isArray(prev) ? prev : [];
+      const exists = prevList.some((item) => {
+        const id = typeof item === 'string' ? item : item?._id || item?.id;
+        return id === prodId;
+      });
+
       if (exists) {
-        return prev.filter((item) => (item._id || item.id) !== prodId);
+        return prevList.filter((item) => {
+          const id = typeof item === 'string' ? item : item?._id || item?.id;
+          return id !== prodId;
+        });
       } else {
-        return [...prev, prod];
+        return [...prevList, prod];
       }
     });
   };

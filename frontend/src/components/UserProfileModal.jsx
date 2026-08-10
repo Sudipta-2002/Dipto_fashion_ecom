@@ -1254,28 +1254,33 @@ const UserProfileModal = ({
                 </div>
               ) : (
                 <div className="products-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: '1rem' }}>
-                  {wishlist.map((prod) => (
-                    <ProductCard
-                      key={prod._id || prod.id}
-                      product={prod}
-                      onAddToCart={onAddToCart}
-                      onClickProductTitle={(p) => {
-                        onClose();
-                        onSelectProduct(p);
-                      }}
-                      onClickProductImage={(p) => {
-                        onClose();
-                        onSelectProduct(p);
-                      }}
-                      isWishlisted={true}
-                      onToggleWishlist={onToggleWishlist}
-                      cartItems={cartItems}
-                      onOpenCart={() => {
-                        onClose();
-                        if (onOpenCart) onOpenCart();
-                      }}
-                    />
-                  ))}
+                  {wishlist.map((item) => {
+                    if (!item) return null;
+                    // If item is a string ID, try finding product in prop/cache or construct minimal fallback
+                    const prod = typeof item === 'object' ? item : { _id: item, name: 'Saved Item', price: 0 };
+                    return (
+                      <ProductCard
+                        key={prod._id || prod.id}
+                        product={prod}
+                        onAddToCart={onAddToCart}
+                        onClickProductTitle={(p) => {
+                          onClose();
+                          onSelectProduct(p);
+                        }}
+                        onClickProductImage={(p) => {
+                          onClose();
+                          onSelectProduct(p);
+                        }}
+                        isWishlisted={true}
+                        onToggleWishlist={onToggleWishlist}
+                        cartItems={cartItems}
+                        onOpenCart={() => {
+                          onClose();
+                          if (onOpenCart) onOpenCart();
+                        }}
+                      />
+                    );
+                  })}
                 </div>
               )}
             </div>
