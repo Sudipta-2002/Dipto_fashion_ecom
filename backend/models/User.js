@@ -16,6 +16,7 @@ const userSchema = new mongoose.Schema({
   phone: { type: String, default: '' },
   gender: { type: String, enum: ['Male', 'Female', 'Other', 'Prefer not to say', ''], default: '' },
   avatar: { type: String, default: '' }, // Base64 or URL
+  profilePicture: { type: String, default: '' }, // Alias for avatar
   addresses: [addressSchema],
   role: { type: String, enum: ['user', 'admin'], default: 'user' }
 }, { timestamps: true });

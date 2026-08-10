@@ -294,7 +294,7 @@ app.post('/api/auth/register', async (req, res) => {
       const hashedPassword = await bcrypt.hash(password, 10);
       const user = await User.create({ name: name.trim(), email: cleanEmail, password: hashedPassword, phone: cleanPhone, addresses: [] });
       const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ token, user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role, addresses: user.addresses } });
+      return res.json({ token, user: { id: user._id, name: user.name, email: user.email, phone: user.phone, gender: user.gender || '', avatar: user.avatar || '', role: user.role, addresses: user.addresses } });
     } else {
       const existing = memoryUsers.find(u => u.email === cleanEmail || (u.phone && u.phone === cleanPhone));
       if (existing) {
@@ -313,7 +313,7 @@ app.post('/api/auth/register', async (req, res) => {
       };
       memoryUsers.push(newUser);
       const token = jwt.sign({ userId: newUser._id, role: newUser.role }, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ token, user: { id: newUser._id, name: newUser.name, email: newUser.email, phone: newUser.phone, role: newUser.role, addresses: newUser.addresses } });
+      return res.json({ token, user: { id: newUser._id, name: newUser.name, email: newUser.email, phone: newUser.phone, gender: newUser.gender || '', avatar: newUser.avatar || '', role: newUser.role, addresses: newUser.addresses } });
     }
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -342,7 +342,7 @@ app.post('/api/auth/login', async (req, res) => {
       if (!isMatch) return res.status(400).json({ message: 'Incorrect password entered' });
 
       const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ token, user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role, addresses: user.addresses } });
+      return res.json({ token, user: { id: user._id, name: user.name, email: user.email, phone: user.phone, gender: user.gender || '', avatar: user.avatar || user.profilePicture || '', profilePicture: user.profilePicture || user.avatar || '', role: user.role, addresses: user.addresses } });
     } else {
       let user = memoryUsers.find(u => u.phone && (u.phone === cleanPhone || u.phone.replace(/\s+/g, '') === cleanPhone.replace(/\s+/g, '')));
       if (!user) {
@@ -362,7 +362,7 @@ app.post('/api/auth/login', async (req, res) => {
         }
       }
       const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ token, user: { id: user._id, name: user.name, email: user.email, phone: user.phone, role: user.role, addresses: user.addresses } });
+      return res.json({ token, user: { id: user._id, name: user.name, email: user.email, phone: user.phone, gender: user.gender || '', avatar: user.avatar || user.profilePicture || '', profilePicture: user.profilePicture || user.avatar || '', role: user.role, addresses: user.addresses } });
     }
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -412,8 +412,8 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
 });
 
-// --- UPDATE USER PROFILE (name, gender, avatar — email/phone immutable) ---
-app.put(['/api/user/profile', '/api/users/profile'], async (req, res) => {
+// --- UPDATE USER PROFILE (name, gender, avatar/profilePicture — email/phone immutable) ---
+app.put(['/api/user/profile', '/api/users/profile', '/api/auth/profile'], async (req, res) => {
   let userId = null;
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -427,29 +427,32 @@ app.put(['/api/user/profile', '/api/users/profile'], async (req, res) => {
   const emailParam = req.query.email || req.body.email;
 
   try {
-    // Only allow updating these safe fields — email and phone are immutable
-    const { name, gender, avatar } = req.body;
+    const { name, gender, avatar, profilePicture } = req.body;
+    const pictureVal = profilePicture !== undefined ? profilePicture : avatar;
 
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Name is required' });
     }
 
-    const updates = {
-      ...(name && { name: name.trim() }),
-      ...(gender !== undefined && { gender }),
-      ...(avatar !== undefined && { avatar })
-    };
-
     if (isMongoConnected()) {
       let user = null;
-      if (userId) user = await User.findByIdAndUpdate(userId, updates, { new: true });
-      else if (emailParam) user = await User.findOneAndUpdate(
-        { email: new RegExp(`^${emailParam.trim()}$`, 'i') },
-        updates,
-        { new: true }
-      );
+      if (userId) {
+        user = await User.findById(userId);
+      } else if (emailParam) {
+        user = await User.findOne({ email: new RegExp(`^${emailParam.trim()}$`, 'i') });
+      }
 
       if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+      // Explicit field assignment & save
+      user.name = name.trim();
+      if (gender !== undefined) user.gender = gender;
+      if (pictureVal !== undefined) {
+        user.avatar = pictureVal;
+        user.profilePicture = pictureVal;
+      }
+
+      await user.save();
 
       const safeUser = {
         id: user._id,
@@ -458,7 +461,8 @@ app.put(['/api/user/profile', '/api/users/profile'], async (req, res) => {
         email: user.email,
         phone: user.phone || '',
         gender: user.gender || '',
-        avatar: user.avatar || '',
+        avatar: user.avatar || user.profilePicture || '',
+        profilePicture: user.profilePicture || user.avatar || '',
         role: user.role,
         addresses: user.addresses || []
       };
@@ -475,7 +479,12 @@ app.put(['/api/user/profile', '/api/users/profile'], async (req, res) => {
 
       if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
-      Object.assign(user, updates);
+      user.name = name.trim();
+      if (gender !== undefined) user.gender = gender;
+      if (pictureVal !== undefined) {
+        user.avatar = pictureVal;
+        user.profilePicture = pictureVal;
+      }
 
       const safeUser = {
         id: user._id,
@@ -484,7 +493,8 @@ app.put(['/api/user/profile', '/api/users/profile'], async (req, res) => {
         email: user.email,
         phone: user.phone || '',
         gender: user.gender || '',
-        avatar: user.avatar || '',
+        avatar: user.avatar || user.profilePicture || '',
+        profilePicture: user.profilePicture || user.avatar || '',
         role: user.role,
         addresses: user.addresses || []
       };

@@ -389,15 +389,6 @@ const UserProfileModal = ({
     const token = localStorage.getItem('df_token');
     const userEmail = user?.email || '';
 
-    // ── OPTIMISTIC UI: Apply update instantly before API returns ──
-    const optimisticUser = {
-      ...user,
-      name: editForm.name.trim(),
-      gender: editForm.gender,
-      avatar: editForm.avatar
-    };
-    if (onUpdateUser) onUpdateUser(optimisticUser);
-
     try {
       const res = await fetch(`${API_URL}/api/user/profile`, {
         method: 'PUT',
@@ -409,6 +400,7 @@ const UserProfileModal = ({
           name: editForm.name.trim(),
           gender: editForm.gender,
           avatar: editForm.avatar,
+          profilePicture: editForm.avatar,
           email: userEmail // fallback identifier for in-memory mode
         })
       });
@@ -416,8 +408,13 @@ const UserProfileModal = ({
       const data = await res.json();
 
       if (res.ok && data.success) {
-        // Confirm the server-returned user (may differ slightly)
-        const confirmedUser = data.user || optimisticUser;
+        // Confirm the server-returned user and sync state + localStorage
+        const confirmedUser = {
+          ...user,
+          ...data.user,
+          avatar: data.user?.avatar || data.user?.profilePicture || editForm.avatar,
+          profilePicture: data.user?.profilePicture || data.user?.avatar || editForm.avatar
+        };
         if (onUpdateUser) onUpdateUser(confirmedUser);
 
         // Also dispatch socket-compatible DOM event for any other listeners
@@ -431,13 +428,9 @@ const UserProfileModal = ({
           setActiveTab('menu');
         }, 1800);
       } else {
-        // Rollback optimistic update
-        if (onUpdateUser) onUpdateUser(user);
         setEditError(data.message || 'Failed to update profile. Please try again.');
       }
     } catch (err) {
-      // Rollback optimistic update
-      if (onUpdateUser) onUpdateUser(user);
       setEditError('Network error. Please check your connection.');
     } finally {
       setEditSaving(false);

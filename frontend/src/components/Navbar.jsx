@@ -154,15 +154,27 @@ const Navbar = ({
                       width: '32px',
                       height: '32px',
                       borderRadius: '50%',
-                      background: 'linear-gradient(135deg, #c026d3 0%, #701a75 100%)',
+                      background: (user.profilePicture || user.avatar) ? 'transparent' : 'linear-gradient(135deg, #c026d3 0%, #701a75 100%)',
                       color: 'white',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
                       fontWeight: '800',
-                      fontSize: '0.85rem'
+                      fontSize: '0.85rem',
+                      overflow: 'hidden',
+                      border: '1.5px solid #f5d0fe'
                     }}>
-                      {user.name ? user.name.charAt(0).toUpperCase() : <User size={16} />}
+                      {(user.profilePicture || user.avatar) ? (
+                        <img
+                          src={user.profilePicture || user.avatar}
+                          alt={user.name || 'User Profile'}
+                          style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                        />
+                      ) : user.name ? (
+                        user.name.charAt(0).toUpperCase()
+                      ) : (
+                        <User size={16} />
+                      )}
                     </div>
                     <div style={{ textAlign: 'left' }} className="user-name-text">
                       <div style={{ fontSize: '0.85rem', fontWeight: '800', color: '#0f172a', lineHeight: 1.1 }}>{user.name}</div>
