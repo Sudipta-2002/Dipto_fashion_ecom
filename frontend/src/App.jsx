@@ -199,6 +199,22 @@ function App() {
     return () => window.removeEventListener('df_new_notification', handleLocalNotif);
   }, []);
 
+  // LOCAL USER PROFILE UPDATE EVENT LISTENER FALLBACK
+  useEffect(() => {
+    const handleLocalProfileUpdate = (e) => {
+      if (e.detail) {
+        const updatedUser = e.detail;
+        setUser((prev) => {
+          const merged = { ...prev, ...updatedUser };
+          try { localStorage.setItem('df_user', JSON.stringify(merged)); } catch (err) {}
+          return merged;
+        });
+      }
+    };
+    window.addEventListener('df_user_profile_updated', handleLocalProfileUpdate);
+    return () => window.removeEventListener('df_user_profile_updated', handleLocalProfileUpdate);
+  }, []);
+
   // REAL-TIME SSE LISTENER FOR STORE ANNOUNCEMENTS
   useEffect(() => {
     let eventSource = null;
