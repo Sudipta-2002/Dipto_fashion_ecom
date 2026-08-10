@@ -360,14 +360,49 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Registration failed');
 
-        localStorage.setItem('df_token', data.token);
-        localStorage.setItem('df_user', JSON.stringify(data.user));
+        // Create a lightweight user clone for localStorage (stripping heavy base64 strings)
+        const sanitizeForStorage = (u) => {
+          if (!u) return u;
+          const clone = { ...u };
+          if (clone.avatar && clone.avatar.startsWith('data:')) {
+            clone.avatar = '';
+          }
+          if (clone.profilePicture && clone.profilePicture.startsWith('data:')) {
+            clone.profilePicture = '';
+          }
+          return clone;
+        };
+
+        try {
+          localStorage.setItem('df_token', data.token);
+          localStorage.setItem('df_user', JSON.stringify(sanitizeForStorage(data.user)));
+        } catch (e) {
+          console.warn('LocalStorage limit reached when saving user session, keeping session in memory.', e);
+        }
+
         onAuthSuccess(data.user);
         onClose();
       } else if (otpOrigin === 'login') {
         if (pendingAuthData && pendingAuthData.data && pendingAuthData.data.token) {
-          localStorage.setItem('df_token', pendingAuthData.data.token);
-          localStorage.setItem('df_user', JSON.stringify(pendingAuthData.data.user));
+          const sanitizeForStorage = (u) => {
+            if (!u) return u;
+            const clone = { ...u };
+            if (clone.avatar && clone.avatar.startsWith('data:')) {
+              clone.avatar = '';
+            }
+            if (clone.profilePicture && clone.profilePicture.startsWith('data:')) {
+              clone.profilePicture = '';
+            }
+            return clone;
+          };
+
+          try {
+            localStorage.setItem('df_token', pendingAuthData.data.token);
+            localStorage.setItem('df_user', JSON.stringify(sanitizeForStorage(pendingAuthData.data.user)));
+          } catch (e) {
+            console.warn('LocalStorage limit reached when saving user session, keeping session in memory.', e);
+          }
+
           onAuthSuccess(pendingAuthData.data.user);
           onClose();
         } else {

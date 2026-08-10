@@ -152,6 +152,15 @@ function App() {
       window.dispatchEvent(new CustomEvent('df_order_status_updated', { detail: updatedOrder }));
     };
 
+    // Helper to sanitize user object for localStorage (strips heavy base64 images)
+    const sanitizeUserForStorage = (u) => {
+      if (!u) return u;
+      const clone = { ...u };
+      if (clone.avatar && clone.avatar.startsWith('data:')) clone.avatar = '';
+      if (clone.profilePicture && clone.profilePicture.startsWith('data:')) clone.profilePicture = '';
+      return clone;
+    };
+
     // --- User Profile Updated (Auth context sync) ---
     const onUserProfileUpdated = (updatedUser) => {
       console.log('[SOCKET] user_profile_updated', updatedUser._id || updatedUser.id);
@@ -161,7 +170,7 @@ function App() {
         const updId = updatedUser._id || updatedUser.id;
         if (prevId && updId && String(prevId) === String(updId)) {
           const merged = { ...prev, ...updatedUser };
-          try { localStorage.setItem('df_user', JSON.stringify(merged)); } catch (e) {}
+          try { localStorage.setItem('df_user', JSON.stringify(sanitizeUserForStorage(merged))); } catch (e) {}
           return merged;
         }
         return prev;
@@ -206,7 +215,12 @@ function App() {
         const updatedUser = e.detail;
         setUser((prev) => {
           const merged = { ...prev, ...updatedUser };
-          try { localStorage.setItem('df_user', JSON.stringify(merged)); } catch (err) {}
+          try {
+            const clone = { ...merged };
+            if (clone.avatar && clone.avatar.startsWith('data:')) clone.avatar = '';
+            if (clone.profilePicture && clone.profilePicture.startsWith('data:')) clone.profilePicture = '';
+            localStorage.setItem('df_user', JSON.stringify(clone));
+          } catch (err) {}
           return merged;
         });
       }
@@ -1170,7 +1184,12 @@ function App() {
         onUpdateUser={(updatedUser) => {
           const merged = { ...user, ...updatedUser };
           setUser(merged);
-          try { localStorage.setItem('df_user', JSON.stringify(merged)); } catch (e) {}
+          try {
+            const clone = { ...merged };
+            if (clone.avatar && clone.avatar.startsWith('data:')) clone.avatar = '';
+            if (clone.profilePicture && clone.profilePicture.startsWith('data:')) clone.profilePicture = '';
+            localStorage.setItem('df_user', JSON.stringify(clone));
+          } catch (e) {}
         }}
         wishlist={wishlist}
         onToggleWishlist={handleToggleWishlist}
