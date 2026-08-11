@@ -29,10 +29,12 @@ import {
   Pencil,
   Camera,
   Save,
-  ArrowLeft
+  ArrowLeft,
+  Info
 } from 'lucide-react';
 import TermsPrivacyModal from './TermsPrivacyModal';
 import AiChatbotModal from './AiChatbotModal';
+import AboutUsModal from './AboutUsModal';
 import ProductRatingModal from './ProductRatingModal';
 import ProductReturnModal from './ProductReturnModal';
 import OrderCancelModal from './OrderCancelModal';
@@ -63,6 +65,7 @@ const UserProfileModal = ({
   const [isPolicyOpen, setIsPolicyOpen] = useState(false);
   const [policyTab, setPolicyTab] = useState('privacy');
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const [isAboutUsOpen, setIsAboutUsOpen] = useState(false);
   
   // Rating, Return & Cancel Modals
   const [ratingProduct, setRatingProduct] = useState(null);
@@ -976,6 +979,23 @@ const UserProfileModal = ({
                 <ChevronRight size={18} color="#ea580c" />
               </div>
 
+              {/* About Us Option */}
+              <div
+                onClick={() => setIsAboutUsOpen(true)}
+                style={{ background: 'linear-gradient(135deg, #fdf4ff, #faf5ff)', border: '1.5px solid #f5d0fe', borderRadius: '12px', padding: '0.85rem 1rem', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', boxShadow: '0 2px 4px rgba(192,38,211,0.08)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem' }}>
+                  <div style={{ width: '38px', height: '38px', borderRadius: '10px', background: '#fdf4ff', border: '1px solid #e9d5ff', color: '#c026d3', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Info size={20} />
+                  </div>
+                  <div>
+                    <div style={{ fontSize: '0.92rem', fontWeight: '800', color: '#701a75' }}>About Us</div>
+                    <div style={{ fontSize: '0.75rem', color: '#a855f7' }}>Learn about Dipto Fashion heritage & story</div>
+                  </div>
+                </div>
+                <ChevronRight size={18} color="#c026d3" />
+              </div>
+
               {/* Terms & Privacy Option */}
               <div
                 onClick={() => {
@@ -1634,6 +1654,11 @@ const UserProfileModal = ({
           }
           setCancelOrder(null);
         }}
+      />
+      {/* About Us Modal */}
+      <AboutUsModal
+        isOpen={isAboutUsOpen}
+        onClose={() => setIsAboutUsOpen(false)}
       />
     </div>
   );

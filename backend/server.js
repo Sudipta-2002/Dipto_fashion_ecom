@@ -1479,6 +1479,7 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
         let deducted = null;
         if (targetId) {
           try { deducted = await Product.findByIdAndUpdate(targetId, { $inc: { remainingStock: -qtyToDeduct } }, { new: true }); } catch (e) {}
+        }
         if (deducted) {
           clearProductCache();
           try { io.emit('product_updated', deducted.toObject ? deducted.toObject() : deducted); } catch (e) {}
