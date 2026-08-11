@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Zap, Clock, ShoppingBag, X, Sparkles, ChevronRight } from 'lucide-react';
 import { API_URL, apiFetch, parseResponseSafely } from '../api';
+import { useSocket } from '../context/SocketContext';
 
 const LiveSaleBanner = ({ onSelectCategory }) => {
   const [config, setConfig] = useState(null);
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, totalMs: 0 });
   const [isDismissed, setIsDismissed] = useState(false);
+  const { socket } = useSocket();
 
   useEffect(() => {
     fetchSaleConfig();
@@ -21,12 +23,27 @@ const LiveSaleBanner = ({ onSelectCategory }) => {
       }
     };
     window.addEventListener('df_live_sale_updated', handleUpdateEvent);
+
+    const handleSocketUpdate = (data) => {
+      if (data) {
+        setConfig(data);
+        setIsDismissed(false);
+      }
+    };
+
+    if (socket) {
+      socket.on('live_sale_updated', handleSocketUpdate);
+    }
+
     return () => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('df_live_sale_updated', handleUpdateEvent);
+      if (socket) {
+        socket.off('live_sale_updated', handleSocketUpdate);
+      }
     };
-  }, []);
+  }, [socket]);
 
   const fetchSaleConfig = async () => {
     try {

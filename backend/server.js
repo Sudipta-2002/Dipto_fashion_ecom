@@ -1134,6 +1134,7 @@ app.post(['/api/admin/live-sale', '/admin/live-sale', '/api/live-sale', '/live-s
       try {
         const sale = await LiveSale.findOneAndUpdate({}, updatedData, { upsert: true, new: true, runValidators: true });
         console.log('>>> MongoDB LiveSale updated successfully:', sale._id);
+        try { io.emit('live_sale_updated', sale.toObject ? sale.toObject() : sale); } catch (e) {}
         return res.status(200).json({ success: true, message: 'Saved to MongoDB', data: sale, liveSale: sale });
       } catch (dbErr) {
         console.error('>>> ERROR: Mongoose LiveSale upsert failed:', dbErr);
@@ -1145,6 +1146,7 @@ app.post(['/api/admin/live-sale', '/admin/live-sale', '/api/live-sale', '/live-s
         ...updatedData,
         endTime: new Date(updatedData.endTime).toISOString()
       };
+      try { io.emit('live_sale_updated', memoryLiveSale); } catch (e) {}
       return res.status(200).json({ success: true, message: 'Saved to memory (DB offline)', data: memoryLiveSale, liveSale: memoryLiveSale });
     }
   } catch (err) {
