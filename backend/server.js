@@ -1467,6 +1467,7 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
           shippingAddress,
           paymentMethod: finalPaymentMethod,
           utrNumber,
+          razorpayPaymentId: (utrNumber && utrNumber.includes('pay_')) ? utrNumber.replace('RZP_', '') : '',
           status: finalStatus
         });
       }
@@ -1981,8 +1982,17 @@ app.post('/api/orders/:id/cancel', async (req, res) => {
 
 // Helper to perform Razorpay refund if order was paid online
 const processRazorpayRefundIfNeeded = async (order) => {
-  const paymentId = order.razorpayPaymentId || order.paymentDetails?.paymentId || (order.paymentMethod === 'Online' && order.utrNumber?.startsWith('pay_') ? order.utrNumber : null);
-  const isOnlinePayment = order.paymentMethod === 'Online' || order.paymentMethod === 'Razorpay' || !!paymentId;
+  // Extract payment ID from razorpayPaymentId or utrNumber (e.g. RZP_pay_12345 or pay_12345)
+  let paymentId = order.razorpayPaymentId || order.paymentDetails?.paymentId || '';
+  if (!paymentId && order.utrNumber) {
+    if (order.utrNumber.startsWith('RZP_pay_')) {
+      paymentId = order.utrNumber.replace('RZP_', '');
+    } else if (order.utrNumber.startsWith('pay_')) {
+      paymentId = order.utrNumber;
+    }
+  }
+
+  const isOnlinePayment = order.paymentMethod === 'Online' || order.paymentMethod === 'RAZORPAY' || order.paymentMethod === 'Razorpay' || !!paymentId;
 
   if (isOnlinePayment && paymentId && paymentId.startsWith('pay_')) {
     console.log(`[RAZORPAY REFUND] Attempting refund for Payment ID: ${paymentId}, Amount: ₹${order.totalAmount}`);
@@ -1991,6 +2001,8 @@ const processRazorpayRefundIfNeeded = async (order) => {
     });
     console.log(`[RAZORPAY REFUND SUCCESS] Refund ID: ${refund.id} for Order: ${order.orderId}`);
     return refund.id;
+  } else {
+    console.warn(`[RAZORPAY REFUND SKIPPED] Order ${order.orderId} is missing valid Razorpay payment ID (paymentId: ${paymentId})`);
   }
   return null;
 };
