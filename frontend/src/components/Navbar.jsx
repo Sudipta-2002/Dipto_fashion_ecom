@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingBag, User, Bell } from 'lucide-react';
+import { ShoppingBag, User, Bell, ArrowDownToLine } from 'lucide-react';
 import ExpandableSearchBar from './ExpandableSearchBar';
 
 const Navbar = ({
@@ -52,7 +52,7 @@ const Navbar = ({
                   onSelectProduct={onSelectProduct}
                   activeFilterCount={activeFilterCount}
                   onOpenFilterModal={onOpenFilterModal}
-                  expandedMaxWidth="min(560px, 75vw)"
+                  expandedMaxWidth="min(460px, 52vw)"
                 />
 
                 <button className="cart-btn" onClick={onOpenCart}>
@@ -60,6 +60,17 @@ const Navbar = ({
                   <span>Cart</span>
                   {cartItemsCount > 0 && <span className="cart-badge">{cartItemsCount}</span>}
                 </button>
+
+                {/* DOWNLOAD APP BUTTON */}
+                <a
+                  href="https://diptofashion.in/downloads/dipto-fashion.apk"
+                  download="dipto-fashion.apk"
+                  className="download-app-btn"
+                  title="Download Dipto Fashion App"
+                >
+                  <ArrowDownToLine size={15} />
+                  <span>Download App</span>
+                </a>
 
                 {/* NOTIFICATION BELL ICON */}
                 <div style={{ position: 'relative' }}>
@@ -207,6 +218,17 @@ const Navbar = ({
                 Dipto Fashion
               </span>
             </div>
+
+            {/* MOBILE DOWNLOAD APP BUTTON */}
+            <a
+              href="https://diptofashion.in/downloads/dipto-fashion.apk"
+              download="dipto-fashion.apk"
+              className="download-app-btn download-app-btn-mobile"
+              title="Download Dipto Fashion App"
+            >
+              <ArrowDownToLine size={13} />
+              <span>Download App</span>
+            </a>
 
             {currentView === 'shop' && (
               <button
