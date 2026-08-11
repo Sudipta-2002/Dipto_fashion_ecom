@@ -762,6 +762,10 @@ function App() {
     setCartItems((prevItems) => {
       const existing = prevItems.find((item) => item._id === product._id && item.selectedSize === autoSize);
       if (existing) {
+        if (existing.quantity >= remStock) {
+          alert(`Only ${remStock} item(s) available in stock! Cannot add more.`);
+          return prevItems;
+        }
         return prevItems.map((item) =>
           (item._id === product._id && item.selectedSize === autoSize)
             ? { ...item, quantity: item.quantity + 1 }
@@ -777,6 +781,14 @@ function App() {
     if (newQty <= 0) {
       handleRemoveFromCart(productId);
       return;
+    }
+    const cartItem = cartItems.find((item) => item._id === productId);
+    if (cartItem) {
+      const remStock = cartItem.remainingStock !== undefined && cartItem.remainingStock !== null ? cartItem.remainingStock : (cartItem.quantity !== undefined ? cartItem.quantity : 10);
+      if (newQty > remStock) {
+        alert(`Only ${remStock} item(s) available in stock!`);
+        return;
+      }
     }
     setCartItems((prevItems) =>
       prevItems.map((item) => (item._id === productId ? { ...item, quantity: newQty } : item))

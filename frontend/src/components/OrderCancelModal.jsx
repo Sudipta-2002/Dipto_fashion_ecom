@@ -85,9 +85,7 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
   };
 
   const refundMethodOptions = [
-    ...(isRazorpay ? [{ id: 'source', icon: <CreditCard size={16} />, label: 'Auto-Refund to Original Payment Source', sub: 'Razorpay will refund to your original UPI / Card / Net-Banking' }] : []),
-    { id: 'upi', icon: <Smartphone size={16} />, label: 'UPI ID', sub: 'Instant refund to any UPI ID (PhonePe, GPay, Paytm...)' },
-    { id: 'bank', icon: <Building2 size={16} />, label: 'Bank Account Transfer (NEFT)', sub: 'Refund to your bank account via NEFT within 3–5 days' }
+    { id: 'source', icon: <CreditCard size={16} />, label: 'Auto-Refund to Original Payment Account', sub: 'The refund will be automatically credited back to your original payment account (UPI / Card / Net-Banking)' }
   ];
 
   return (

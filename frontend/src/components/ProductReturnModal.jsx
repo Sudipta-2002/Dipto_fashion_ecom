@@ -124,70 +124,14 @@ const ProductReturnModal = ({ isOpen, onClose, order, onReturnSuccess }) => {
               </select>
             </div>
 
-            {/* Refund Bank Details & UPI */}
-            <div style={{ background: '#f8fafc', border: '1.5px solid #e2e8f0', borderRadius: '10px', padding: '0.9rem', marginBottom: '1rem' }}>
-              <h4 style={{ fontSize: '0.88rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.75rem' }}>
-                Enter Refund Details (Bank Account or UPI ID) *
-              </h4>
-
-              <div className="form-group" style={{ marginBottom: '0.75rem' }}>
-                <label style={{ fontSize: '0.78rem', fontWeight: '700', color: '#475569' }}>UPI ID (e.g. name@upi or phone@ybl)</label>
-                <input
-                  type="text"
-                  placeholder="Enter UPI ID for instant refund"
-                  value={upiId}
-                  onChange={(e) => setUpiId(e.target.value)}
-                  style={{ width: '100%', padding: '0.6rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.85rem' }}
-                />
+            {/* Refund Information Banner (No UPI Input required) */}
+            <div style={{ background: '#fdf4ff', border: '1.5px solid #f5d0fe', borderRadius: '10px', padding: '0.9rem', marginBottom: '1rem' }}>
+              <div style={{ fontSize: '0.88rem', fontWeight: '800', color: '#701a75', marginBottom: '0.35rem' }}>
+                💳 Automatic Refund to Original Account
               </div>
-
-              <div style={{ textAlign: 'center', fontSize: '0.75rem', color: '#64748b', fontWeight: '700', margin: '0.4rem 0' }}>— OR BANK DETAILS —</div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                <div className="form-group" style={{ marginBottom: '0.5rem' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#475569' }}>Account Holder Name</label>
-                  <input
-                    type="text"
-                    placeholder="Full name as in bank"
-                    value={accountHolder}
-                    onChange={(e) => setAccountHolder(e.target.value)}
-                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem' }}
-                  />
-                </div>
-                <div className="form-group" style={{ marginBottom: '0.5rem' }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#475569' }}>Bank Name</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. SBI, HDFC, ICICI"
-                    value={bankName}
-                    onChange={(e) => setBankName(e.target.value)}
-                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem' }}
-                  />
-                </div>
-              </div>
-
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.5rem' }}>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#475569' }}>Account Number</label>
-                  <input
-                    type="text"
-                    placeholder="Bank Account No."
-                    value={accountNumber}
-                    onChange={(e) => setAccountNumber(e.target.value)}
-                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem' }}
-                  />
-                </div>
-                <div className="form-group" style={{ marginBottom: 0 }}>
-                  <label style={{ fontSize: '0.75rem', fontWeight: '700', color: '#475569' }}>IFSC Code</label>
-                  <input
-                    type="text"
-                    placeholder="e.g. SBIN0001234"
-                    value={ifscCode}
-                    onChange={(e) => setIfscCode(e.target.value)}
-                    style={{ width: '100%', padding: '0.55rem', border: '1px solid #cbd5e1', borderRadius: '6px', fontSize: '0.82rem' }}
-                  />
-                </div>
-              </div>
+              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0, lineHeight: '1.45' }}>
+                Upon pickup inspection and approval, your refund will be automatically credited back to the exact same account from which payment was made (UPI / Credit/Debit Card / Net Banking).
+              </p>
             </div>
 
             <div className="form-group" style={{ marginBottom: '1rem' }}>

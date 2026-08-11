@@ -2379,7 +2379,7 @@ app.get('/api/admin/billing', async (req, res) => {
         return;
       }
 
-      const isSold = ['Shipped', 'Out for Delivery', 'Delivered'].includes(order.status);
+      const isSold = ['Accepted', 'Shipped', 'Out for Delivery', 'Delivered'].includes(order.status);
       const isReturned = ['Return Requested', 'Return Approved', 'Refund Completed'].includes(order.status);
 
       if (isSold) {
@@ -2388,11 +2388,11 @@ app.get('/api/admin/billing', async (req, res) => {
           id: order._id,
           date: order.updatedAt || order.createdAt,
           orderId: order.orderId,
-          customerName: order.shippingAddress?.userName || 'Customer',
+          customerName: order.shippingAddress?.userName || order.userName || 'Customer',
           utrNumber: order.utrNumber || 'N/A',
           type: 'credit',
           sign: '+',
-          label: 'Item Sold / Shipped',
+          label: 'Order Confirmed / Shipped',
           amount: order.totalAmount || 0,
           status: order.status
         });
@@ -2404,7 +2404,7 @@ app.get('/api/admin/billing', async (req, res) => {
           id: order._id + '_ret',
           date: order.returnDetails?.requestedAt || order.updatedAt || order.createdAt,
           orderId: order.orderId,
-          customerName: order.shippingAddress?.userName || 'Customer',
+          customerName: order.shippingAddress?.userName || order.userName || 'Customer',
           utrNumber: order.utrNumber || 'N/A',
           type: 'debit',
           sign: '-',

@@ -440,7 +440,7 @@ const AdminBilling = () => {
                       <td style={{ fontSize: '0.8rem', fontWeight: '700', color: '#64748b' }}>
                         {entry.status}
                       </td>
-                      <td style={{ textAlign: 'right', fontWeight: '900', fontSize: '1rem', color: isCredit ? '#16a34a' : '#dc2626' }}>
+                      <td style={{ textAlign: 'right', fontWeight: '800', fontSize: '0.95rem', color: isCredit ? '#15803d' : '#b91c1c' }}>
                         {isCredit ? `+ ₹${entry.amount.toLocaleString('en-IN')}` : `- ₹${Math.abs(entry.amount).toLocaleString('en-IN')}`}
                       </td>
                     </tr>

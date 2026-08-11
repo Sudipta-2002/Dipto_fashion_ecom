@@ -1641,3 +1641,236 @@ PLEASE INTEGRATE THE FOLLOWING BACKEND APIs:
 
 6. TYPESCRIPT CHECK:
    - Run `npx tsc --noEmit` upon completion to verify 0 TypeScript compilation errors.
+
+
+
+
+
+
+
+
+
+   order management api
+
+   
+Tell me which APIs are used in My Orders or Order History to view orders so that when an order is
+  placed, it goes to the admin.
+  When the admin updates the order status, which API is used and how is it updated in My Orders?
+  Also, if canceled, which API is there and how does it update the status as well as in the admin panel?
+  And if returned, how does it go to the admin panel and via which API, and how is the status updated via
+  which API?
+  Tell me all these so I can connect the APIs in the Android app so everything can be viewed correctly in
+  My Orders.
+  Do not make any changes to code files or code."
+
+● Search(Order routes search in server.js)
+● Read(C:/Users/pauls/OneDrive/Desktop/ECOM/backend/server.js)
+● Read(C:/Users/pauls/OneDrive/Desktop/ECOM/backend/server.js)
+● Read(C:/Users/pauls/OneDrive/Desktop/ECOM/backend/server.js) (ctrl+o to expand)
+  Here is the complete reference and step-by-step breakdown of all APIs, HTTP methods, payloads, and   
+  Socket/Polling mechanics used for the Order Lifecycle (Place, Fetch, Update Status, Cancel, Return)  
+  so you can connect them seamlessly in your Android App:                                              
+  ──────                                                                                               
+  ## 1. 🛍️ Placing an Order (Sends Order to Admin Panel)                                               
+                                                                                                       
+  When a customer places an order, it is posted to the backend. The backend stores it in MongoDB and   
+  instantly notifies the Admin Panel via Socket.IO real-time event.                                    
+                                                                                                       
+   Detail                     │ Specification
+  ────────────────────────────┼────────────────────────────────────────────────────────────────────────
+   Endpoint Path              │ POST /api/orders
+   Full URL                   │ https://dipto-fashion-backend.onrender.com/api/orders
+   Headers                    │ Authorization: Bearer <user_jwt_token>, Content-Type: application/json
+                                                                                                       
+  ### Request Body (JSON):                                                                             
+                                                                                                       
+    {                                                                                                  
+      "items": [                                                                                       
+        {                                                                                              
+          "product": "64abc123def456",                                                                 
+          "name": "Kanjivaram Silk Saree",                                                             
+          "price": 2499,                                                                               
+          "quantity": 1,                                                                               
+          "image": "https://example.com/saree.jpg"                                                     
+        }                                                                                              
+      ],                                                                                               
+      "totalAmount": 2499,                                                                             
+      "paymentMethod": "UPI_QR", // or "COD" or "RAZORPAY"                                             
+      "utrNumber": "UTR123456789", // Transaction ID / Payment Proof                                   
+      "shippingAddress": {                                                                             
+        "userName": "Sudipta Paul",                                                                    
+        "mobileNumber": "9876543210",                                                                  
+        "address": "123 Main Street",                                                                  
+        "pincode": "700001"                                                                            
+      }                                                                                                
+    }                                                                                                  
+                                                                                                       
+  ### How it reaches the Admin:                                                                        
+                                                                                                       
+  • The backend saves the order with status: "Pending Verification".                                   
+  • The backend emits a Socket.IO event new_order_placed.                                              
+  • The Admin Panel listens to GET /api/admin/orders (or Socket) and the new order instantly pops up in
+  the Admin Dashboard!                                                                                 
+  ──────                                                                                               
+  ## 2. 📜 Viewing Customer Orders ("My Orders" Screen)                                                
+                                                                                                       
+  To fetch and display all past and live orders for the logged-in user:                                
+                                                                                                       
+   Detail                              │ Specification
+  ─────────────────────────────────────┼───────────────────────────────────────────────────────────────
+   Endpoint Path                       │ GET /api/user/my-orders
+   Full URL                            │ https://dipto-fashion-backend.onrender.com/api/user/my-orders
+   Headers                             │ Authorization: Bearer <user_jwt_token>
+                                                                                                       
+  │ Alternative lookup: GET /api/orders/user?email=customer@example.com                                
+                                                                                                       
+  ### Response (200 OK):                                                                               
+                                                                                                       
+  Returns an array of order objects belonging to that user sorted by newest first.                     
+  ──────                                                                                               
+  ## 3. 🚚 Admin Updates Order Status (Accepted / Shipped / Delivered)                                 
+                                                                                                       
+  When the Admin updates the shipping status from the Admin Panel:                                     
+                                                                                                       
+   Detail                │ Specification
+  ───────────────────────┼─────────────────────────────────────────────────────────────────────────────
+   Endpoint Path         │ PUT /api/orders/:orderId/status
+   Full URL              │ https://dipto-fashion-backend.onrender.com/api/orders/64abc123def456/status
+   Headers               │ Content-Type: application/json
+                                                                                                       
+  ### Request Body (JSON):                                                                             
+                                                                                                       
+    {                                                                                                  
+      "status": "Shipped" // Allowed: 'Accepted', 'Shipped', 'Out for Delivery', 'Delivered',          
+  'Rejected'                                                                                           
+    }                                                                                                  
+                                                                                                       
+  ### How "My Orders" in the App gets updated:                                                         
+                                                                                                       
+  1. Real-time Socket: The backend broadcasts a order_status_updated socket event containing the       
+  updated order object.                                                                                
+  2. REST Polling (Fallback): The app periodically calls GET /api/user/my-orders (e.g., every 10–15s or
+  on screen pull-to-refresh) to get the latest status.                                                 
+  ──────                                                                                               
+  ## 4. ❌ Order Cancellation Flow                                                                     
+                                                                                                       
+  Cancellation is a two-step approval process:                                                         
+                                                                                                       
+  ### Step A: User Requests Cancellation (In App)                                                      
+                                                                                                       
+   Detail                │ Specification
+  ───────────────────────┼─────────────────────────────────────────────────────────────────────────────
+   Endpoint Path         │ POST /api/orders/:orderId/cancel
+   Full URL              │ https://dipto-fashion-backend.onrender.com/api/orders/64abc123def456/cancel
+   Headers               │ Authorization: Bearer <user_jwt_token>, Content-Type: application/json
+                                                                                                       
+  #### Request Body (JSON):                                                                            
+                                                                                                       
+    {                                                                                                  
+      "reason": "Ordered wrong size",                                                                  
+      "refundToSource": true,                                                                          
+      "upiId": "user@upi",                                                                             
+      "bankName": "HDFC Bank",                                                                         
+      "accountNumber": "1234567890",                                                                   
+      "ifscCode": "HDFC0001234"                                                                        
+    }                                                                                                  
+                                                                                                       
+  • Status becomes Cancellation Requested.                                                             
+  • It immediately appears in the Admin Panel for review.                                              
+  ──────                                                                                               
+  ### Step B: Admin Approves Cancellation (In Admin Panel)                                             
+                                                                                                       
+   Detail        │ Specification
+  ───────────────┼─────────────────────────────────────────────────────────────────────────────────────
+   Endpoint Path │ POST /api/orders/:orderId/approve-cancellation
+   Full URL      │ https://dipto-fashion-backend.onrender.com/api/orders/64abc123def456/approve-
+                 │ cancellation
+                                                                                                       
+  • Status changes to Cancelled.                                                                       
+  • Item stock is automatically restored in the database.                                              
+  • If paid via Razorpay, auto-refund is triggered.                                                    
+  • Emit socket order_status_updated updates My Orders status to Cancelled.                            
+  ──────                                                                                               
+  ## 5. 🔄 Order Return Flow (Post-Delivery)                                                           
+                                                                                                       
+  If an order is Delivered and the customer requests a return:                                         
+                                                                                                       
+  ### Step A: Customer Submits Return Request (In App)                                                 
+                                                                                                       
+   Detail                │ Specification
+  ───────────────────────┼─────────────────────────────────────────────────────────────────────────────
+   Endpoint Path         │ POST /api/orders/:orderId/return
+   Full URL              │ https://dipto-fashion-backend.onrender.com/api/orders/64abc123def456/return
+   Headers               │ Authorization: Bearer <user_jwt_token>, Content-Type: application/json
+                                                                                                       
+  #### Request Body (JSON):                                                                            
+                                                                                                       
+    {                                                                                                  
+      "reason": "Defective item",                                                                      
+      "notes": "Stitching unraveled near seam",                                                        
+      "upiId": "user@upi",                                                                             
+      "bankName": "SBI",                                                                               
+      "accountNumber": "9876543210",                                                                   
+      "ifscCode": "SBIN0001234"                                                                        
+    }                                                                                                  
+                                                                                                       
+  • Status updates to Return Requested.                                                                
+  • Auto-calculates pickup date (3 days from request).                                                 
+  • Shows up under "Return Requests" in the Admin Panel.                                               
+  ──────                                                                                               
+  ### Step B: Admin Approves Return & Issues Refund (In Admin Panel)                                   
+                                                                                                       
+  1. Approve Pickup: Admin calls PUT /api/orders/:orderId/status with {"status": "Return Approved"}.   
+  2. Complete Refund: Admin calls PUT /api/orders/:orderId/status with {"status": "Refund Completed"}. 
+                                                                                                       
+  • Status in My Orders updates to Return Approved / Refund Completed.                                 
+  • Stock is restored to the product inventory upon return approval.                                   
+  ──────                                                                                               
+  ## 📊 Summary Table for Android Integration                                                          
+                                                                                                       
+   Task                │ API Endpoint            │ HTTP Met… │ Who Triggers │ Resulting Status
+  ─────────────────────┼─────────────────────────┼───────────┼──────────────┼──────────────────────────
+   Place Order         │ /api/orders             │ POST      │ App (User)   │ Pending Verification
+   Fetch My Orders     │ /api/user/my-orders     │ GET       │ App (User)   │ Reads all orders
+   Update Order Status │ /api/orders/:id/status  │ PUT       │ Admin Panel  │ Accepted / Shipped / Out
+                       │                         │           │              │ for Delivery / Delivered
+   Request Cancel      │ /api/orders/:id/cancel  │ POST      │ App (User)   │ Cancellation Requested
+   Approve Cancel      │ /api/orders/:id/approve │ POST      │ Admin Panel  │ Cancelled
+                       │ -cancellation           │           │              │
+   Request Return      │ /api/orders/:id/return  │ POST      │ App (User)   │ Return Requested
+   Approve Return      │ /api/orders/:id/status  │ PUT       │ Admin Panel  │ Return Approved / Refund
+                       │                         │           │              │ Completed
+
+
+
+Based on the exact API breakdown and Order Lifecycle flow described above, wire up and connect all order-related functionalities in the Android React Native app.
+
+### Requirements & Technical Implementation:
+
+1. Connect Order Placement API (POST /api/orders):
+   - In the Checkout / Payment Completion handler:
+     * Make an authenticated HTTP POST request to `https://dipto-fashion-backend.onrender.com/api/orders`.
+     * Headers: `Content-Type: application/json` and `Authorization: Bearer <token>`.
+     * Ensure the payload matches backend expectations (`items`, `totalAmount`, `paymentMethod`, `utrNumber`, `shippingAddress`).
+     * On 200/201 response, clear cart state and navigate to the "My Orders" screen.
+
+2. Connect Fetch "My Orders" API (GET /api/user/my-orders):
+   - In `MyOrdersScreen.tsx` / `OrderHistoryScreen.tsx`:
+     * Use `useFocusEffect` (or `useEffect`) to query `https://dipto-fashion-backend.onrender.com/api/user/my-orders` using Bearer Auth token on mount and focus.
+     * Render the order cards showing items, order ID, date, total amount, and status badges ('Pending Verification', 'Accepted', 'Shipped', 'Out for Delivery', 'Delivered', 'Cancelled', 'Return Requested', 'Refund Completed').
+     * Add `RefreshControl` pull-to-refresh to fetch updated order statuses updated by Admin.
+
+3. Connect Cancel Order API (POST /api/orders/:orderId/cancel):
+   - On "Cancel Order" CTA tap:
+     * Send HTTP POST to `https://dipto-fashion-backend.onrender.com/api/orders/${orderId}/cancel`.
+     * Pass cancellation reason and bank/UPI details in the JSON body.
+     * On success, set status badge locally to "Cancellation Requested" and trigger `fetchMyOrders()`.
+
+4. Connect Return Order API (POST /api/orders/:orderId/return):
+   - On "Return Order" CTA tap for delivered items:
+     * Send HTTP POST to `https://dipto-fashion-backend.onrender.com/api/orders/${orderId}/return`.
+     * Pass return reason, notes, and bank/UPI refund details in the JSON body.
+     * On success, set status badge locally to "Return Requested" and refresh list.
+
+5. TypeScript Build Check:
+   - Run `npx tsc --noEmit` to confirm 0 compilation errors upon completion.
