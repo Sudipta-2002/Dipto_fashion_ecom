@@ -1277,6 +1277,8 @@ const deductRemainingStock = async (orderRef, itemsInput) => {
           updatedProduct.remainingStock = 0;
           await updatedProduct.save().catch(() => {});
         }
+        clearProductCache();
+        try { io.emit('product_updated', updatedProduct.toObject ? updatedProduct.toObject() : updatedProduct); } catch (e) {}
         console.log(`========================================`);
         console.log(`[DEDUCT SUCCESS] Product ID: ${updatedProduct._id} | remainingStock: ${updatedProduct.remainingStock} (quantity unchanged: ${updatedProduct.quantity})`);
         console.log(`========================================`);
@@ -1288,6 +1290,8 @@ const deductRemainingStock = async (orderRef, itemsInput) => {
       if (prod) {
         const prevRem = prod.remainingStock !== undefined && prod.remainingStock !== null ? prod.remainingStock : prod.quantity;
         prod.remainingStock = Math.max(0, prevRem - qtyToDeduct);
+        clearProductCache();
+        try { io.emit('product_updated', prod); } catch (e) {}
         // quantity (total stock) is intentionally NOT modified
         console.log(`[MEM DEDUCT SUCCESS] Product ID: ${prod._id || prod.id} | New remainingStock: ${prod.remainingStock}`);
       }
@@ -1356,6 +1360,8 @@ const restoreRemainingStock = async (orderRef, itemsInput, reasonType = 'Cancell
       }
 
       if (updatedProduct) {
+        clearProductCache();
+        try { io.emit('product_updated', updatedProduct.toObject ? updatedProduct.toObject() : updatedProduct); } catch (e) {}
         const logHeader = reasonType === 'Cancellation' ? '[STOCK RESTORED - USER CANCEL]' : '[STOCK RESTORED - ADMIN REFUND]';
         console.log(`========================================`);
         console.log(`${logHeader} Product ID: ${updatedProduct._id} | remainingStock: ${updatedProduct.remainingStock} (quantity fixed at: ${updatedProduct.quantity})`);
@@ -1368,6 +1374,8 @@ const restoreRemainingStock = async (orderRef, itemsInput, reasonType = 'Cancell
       if (prod) {
         const prevRem = prod.remainingStock !== undefined && prod.remainingStock !== null ? prod.remainingStock : prod.quantity;
         prod.remainingStock = prevRem + qtyToRestore;
+        clearProductCache();
+        try { io.emit('product_updated', prod); } catch (e) {}
         // quantity (total stock) is intentionally NOT modified
         const logHeader = reasonType === 'Cancellation' ? '[STOCK RESTORED - USER CANCEL]' : '[STOCK RESTORED - ADMIN REFUND]';
         console.log(`${logHeader} Product ID: ${prod._id || prod.id} | New remainingStock: ${prod.remainingStock}`);
@@ -1471,11 +1479,18 @@ app.post(['/api/orders', '/orders'], async (req, res) => {
         let deducted = null;
         if (targetId) {
           try { deducted = await Product.findByIdAndUpdate(targetId, { $inc: { remainingStock: -qtyToDeduct } }, { new: true }); } catch (e) {}
-          if (deducted) console.log(`[DEDUCT SUCCESS] Product ID: ${targetId} | remainingStock: ${deducted.remainingStock} (quantity fixed: ${deducted.quantity})`);
+        if (deducted) {
+          clearProductCache();
+          try { io.emit('product_updated', deducted.toObject ? deducted.toObject() : deducted); } catch (e) {}
+          console.log(`[DEDUCT SUCCESS] Product ID: ${targetId} | remainingStock: ${deducted.remainingStock} (quantity fixed: ${deducted.quantity})`);
         }
         if (!deducted && item.name) {
           try { deducted = await Product.findOneAndUpdate({ name: item.name }, { $inc: { remainingStock: -qtyToDeduct } }, { new: true }); } catch (e) {}
-          if (deducted) console.log(`[DEDUCT BY NAME SUCCESS] Name: ${item.name} | remainingStock: ${deducted.remainingStock}`);
+          if (deducted) {
+            clearProductCache();
+            try { io.emit('product_updated', deducted.toObject ? deducted.toObject() : deducted); } catch (e) {}
+            console.log(`[DEDUCT BY NAME SUCCESS] Name: ${item.name} | remainingStock: ${deducted.remainingStock}`);
+          }
         }
         if (!deducted) console.warn(`[DEDUCTION FAILED] Cannot find product for item:`, item.name || targetId);
       }
