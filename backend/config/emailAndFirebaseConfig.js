@@ -44,8 +44,9 @@ const resend = new Resend(process.env.RESEND_API_KEY);
 export const sendOTPEmail = async (toEmail, otp, purpose = 'Verification') => {
   try {
     const data = await resend.emails.send({
-      from: 'onboarding@resend.dev',
+      from: 'Dipto Fashion <noreply@diptofashion.in>',
       to: toEmail,
+
       subject: `Your OTP Code for ${purpose}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; background: #ffffff;">
