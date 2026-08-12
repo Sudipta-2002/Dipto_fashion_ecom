@@ -453,9 +453,8 @@ app.post('/api/auth/send-otp', async (req, res) => {
 
     const params = new URLSearchParams({
       authorization: fast2smsKey,
-      route: 'otp',
-      variables_values: otp,
-      flash: '0',
+      route: 'q',
+      message: `${otp} is your OTP for Dipto Fashion. Don't share it.`,
       numbers: tenDigit
     });
 
