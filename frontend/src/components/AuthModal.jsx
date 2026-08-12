@@ -887,6 +887,8 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
                         placeholder="Mobile Phone Number"
                         value={formData.phone}
                         onChange={handleChange}
+                        inputMode="numeric"
+                        maxLength={10}
                         style={{ ...inputStyle(fieldErrors.phone), width: '100%' }}
                       />
                       <Phone size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
