@@ -188,7 +188,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     try {
       if (mode === 'signup') {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         const res = await fetch(`${API_URL}/api/auth/send-otp`, {
           method: 'POST',
@@ -209,7 +209,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         setSuccessMsg(`A 6-digit OTP code has been sent to ${cleanEmail}`);
       } else if (mode === 'login') {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         const res = await fetch(`${API_URL}/api/auth/login-check`, {
           method: 'POST',
@@ -230,7 +230,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         setSuccessMsg(`Credentials verified! A 6-digit OTP code has been sent to ${cleanEmail}`);
       } else if (mode === 'forgot') {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        const timeoutId = setTimeout(() => controller.abort(), 10000);
 
         const res = await fetch(`${API_URL}/api/auth/forgot-password-check`, {
           method: 'POST',
@@ -242,6 +242,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
 
         const data = await res.json().catch(() => ({ message: `Server error (${res.status})` }));
         if (!res.ok) throw new Error(data.message || 'Failed to process request');
+
 
         setOtpTargetEmail(cleanEmail);
         setOtpOrigin('forgot');
