@@ -1,9 +1,10 @@
-// Firebase Phone Auth has been replaced by Fast2SMS OTP via the backend.
-// RecaptchaVerifier and signInWithPhoneNumber are no longer used.
-// This file is kept as a stub for any future Firebase service integration.
+// firebase.js
+// Firebase Phone Auth — OTP is sent and verified entirely on the client
+// using signInWithPhoneNumber + RecaptchaVerifier (Firebase Auth SDK).
+// The backend does NOT send or store OTPs.
 
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, RecaptchaVerifier, signInWithPhoneNumber } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDDEFVIapAsFkv4uubKBf5hZeLKQrSv8C4",
@@ -17,3 +18,4 @@ const firebaseConfig = {
 
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
+export { RecaptchaVerifier, signInWithPhoneNumber };

@@ -1,10 +1,9 @@
 // FirebaseAuthComponent.jsx
-// NOTE: This component previously used Firebase Phone Auth (signInWithPhoneNumber + RecaptchaVerifier).
-// Phone OTP is now handled by Fast2SMS via the backend routes:
-//   POST /api/auth/send-otp   — sends OTP via Fast2SMS
-//   POST /api/auth/verify-otp — verifies OTP server-side
-// This standalone demo component is kept for reference but is not used in the main auth flow.
-// The main auth modal (AuthModal.jsx) has already been fully migrated.
+// Standalone reference/demo component for Firebase Phone Auth flow.
+// The main auth modal (AuthModal.jsx) uses Firebase signInWithPhoneNumber
+// + RecaptchaVerifier for OTP sending and confirmationResult.confirm() for verification.
+// Fast2SMS and backend /api/auth/send-otp / /api/auth/verify-otp have been removed.
+// This file is kept for reference but is NOT used in the main auth flow.
 
 import React, { useState, useEffect } from 'react';
 import { Phone, Lock, CheckCircle2, AlertCircle, RefreshCw, KeyRound, ArrowRight } from 'lucide-react';

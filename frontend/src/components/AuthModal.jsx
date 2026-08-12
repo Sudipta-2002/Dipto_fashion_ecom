@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Lock, Mail, Phone, X, Eye, EyeOff, ShieldCheck, ArrowRight, KeyRound, CheckCircle2, RotateCcw } from 'lucide-react';
 import { API_URL } from '../api';
+import { auth, RecaptchaVerifier, signInWithPhoneNumber } from '../firebase';
 
 const COUNTRY_CODES = [
   { code: '+91', country: 'India 🇮🇳' },
@@ -56,6 +57,8 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
   const [pendingAuthData, setPendingAuthData] = useState(null);
+  const [confirmationResult, setConfirmationResult] = useState(null);
+  const recaptchaVerifierRef = useRef(null);
 
   // Automatically reset all form fields whenever the modal opens
   useEffect(() => {
@@ -64,16 +67,30 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     }
   }, [isOpen]);
 
-  // Helper: send OTP via backend (Fast2SMS)
-  const sendOtpViaBackend = async (formattedPhone) => {
-    const res = await fetch(`${API_URL}/api/auth/send-otp`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: formattedPhone })
+  // Helper: send OTP via Firebase Phone Auth
+  const sendOtpViaFirebase = async (formattedPhone) => {
+    // Clear any existing reCAPTCHA widget first
+    if (recaptchaVerifierRef.current) {
+      try { recaptchaVerifierRef.current.clear(); } catch (_) {}
+      recaptchaVerifierRef.current = null;
+    }
+
+    // Ensure the invisible reCAPTCHA container exists in the DOM
+    let container = document.getElementById('recaptcha-container');
+    if (!container) {
+      container = document.createElement('div');
+      container.id = 'recaptcha-container';
+      document.body.appendChild(container);
+    }
+
+    recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
+      size: 'invisible',
+      callback: () => {}
     });
-    const data = await res.json();
-    if (!res.ok) throw new Error(data.message || 'Failed to send OTP');
-    return data;
+
+    const result = await signInWithPhoneNumber(auth, formattedPhone, recaptchaVerifierRef.current);
+    setConfirmationResult(result);
+    return result;
   };
 
   // Resend Timer Countdown for OTP
@@ -106,6 +123,11 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     setShowPassword(false);
     setShowConfirmPassword(false);
     setPendingAuthData(null);
+    setConfirmationResult(null);
+    if (recaptchaVerifierRef.current) {
+      try { recaptchaVerifierRef.current.clear(); } catch (_) {}
+      recaptchaVerifierRef.current = null;
+    }
   };
 
   if (!isOpen) return null;
@@ -176,7 +198,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
   };
 
   // -------------------------------------------------------------
-  // Form Submit Handler (Triggers Fast2SMS OTP Flow)
+  // Form Submit Handler (Triggers Firebase OTP Flow)
   // -------------------------------------------------------------
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -210,8 +232,8 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Signup validation failed');
 
-        // Send OTP via Fast2SMS backend
-        await sendOtpViaBackend(formattedPhone);
+        // Send OTP via Firebase Phone Auth
+        await sendOtpViaFirebase(formattedPhone);
 
         setPendingAuthData({ type: 'signup', payload });
         setOtpTargetPhone(formattedPhone);
@@ -233,8 +255,8 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Login failed');
 
-        // Send OTP via Fast2SMS backend
-        await sendOtpViaBackend(formattedPhone);
+        // Send OTP via Firebase Phone Auth
+        await sendOtpViaFirebase(formattedPhone);
 
         setPendingAuthData({ type: 'login', data });
         setOtpTargetPhone(formattedPhone);
@@ -243,8 +265,8 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         setResendTimer(30);
         setMode('otp');
       } else if (mode === 'forgot') {
-        // Send OTP via Fast2SMS backend
-        await sendOtpViaBackend(formattedPhone);
+        // Send OTP via Firebase Phone Auth
+        await sendOtpViaFirebase(formattedPhone);
 
         setPendingAuthData({
           type: 'forgot',
@@ -265,7 +287,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
   };
 
   // -------------------------------------------------------------
-  // OTP Verification Handler (Fast2SMS backend verify)
+  // OTP Verification Handler (Firebase confirmationResult.confirm)
   // -------------------------------------------------------------
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
@@ -277,17 +299,16 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
       return;
     }
 
+    if (!confirmationResult) {
+      setError('OTP session expired. Please go back and request a new OTP.');
+      return;
+    }
+
     setLoading(true);
 
     try {
-      // Verify OTP via backend (Fast2SMS store)
-      const verifyRes = await fetch(`${API_URL}/api/auth/verify-otp`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ phone: otpTargetPhone, otp: otpCode })
-      });
-      const verifyData = await verifyRes.json();
-      if (!verifyRes.ok) throw new Error(verifyData.message || 'OTP verification failed');
+      // Verify OTP via Firebase (client-side)
+      await confirmationResult.confirm(otpCode);
 
       if (otpOrigin === 'signup') {
         // ONLY AFTER OTP VERIFICATION: Register user and save to database
@@ -398,7 +419,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     setResendTimer(30);
     setError('');
     try {
-      await sendOtpViaBackend(otpTargetPhone);
+      await sendOtpViaFirebase(otpTargetPhone);
       setSuccessMsg('A new 6-digit OTP has been sent to your mobile number!');
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) {
