@@ -69,28 +69,41 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
 
   // Helper: send OTP via Firebase Phone Auth
   const sendOtpViaFirebase = async (formattedPhone) => {
+    // ─── DEV MODE: Bypass Firebase SMS ───────────────────────────────────────
+    // Comment out the block below and uncomment the Firebase block to go live.
+    const DEV_MODE_OTP = true;
+    if (DEV_MODE_OTP) {
+      console.log('[DEV MODE] Skipping Firebase SMS. OTP screen will open immediately.');
+      console.log('[DEV MODE] Accept any 6-digit code (e.g. 123456) on the next screen.');
+      setConfirmationResult('DEV_MODE'); // dummy sentinel so verify check passes
+      return;
+    }
+    // ─── END DEV MODE ────────────────────────────────────────────────────────
+
+    // ── LIVE Firebase Phone Auth (restore when billing is active) ────────────
     // Clear any existing reCAPTCHA widget first
-    if (recaptchaVerifierRef.current) {
-      try { recaptchaVerifierRef.current.clear(); } catch (_) {}
-      recaptchaVerifierRef.current = null;
-    }
-
-    // Ensure the invisible reCAPTCHA container exists in the DOM
-    let container = document.getElementById('recaptcha-container');
-    if (!container) {
-      container = document.createElement('div');
-      container.id = 'recaptcha-container';
-      document.body.appendChild(container);
-    }
-
-    recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
-      size: 'invisible',
-      callback: () => {}
-    });
-
-    const result = await signInWithPhoneNumber(auth, formattedPhone, recaptchaVerifierRef.current);
-    setConfirmationResult(result);
-    return result;
+    // if (recaptchaVerifierRef.current) {
+    //   try { recaptchaVerifierRef.current.clear(); } catch (_) {}
+    //   recaptchaVerifierRef.current = null;
+    // }
+    //
+    // // Ensure the invisible reCAPTCHA container exists in the DOM
+    // let container = document.getElementById('recaptcha-container');
+    // if (!container) {
+    //   container = document.createElement('div');
+    //   container.id = 'recaptcha-container';
+    //   document.body.appendChild(container);
+    // }
+    //
+    // recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
+    //   size: 'invisible',
+    //   callback: () => {}
+    // });
+    //
+    // const result = await signInWithPhoneNumber(auth, formattedPhone, recaptchaVerifierRef.current);
+    // setConfirmationResult(result);
+    // return result;
+    // ─────────────────────────────────────────────────────────────────────────
   };
 
   // Resend Timer Countdown for OTP
@@ -307,8 +320,17 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     setLoading(true);
 
     try {
-      // Verify OTP via Firebase (client-side)
-      await confirmationResult.confirm(otpCode);
+      // ─── DEV MODE: Accept any 6-digit code ─────────────────────────────────
+      if (confirmationResult === 'DEV_MODE') {
+        console.log('[DEV MODE] OTP accepted without Firebase verification.');
+        // Falls through to the success logic below — no Firebase call made.
+      } else {
+        // ── LIVE: Verify OTP via Firebase (restore when billing is active) ────
+        // await confirmationResult.confirm(otpCode);
+        // ─────────────────────────────────────────────────────────────────────
+        await confirmationResult.confirm(otpCode);
+      }
+      // ─── END DEV MODE ──────────────────────────────────────────────────────
 
       if (otpOrigin === 'signup') {
         // ONLY AFTER OTP VERIFICATION: Register user and save to database
