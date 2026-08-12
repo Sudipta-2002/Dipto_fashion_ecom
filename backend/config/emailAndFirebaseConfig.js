@@ -46,21 +46,21 @@ const EMAIL_USER = process.env.EMAIL_USER || 'sudiptapaul868@gmail.com';
 const EMAIL_PASS = process.env.EMAIL_PASS || 'kdhhovslzfzdpvcv';
 
 export const transporter = nodemailer.createTransport({
-  service: 'gmail',
+  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+  port: 587,
+  secure: false, // true for 465, false for other ports (Explicit TLS / STARTTLS)
   auth: {
-    user: EMAIL_USER,
-    pass: EMAIL_PASS
+    user: process.env.EMAIL_USER || 'sudiptapaul868@gmail.com',
+    pass: process.env.EMAIL_PASS || 'kdhhovslzfzdpvcv'
   },
   tls: {
     rejectUnauthorized: false
   },
-  pool: true,
-  maxConnections: 3,
-  maxMessages: 100,
-  connectionTimeout: 15000,
-  greetingTimeout: 10000,
-  socketTimeout: 15000
+  connectionTimeout: 10000, // 10 seconds timeout
+  greetingTimeout: 5000,
+  socketTimeout: 10000
 });
+
 
 // Helper function to send 6-digit OTP email via Resend API (or Nodemailer fallback)
 export const sendOTPEmail = async (toEmail, otpCode, purpose = 'Verification') => {
