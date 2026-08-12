@@ -39,74 +39,30 @@ try {
 
 import { Resend } from 'resend';
 
-// Resend API Transport (HTTPS port 443 — bypasses Render SMTP port blocks)
-const resendApiKey = process.env.RESEND_API_KEY || 're_123456789';
-const resend = new Resend(resendApiKey);
+const resend = new Resend(process.env.RESEND_API_KEY);
 
-// Nodemailer Transporter Fallback Setup
-export const transporter = nodemailer.createTransport({
-  host: 'smtp.gmail.com',
-  port: 587,
-  secure: false, // Use STARTTLS
-  family: 4,     // Force IPv4
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASS
-  },
-  tls: {
-    rejectUnauthorized: false
-  },
-  connectionTimeout: 10000,
-  greetingTimeout: 5000,
-  socketTimeout: 10000
-});
-
-
-
-// Helper function to send 6-digit OTP email via Resend API (or Nodemailer fallback)
-export const sendOTPEmail = async (toEmail, otpCode, purpose = 'Verification') => {
-  const htmlContent = `
-    <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; background: #ffffff;">
-      <h2 style="color: #4f46e5; text-align: center; margin-top: 0;">OTP Verification</h2>
-      <p style="font-size: 15px; color: #334155;">Hello,</p>
-      <p style="font-size: 15px; color: #334155;">Your 6-digit One-Time Password (OTP) for <strong>${purpose}</strong> is:</p>
-      <div style="text-align: center; margin: 24px 0;">
-        <span style="font-size: 32px; font-weight: 800; letter-spacing: 6px; color: #8b5cf6; background: #f1f5f9; padding: 12px 24px; border-radius: 8px; display: inline-block;">${otpCode}</span>
-      </div>
-      <p style="font-size: 14px; color: #64748b;">This OTP is valid for <strong>5 minutes</strong>. Do not share this code with anyone.</p>
-      <hr style="border: none; border-top: 1px solid #e2e8f0; margin: 20px 0;" />
-      <p style="font-size: 12px; color: #94a3b8; text-align: center;">If you did not request this OTP, please ignore this email.</p>
-    </div>
-  `;
-
-  // 1. Primary: Try Resend HTTPS API (bypasses Render SMTP port blocking)
+export const sendOTPEmail = async (toEmail, otp, purpose = 'Verification') => {
   try {
-    const resendResponse = await resend.emails.send({
-      from: 'Dipto Fashion <onboarding@resend.dev>',
-      to: [toEmail],
-      subject: `[${otpCode}] Your OTP Code for ${purpose}`,
-      html: htmlContent
+    const data = await resend.emails.send({
+      from: 'onboarding@resend.dev',
+      to: toEmail,
+      subject: `Your OTP Code for ${purpose}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 500px; margin: 0 auto; border: 1px solid #e2e8f0; border-radius: 12px; padding: 24px; background: #ffffff;">
+          <h2 style="color: #4f46e5; text-align: center; margin-top: 0;">OTP Verification</h2>
+          <p style="font-size: 15px; color: #334155;">Hello,</p>
+          <p style="font-size: 15px; color: #334155;">Your verification code is: <strong style="font-size: 22px; color: #8b5cf6;">${otp}</strong></p>
+          <p style="font-size: 14px; color: #64748b;">This OTP is valid for <strong>5 minutes</strong>. Do not share this code with anyone.</p>
+        </div>
+      `
     });
-    
-    if (resendResponse && (resendResponse.id || resendResponse.data)) {
-      console.log('Email sent successfully via Resend API:', resendResponse);
-      return resendResponse;
-    }
-  } catch (resendError) {
-    console.warn('Resend API dispatch failed or key unconfigured, falling back to Nodemailer SMTP:', resendError.message);
+    console.log('Email sent successfully via Resend API:', data);
+    return data;
+  } catch (error) {
+    console.error('Resend Email Error:', error);
+    throw error;
   }
-
-  // 2. Fallback: Nodemailer SMTP
-  const mailOptions = {
-    from: `"Dipto Fashion Auth" <${process.env.EMAIL_USER || 'sudiptapaul868@gmail.com'}>`,
-    to: toEmail,
-    subject: `[${otpCode}] Your OTP Code for ${purpose}`,
-    html: htmlContent
-  };
-
-  return await transporter.sendMail(mailOptions);
 };
 
-
-
 export { firebaseAdminApp };
+
