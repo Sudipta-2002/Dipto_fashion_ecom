@@ -447,34 +447,48 @@ app.post('/api/auth/send-otp', async (req, res) => {
     // Store OTP against full phone (E.164) with expiry
     otpStore.set(cleanPhone, { otp, expiresAt });
 
-    // Send OTP via Fast2SMS Bulk V2 API (OTP route, without DLT)
+    // Send OTP via Fast2SMS Bulk V2 API (Quick SMS route, without DLT)
     const fast2smsUrl = 'https://www.fast2sms.com/dev/bulkV2';
     const fast2smsKey = process.env.FAST2SMS_API_KEY || 'zk2Vprtf9MZE8XO1DFuomavlR0Yw4e5TBISKLbPWjJUn36CAHskzZKnNp6yed4JLufroC9H2VAB7DRw0';
 
-    const params = new URLSearchParams({
-      authorization: fast2smsKey,
-      route: 'q',
-      message: `${otp} is your OTP for Dipto Fashion. Don't share it.`,
-      numbers: tenDigit
-    });
+    console.log('[FAST2SMS] Sending OTP to cleaned number:', tenDigit);
 
-    const smsRes = await fetch(`${fast2smsUrl}?${params.toString()}`, {
-      method: 'GET',
-      headers: { 'cache-control': 'no-cache' }
-    });
+    try {
+      const params = new URLSearchParams({
+        authorization: fast2smsKey,
+        route: 'q',
+        message: `${otp} is your OTP for Dipto Fashion. Don't share it.`,
+        numbers: tenDigit,
+        flash: '0'
+      });
 
-    const smsData = await smsRes.json();
-    console.log('[FAST2SMS] Response:', smsData);
+      const smsRes = await fetch(`${fast2smsUrl}?${params.toString()}`, {
+        method: 'GET',
+        headers: { 'cache-control': 'no-cache' }
+      });
 
-    if (!smsData.return) {
-      console.error('[FAST2SMS] Failed to send OTP:', smsData);
-      return res.status(502).json({ message: 'Failed to send OTP. Please try again.' });
+      const smsData = await smsRes.json();
+      console.log('[FAST2SMS] Response:', smsData);
+
+      if (smsData.return === false) {
+        console.error('[FAST2SMS] API rejected request:', smsData);
+        return res.status(400).json({
+          success: false,
+          message: smsData.message || 'Failed to send OTP. Please try again.'
+        });
+      }
+
+      return res.json({ success: true, message: `OTP sent successfully to ${cleanPhone}` });
+    } catch (smsErr) {
+      console.error('[FAST2SMS] Network/API error:', smsErr.message);
+      return res.status(500).json({
+        success: false,
+        message: smsErr.message || 'Failed to send OTP'
+      });
     }
-
-    return res.json({ success: true, message: `OTP sent successfully to ${cleanPhone}` });
   } catch (err) {
-    console.error('[FAST2SMS] Error:', err.message);
-    res.status(500).json({ message: err.message });
+    console.error('[SEND-OTP] Unexpected error:', err.message);
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 
