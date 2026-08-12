@@ -1394,21 +1394,7 @@ table.admin-table th {
   }
 }
 
-/* --- Firebase reCAPTCHA Placement & Badge Styling --- */
-#auth-recaptcha-container, #recaptcha-container {
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
-  margin-bottom: 12px !important;
-  width: 100% !important;
-  min-height: 0 !important;
-}
 
-.grecaptcha-badge {
-  position: static !important;
-  margin: 0 auto !important;
-  box-shadow: none !important;
-}
 
 /* ============================================================
    DOWNLOAD APP BUTTON

@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { User, Lock, Mail, Phone, X, Eye, EyeOff, ShieldCheck, ArrowRight, KeyRound, CheckCircle2, RotateCcw } from 'lucide-react';
 import { API_URL } from '../api';
-import { auth, RecaptchaVerifier, signInWithPhoneNumber } from '../firebase';
 
 const COUNTRY_CODES = [
   { code: '+91', country: 'India 🇮🇳' },
@@ -65,43 +64,16 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     }
   }, [isOpen]);
 
-  const [confirmationResult, setConfirmationResult] = useState(null);
-  const recaptchaVerifierRef = useRef(null);
-
-  // Dynamic initialization of RecaptchaVerifier right before sending OTP
-  const getRecaptchaVerifier = () => {
-    try {
-      if (!window.authRecaptchaVerifier) {
-        window.authRecaptchaVerifier = new RecaptchaVerifier(
-          auth,
-          'auth-recaptcha-container',
-          {
-            size: 'invisible',
-            callback: (response) => {},
-            'expired-callback': () => {
-              setError('reCAPTCHA expired. Please try sending OTP again.');
-            }
-          }
-        );
-      }
-      recaptchaVerifierRef.current = window.authRecaptchaVerifier;
-      return window.authRecaptchaVerifier;
-    } catch (err) {
-      console.error('Firebase Auth Error:', err.code, err.message);
-      return null;
-    }
-  };
-
-  // Helper to reset reCAPTCHA widget on error
-  const resetRecaptcha = async () => {
-    try {
-      if (window.grecaptcha && window.authRecaptchaVerifier) {
-        const widgetId = await window.authRecaptchaVerifier.render();
-        window.grecaptcha.reset(widgetId);
-      }
-    } catch (e) {
-      console.warn('reCAPTCHA reset notice:', e);
-    }
+  // Helper: send OTP via backend (Fast2SMS)
+  const sendOtpViaBackend = async (formattedPhone) => {
+    const res = await fetch(`${API_URL}/api/auth/send-otp`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: formattedPhone })
+    });
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || 'Failed to send OTP');
+    return data;
   };
 
   // Resend Timer Countdown for OTP
@@ -204,7 +176,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
   };
 
   // -------------------------------------------------------------
-  // Form Submit Handler (Triggers Firebase OTP Flow)
+  // Form Submit Handler (Triggers Fast2SMS OTP Flow)
   // -------------------------------------------------------------
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -238,17 +210,8 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Signup validation failed');
 
-        // Send OTP via Firebase signInWithPhoneNumber
-        const appVerifier = getRecaptchaVerifier();
-        if (appVerifier) {
-          try {
-            const firebaseConfirm = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
-            setConfirmationResult(firebaseConfirm);
-          } catch (fbErr) {
-            console.error("Firebase Auth Error:", fbErr.code, fbErr.message);
-            resetRecaptcha();
-          }
-        }
+        // Send OTP via Fast2SMS backend
+        await sendOtpViaBackend(formattedPhone);
 
         setPendingAuthData({ type: 'signup', payload });
         setOtpTargetPhone(formattedPhone);
@@ -270,17 +233,8 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Login failed');
 
-        // Send OTP via Firebase signInWithPhoneNumber
-        const appVerifier = getRecaptchaVerifier();
-        if (appVerifier) {
-          try {
-            const firebaseConfirm = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
-            setConfirmationResult(firebaseConfirm);
-          } catch (fbErr) {
-            console.error("Firebase Auth Error:", fbErr.code, fbErr.message);
-            resetRecaptcha();
-          }
-        }
+        // Send OTP via Fast2SMS backend
+        await sendOtpViaBackend(formattedPhone);
 
         setPendingAuthData({ type: 'login', data });
         setOtpTargetPhone(formattedPhone);
@@ -289,17 +243,8 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         setResendTimer(30);
         setMode('otp');
       } else if (mode === 'forgot') {
-        // Send OTP via Firebase signInWithPhoneNumber
-        const appVerifier = getRecaptchaVerifier();
-        if (appVerifier) {
-          try {
-            const firebaseConfirm = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
-            setConfirmationResult(firebaseConfirm);
-          } catch (fbErr) {
-            console.error("Firebase Auth Error:", fbErr.code, fbErr.message);
-            resetRecaptcha();
-          }
-        }
+        // Send OTP via Fast2SMS backend
+        await sendOtpViaBackend(formattedPhone);
 
         setPendingAuthData({
           type: 'forgot',
@@ -313,16 +258,14 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         setMode('otp');
       }
     } catch (err) {
-      console.error("Firebase Auth Error:", err.code, err.message);
       setError(err.message);
-      resetRecaptcha();
     } finally {
       setLoading(false);
     }
   };
 
   // -------------------------------------------------------------
-  // OTP Verification Handler (Firebase confirm)
+  // OTP Verification Handler (Fast2SMS backend verify)
   // -------------------------------------------------------------
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
@@ -337,18 +280,14 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     setLoading(true);
 
     try {
-      // If Firebase confirmationResult exists, verify with Firebase Auth
-      if (confirmationResult && typeof confirmationResult.confirm === 'function') {
-        try {
-          await confirmationResult.confirm(otpCode);
-        } catch (fbErr) {
-          console.warn('Firebase OTP verification fallback check:', fbErr);
-          // If custom/mock OTP used in dev environment, allow continuation
-          if (fbErr.code === 'auth/invalid-verification-code') {
-            throw new Error('Invalid OTP code. Please check and enter again.');
-          }
-        }
-      }
+      // Verify OTP via backend (Fast2SMS store)
+      const verifyRes = await fetch(`${API_URL}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: otpTargetPhone, otp: otpCode })
+      });
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok) throw new Error(verifyData.message || 'OTP verification failed');
 
       if (otpOrigin === 'signup') {
         // ONLY AFTER OTP VERIFICATION: Register user and save to database
@@ -454,12 +393,17 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     }
   };
 
-  const handleResendOtp = () => {
+  const handleResendOtp = async () => {
     setOtpValues(['', '', '', '', '', '']);
     setResendTimer(30);
     setError('');
-    setSuccessMsg('A new 6-digit OTP has been sent to your mobile number!');
-    setTimeout(() => setSuccessMsg(''), 3000);
+    try {
+      await sendOtpViaBackend(otpTargetPhone);
+      setSuccessMsg('A new 6-digit OTP has been sent to your mobile number!');
+      setTimeout(() => setSuccessMsg(''), 3000);
+    } catch (err) {
+      setError(err.message || 'Failed to resend OTP. Please try again.');
+    }
   };
 
   const inputStyle = (hasError) => ({
@@ -795,8 +739,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
                   {fieldErrors.confirmNewPassword && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.confirmNewPassword}</span>}
                 </div>
 
-                {/* reCAPTCHA container placed directly above submit button */}
-                <div id="auth-recaptcha-container"></div>
+
 
                 <button
                   type="submit"
@@ -981,8 +924,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
                   <span style={{ color: '#c026d3', fontWeight: '700', cursor: 'pointer' }}>Privacy Policy</span>.
                 </p>
 
-                {/* reCAPTCHA container placed directly above submit button */}
-                <div id="auth-recaptcha-container"></div>
+
 
                 <button
                   type="submit"

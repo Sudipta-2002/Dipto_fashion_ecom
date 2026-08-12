@@ -412,6 +412,104 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
 });
 
+// ============================================================
+// FAST2SMS OTP SYSTEM
+// In-memory OTP store: { phone: { otp, expiresAt } }
+// Phone key is stored as the full E.164 number (+919876543210).
+// Only the last 10 digits are passed to Fast2SMS.
+// ============================================================
+const otpStore = new Map();
+const OTP_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+// Utility: extract 10-digit number from full phone (+919876543210 → 9876543210)
+const extractTenDigits = (fullPhone) => {
+  const digitsOnly = fullPhone.replace(/\D/g, '');
+  return digitsOnly.slice(-10);
+};
+
+// SEND OTP via Fast2SMS
+app.post('/api/auth/send-otp', async (req, res) => {
+  try {
+    const { phone } = req.body;
+    if (!phone) return res.status(400).json({ message: 'Phone number is required' });
+
+    const cleanPhone = phone.trim();
+    const tenDigit = extractTenDigits(cleanPhone);
+
+    if (tenDigit.length !== 10) {
+      return res.status(400).json({ message: 'Invalid phone number. Must resolve to a 10-digit Indian mobile number.' });
+    }
+
+    // Generate random 6-digit OTP
+    const otp = String(Math.floor(100000 + Math.random() * 900000));
+    const expiresAt = Date.now() + OTP_TTL_MS;
+
+    // Store OTP against full phone (E.164) with expiry
+    otpStore.set(cleanPhone, { otp, expiresAt });
+
+    // Send OTP via Fast2SMS Bulk V2 API (OTP route, without DLT)
+    const fast2smsUrl = 'https://www.fast2sms.com/dev/bulkV2';
+    const fast2smsKey = process.env.FAST2SMS_API_KEY || 'zk2Vprtf9MZE8XO1DFuomavlR0Yw4e5TBISKLbPWjJUn36CAHskzZKnNp6yed4JLufroC9H2VAB7DRw0';
+
+    const params = new URLSearchParams({
+      authorization: fast2smsKey,
+      route: 'otp',
+      variables_values: otp,
+      flash: '0',
+      numbers: tenDigit
+    });
+
+    const smsRes = await fetch(`${fast2smsUrl}?${params.toString()}`, {
+      method: 'GET',
+      headers: { 'cache-control': 'no-cache' }
+    });
+
+    const smsData = await smsRes.json();
+    console.log('[FAST2SMS] Response:', smsData);
+
+    if (!smsData.return) {
+      console.error('[FAST2SMS] Failed to send OTP:', smsData);
+      return res.status(502).json({ message: 'Failed to send OTP. Please try again.' });
+    }
+
+    return res.json({ success: true, message: `OTP sent successfully to ${cleanPhone}` });
+  } catch (err) {
+    console.error('[FAST2SMS] Error:', err.message);
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// VERIFY OTP
+app.post('/api/auth/verify-otp', async (req, res) => {
+  try {
+    const { phone, otp } = req.body;
+    if (!phone || !otp) return res.status(400).json({ message: 'Phone number and OTP are required' });
+
+    const cleanPhone = phone.trim();
+    const record = otpStore.get(cleanPhone);
+
+    if (!record) {
+      return res.status(400).json({ message: 'No OTP found for this number. Please request a new OTP.' });
+    }
+
+    if (Date.now() > record.expiresAt) {
+      otpStore.delete(cleanPhone);
+      return res.status(400).json({ message: 'OTP has expired. Please request a new OTP.' });
+    }
+
+    if (String(otp).trim() !== record.otp) {
+      return res.status(400).json({ message: 'Invalid OTP. Please check and try again.' });
+    }
+
+    // OTP matched — clear it immediately (single use)
+    otpStore.delete(cleanPhone);
+
+    return res.json({ success: true, message: 'OTP verified successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
 // --- UPDATE USER PROFILE (name, gender, avatar/profilePicture — email/phone immutable) ---
 app.put(['/api/user/profile', '/api/users/profile', '/api/auth/profile'], async (req, res) => {
   let userId = null;

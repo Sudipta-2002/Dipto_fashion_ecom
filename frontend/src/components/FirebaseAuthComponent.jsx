@@ -1,45 +1,25 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Phone, Lock, CheckCircle2, AlertCircle, RefreshCw, KeyRound, ArrowRight } from 'lucide-react';
-import { auth, RecaptchaVerifier, signInWithPhoneNumber } from './firebase';
+// FirebaseAuthComponent.jsx
+// NOTE: This component previously used Firebase Phone Auth (signInWithPhoneNumber + RecaptchaVerifier).
+// Phone OTP is now handled by Fast2SMS via the backend routes:
+//   POST /api/auth/send-otp   — sends OTP via Fast2SMS
+//   POST /api/auth/verify-otp — verifies OTP server-side
+// This standalone demo component is kept for reference but is not used in the main auth flow.
+// The main auth modal (AuthModal.jsx) has already been fully migrated.
 
-const FirebaseAuthComponent = () => {
+import React, { useState, useEffect } from 'react';
+import { Phone, Lock, CheckCircle2, AlertCircle, RefreshCw, KeyRound, ArrowRight } from 'lucide-react';
+import { API_URL } from '../api';
+
+const Fast2SMSAuthComponent = () => {
   const [phoneNumber, setPhoneNumber] = useState('');
   const [otpCode, setOtpCode] = useState('');
-  const [confirmationResult, setConfirmationResult] = useState(null);
-  
+  const [fullPhone, setFullPhone] = useState('');
+
   const [otpSent, setOtpSent] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [resendTimer, setResendTimer] = useState(30);
-
-  const recaptchaVerifierRef = useRef(null);
-
-  // Helper: Get or initialize RecaptchaVerifier dynamically right before sending OTP
-  const getRecaptchaVerifier = () => {
-    try {
-      if (!window.recaptchaVerifier) {
-        window.recaptchaVerifier = new RecaptchaVerifier(
-          auth,
-          'recaptcha-container',
-          {
-            size: 'invisible',
-            callback: (response) => {
-              // reCAPTCHA solved
-            },
-            'expired-callback': () => {
-              setError('reCAPTCHA expired. Please try sending OTP again.');
-            }
-          }
-        );
-      }
-      recaptchaVerifierRef.current = window.recaptchaVerifier;
-      return window.recaptchaVerifier;
-    } catch (err) {
-      console.error('Firebase RecaptchaVerifier Initialization Error:', err);
-      return null;
-    }
-  };
 
   // Timer countdown for resend OTP
   useEffect(() => {
@@ -50,23 +30,7 @@ const FirebaseAuthComponent = () => {
     return () => clearInterval(timer);
   }, [otpSent, resendTimer]);
 
-  // Helper: Auto-append +91 country code if missing
-  const formatPhoneNumberWithCountryCode = (number) => {
-    let clean = number.trim().replace(/[^\d+]/g, '');
-    if (!clean.startsWith('+')) {
-      clean = clean.replace(/^0+/, '');
-      if (clean.length === 10) {
-        clean = `+91${clean}`;
-      } else if (!clean.startsWith('91') && clean.length > 0) {
-        clean = `+91${clean}`;
-      } else if (clean.startsWith('91')) {
-        clean = `+${clean}`;
-      }
-    }
-    return clean;
-  };
-
-  // 1. Send OTP Function using Firebase signInWithPhoneNumber with error reset
+  // 1. Send OTP via Fast2SMS backend
   const handleSendOtp = async (e) => {
     if (e) e.preventDefault();
     setError('');
@@ -78,45 +42,30 @@ const FirebaseAuthComponent = () => {
       return;
     }
 
-    const formattedPhone = formatPhoneNumberWithCountryCode(phoneNumber);
+    // Build full E.164 phone
+    const formatted = rawNumber.length === 10 ? `+91${rawNumber}` : `+${rawNumber}`;
+    setFullPhone(formatted);
     setLoading(true);
 
     try {
-      const appVerifier = getRecaptchaVerifier();
-      if (!appVerifier) {
-        throw new Error('reCAPTCHA verifier not initialized properly.');
-      }
-
-      const result = await signInWithPhoneNumber(auth, formattedPhone, appVerifier);
-      setConfirmationResult(result);
+      const res = await fetch(`${API_URL}/api/auth/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: formatted })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to send OTP');
       setOtpSent(true);
       setResendTimer(30);
-      setSuccess(`OTP sent successfully to ${formattedPhone}!`);
+      setSuccess(`OTP sent successfully to ${formatted}!`);
     } catch (err) {
-      console.error("Firebase Auth Error:", err.code, err.message);
-      let msg = err.message || 'Failed to send OTP. Please check your phone number.';
-      if (err.code === 'auth/invalid-phone-number') {
-        msg = 'Invalid phone number format. Please enter a valid 10-digit number.';
-      } else if (err.code === 'auth/too-many-requests') {
-        msg = 'Too many requests. Please try again after some time.';
-      }
-      setError(msg);
-
-      // Reset reCAPTCHA on failure using grecaptcha.reset() so user can try again
-      try {
-        if (window.grecaptcha && window.recaptchaVerifier) {
-          const widgetId = await window.recaptchaVerifier.render();
-          window.grecaptcha.reset(widgetId);
-        }
-      } catch (resetErr) {
-        console.warn('reCAPTCHA reset notice:', resetErr);
-      }
+      setError(err.message || 'Failed to send OTP. Please check your phone number.');
     } finally {
       setLoading(false);
     }
   };
 
-  // 2. Verify OTP Function using confirmationResult.confirm(otpCode)
+  // 2. Verify OTP via Fast2SMS backend
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
     setError('');
@@ -128,27 +77,19 @@ const FirebaseAuthComponent = () => {
       return;
     }
 
-    if (!confirmationResult) {
-      setError('No active OTP session found. Please click "Send OTP" again.');
-      return;
-    }
-
     setLoading(true);
 
     try {
-      const userCredential = await confirmationResult.confirm(cleanOtp);
-      const user = userCredential.user;
-      console.log('Firebase Phone Auth User:', user);
-      setSuccess(`Phone verified successfully! Logged in as ${user.phoneNumber || user.uid}`);
+      const res = await fetch(`${API_URL}/api/auth/verify-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ phone: fullPhone, otp: cleanOtp })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Invalid OTP code entered.');
+      setSuccess(`Phone verified successfully! (${fullPhone})`);
     } catch (err) {
-      console.error("Firebase Auth Error:", err.code, err.message);
-      let msg = err.message || 'Invalid OTP code entered.';
-      if (err.code === 'auth/invalid-verification-code') {
-        msg = 'Invalid OTP code. Please check and enter again.';
-      } else if (err.code === 'auth/code-expired') {
-        msg = 'OTP code has expired. Please click "Resend OTP".';
-      }
-      setError(msg);
+      setError(err.message || 'Invalid OTP code entered.');
     } finally {
       setLoading(false);
     }
@@ -161,11 +102,11 @@ const FirebaseAuthComponent = () => {
           {otpSent ? <KeyRound size={26} /> : <Phone size={26} />}
         </div>
         <h2 style={{ fontSize: '1.35rem', fontWeight: '800', color: '#0f172a', margin: 0 }}>
-          {otpSent ? 'Enter Verification Code' : 'Firebase Phone Auth'}
+          {otpSent ? 'Enter Verification Code' : 'Phone Verification'}
         </h2>
         <p style={{ fontSize: '0.82rem', color: '#64748b', marginTop: '0.35rem' }}>
           {otpSent
-            ? `Enter the 6-digit OTP sent to ${formatPhoneNumberWithCountryCode(phoneNumber)}`
+            ? `Enter the 6-digit OTP sent to ${fullPhone}`
             : 'Enter your 10-digit mobile number (+91 will be auto-appended)'}
         </p>
       </div>
@@ -211,9 +152,6 @@ const FirebaseAuthComponent = () => {
             </div>
           </div>
 
-          {/* reCAPTCHA container placed directly above the action button */}
-          <div id="recaptcha-container"></div>
-
           <button
             type="submit"
             style={{ width: '100%', height: '46px', background: 'linear-gradient(135deg, #c026d3, #9333ea)', color: 'white', border: 'none', borderRadius: '8px', fontSize: '0.92rem', fontWeight: '800', cursor: loading ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', transition: 'all 0.2s ease' }}
@@ -258,7 +196,7 @@ const FirebaseAuthComponent = () => {
             )}
             <button
               type="button"
-              onClick={() => { setOtpSent(false); setConfirmationResult(null); setError(''); setSuccess(''); }}
+              onClick={() => { setOtpSent(false); setError(''); setSuccess(''); setOtpCode(''); }}
               style={{ background: 'none', border: 'none', color: '#475569', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline' }}
             >
               Change Phone Number
@@ -278,4 +216,4 @@ const FirebaseAuthComponent = () => {
   );
 };
 
-export default FirebaseAuthComponent;
+export default Fast2SMSAuthComponent;
