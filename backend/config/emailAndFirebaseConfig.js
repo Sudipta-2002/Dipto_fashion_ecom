@@ -1,3 +1,4 @@
+import dns from 'dns';
 import nodemailer from 'nodemailer';
 import dotenv from 'dotenv';
 import fs from 'fs';
@@ -5,6 +6,9 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 
 dotenv.config();
+
+// Force Node.js to use IPv4 DNS lookup first to fix Render IPv6 issues
+dns.setDefaultResultOrder('ipv4first');
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -33,8 +37,6 @@ try {
   // Silent fallback when using placeholder keys
 }
 
-
-
 import { Resend } from 'resend';
 
 // Resend API Transport (HTTPS port 443 — bypasses Render SMTP port blocks)
@@ -42,24 +44,23 @@ const resendApiKey = process.env.RESEND_API_KEY || 're_123456789';
 const resend = new Resend(resendApiKey);
 
 // Nodemailer Transporter Fallback Setup
-const EMAIL_USER = process.env.EMAIL_USER || 'sudiptapaul868@gmail.com';
-const EMAIL_PASS = process.env.EMAIL_PASS || 'kdhhovslzfzdpvcv';
-
 export const transporter = nodemailer.createTransport({
-  host: process.env.EMAIL_HOST || 'smtp.gmail.com',
+  host: 'smtp.gmail.com',
   port: 587,
-  secure: false, // true for 465, false for other ports (Explicit TLS / STARTTLS)
+  secure: false, // Use STARTTLS
+  family: 4,     // Force IPv4
   auth: {
-    user: process.env.EMAIL_USER || 'sudiptapaul868@gmail.com',
-    pass: process.env.EMAIL_PASS || 'kdhhovslzfzdpvcv'
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASS
   },
   tls: {
     rejectUnauthorized: false
   },
-  connectionTimeout: 10000, // 10 seconds timeout
+  connectionTimeout: 10000,
   greetingTimeout: 5000,
   socketTimeout: 10000
 });
+
 
 
 // Helper function to send 6-digit OTP email via Resend API (or Nodemailer fallback)
@@ -97,7 +98,7 @@ export const sendOTPEmail = async (toEmail, otpCode, purpose = 'Verification') =
 
   // 2. Fallback: Nodemailer SMTP
   const mailOptions = {
-    from: `"Dipto Fashion Auth" <${EMAIL_USER}>`,
+    from: `"Dipto Fashion Auth" <${process.env.EMAIL_USER || 'sudiptapaul868@gmail.com'}>`,
     to: toEmail,
     subject: `[${otpCode}] Your OTP Code for ${purpose}`,
     html: htmlContent
@@ -105,6 +106,7 @@ export const sendOTPEmail = async (toEmail, otpCode, purpose = 'Verification') =
 
   return await transporter.sendMail(mailOptions);
 };
+
 
 
 export { firebaseAdminApp };
