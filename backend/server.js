@@ -278,14 +278,16 @@ app.post('/api/auth/send-otp', async (req, res) => {
     try {
       await sendOTPEmail(cleanEmail, otpCode, type === 'signup' ? 'Account Registration' : type === 'login' ? 'Account Login' : 'Password Reset');
     } catch (mailErr) {
-      console.error('[NODEMAILER ERROR]', mailErr);
-      return res.status(500).json({ message: 'Failed to send OTP email. Please check your email address and try again.' });
+      console.error('Nodemailer Dispatch Error Details:', mailErr);
+      return res.status(500).json({ success: false, message: mailErr.message || 'Failed to send OTP via email' });
     }
 
     return res.json({ success: true, message: `A 6-digit OTP has been sent to ${cleanEmail}` });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('send-otp route error:', err);
+    res.status(500).json({ success: false, message: err.message || 'Server error processing OTP request' });
   }
+
 });
 
 // 2. SIGNUP ROUTE: Validates OTP from MongoDB and creates User in MongoDB

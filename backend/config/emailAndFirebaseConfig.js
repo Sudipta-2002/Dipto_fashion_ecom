@@ -45,13 +45,17 @@ export const transporter = nodemailer.createTransport({
   port: 465,
   secure: true,
   auth: {
-    user: EMAIL_USER,
-    pass: EMAIL_PASS
+    user: process.env.EMAIL_USER || 'sudiptapaul868@gmail.com',
+    pass: process.env.EMAIL_PASS || 'kdhhovslzfzdpvcv'
   },
-  connectionTimeout: 10000, // 10 seconds timeout
+  tls: {
+    rejectUnauthorized: false
+  },
+  connectionTimeout: 10000,
   greetingTimeout: 5000,
   socketTimeout: 10000
 });
+
 
 
 // Helper function to send 6-digit OTP email
