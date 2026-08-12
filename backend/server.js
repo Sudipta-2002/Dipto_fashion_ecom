@@ -15,6 +15,7 @@ import NodeCache from 'node-cache';
 
 import connectDB from './config/db.js';
 import User from './models/User.js';
+import OTP from './models/OTP.js';
 import Category from './models/Category.js';
 import Product from './models/Product.js';
 import Order from './models/Order.js';
@@ -24,6 +25,8 @@ import Coupon from './models/Coupon.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
+import { sendOTPEmail, firebaseAdminApp } from './config/emailAndFirebaseConfig.js';
+
 
 dotenv.config();
 
@@ -237,174 +240,326 @@ app.post('/api/admin/login', async (req, res) => {
 
 // --- USER AUTH ROUTES ---
 
-// PRE-CHECK SIGNUP: Validates uniqueness of Email & Phone BEFORE OTP verification (without creating user)
-app.post('/api/auth/pre-check-signup', async (req, res) => {
+// --- USER AUTH & OTP SYSTEM ---
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// 1. REQUEST OTP ROUTE: Handles email validation, checks DB presence based on flow type, generates 6-digit OTP, sends via Nodemailer, and saves to MongoDB OTP collection
+app.post('/api/auth/send-otp', async (req, res) => {
   try {
-    const { name, email, password, phone } = req.body;
-    if (!name || !email || !password || !phone) {
-      return res.status(400).json({ message: 'Name, email, password, and phone number are required' });
-    }
-    if (password.length < 8) {
-      return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+    const { email, type } = req.body; // type: 'signup' | 'login' | 'forgot'
+    if (!email || !emailRegex.test(email.trim())) {
+      return res.status(400).json({ message: 'Valid email address is required (e.g. user@domain.com)' });
     }
 
-    const cleanPhone = phone.trim();
+    const cleanEmail = email.trim().toLowerCase();
 
+    // Check user existence based on flow
     if (isMongoConnected()) {
-      const existingUser = await User.findOne({ $or: [{ email: email.trim() }, { phone: cleanPhone }] });
-      if (existingUser) {
-        if (existingUser.phone === cleanPhone) return res.status(400).json({ message: 'Phone number is already registered' });
-        return res.status(400).json({ message: 'Email is already registered' });
+      const existingUser = await User.findOne({ email: cleanEmail });
+      if (type === 'signup' && existingUser) {
+        return res.status(400).json({ message: 'Gmail is already registered. Please log in.' });
       }
-    } else {
-      const existing = memoryUsers.find(u => u.email === email.trim() || (u.phone && u.phone === cleanPhone));
-      if (existing) {
-        if (existing.phone === cleanPhone) return res.status(400).json({ message: 'Phone number is already registered' });
-        return res.status(400).json({ message: 'Email is already registered' });
+      if ((type === 'login' || type === 'forgot') && !existingUser) {
+        return res.status(400).json({ message: 'No registered user found with this Gmail address.' });
       }
     }
 
-    return res.json({ success: true, message: 'Signup details validated. Ready for OTP verification.' });
+    // Generate 6-digit random numeric OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Save or update OTP in MongoDB (or in-memory)
+    if (isMongoConnected()) {
+      // Remove any existing OTP for this email
+      await OTP.deleteMany({ email: cleanEmail });
+      await OTP.create({ email: cleanEmail, otp: otpCode });
+    }
+
+    // Send 6-digit OTP via Nodemailer to user's Gmail
+    try {
+      await sendOTPEmail(cleanEmail, otpCode, type === 'signup' ? 'Account Registration' : type === 'login' ? 'Account Login' : 'Password Reset');
+    } catch (mailErr) {
+      console.error('[NODEMAILER ERROR]', mailErr);
+      return res.status(500).json({ message: 'Failed to send OTP email. Please check your email address and try again.' });
+    }
+
+    return res.json({ success: true, message: `A 6-digit OTP has been sent to ${cleanEmail}` });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// REGISTER USER: Executed ONLY AFTER OTP verification is successful
-app.post('/api/auth/register', async (req, res) => {
+// 2. SIGNUP ROUTE: Validates OTP from MongoDB and creates User in MongoDB
+app.post('/api/auth/verify-signup', async (req, res) => {
   try {
-    const { name, email, password, phone } = req.body;
-    if (!name || !email || !password || !phone) {
-      return res.status(400).json({ message: 'Name, email, password, and phone number are required' });
+    const { name, email, phone, password, otp } = req.body;
+    if (!name || !email || !password || !phone || !otp) {
+      return res.status(400).json({ message: 'Name, mobile number, Gmail, password, and OTP are required' });
     }
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!emailRegex.test(cleanEmail)) {
+      return res.status(400).json({ message: 'Invalid email address format' });
+    }
+
     if (password.length < 8) {
       return res.status(400).json({ message: 'Password must be at least 8 characters long' });
     }
 
-    const cleanPhone = phone.trim();
-    const cleanEmail = email.trim();
-
+    // Verify OTP from MongoDB
     if (isMongoConnected()) {
-      const existingUser = await User.findOne({ $or: [{ email: cleanEmail }, { phone: cleanPhone }] });
+      const otpRecord = await OTP.findOne({ email: cleanEmail, otp: otp.trim() });
+      if (!otpRecord) {
+        return res.status(400).json({ message: 'Invalid or expired OTP. Please request a new OTP.' });
+      }
+
+      // Check if user exists
+      const existingUser = await User.findOne({ email: cleanEmail });
       if (existingUser) {
-        if (existingUser.phone === cleanPhone) return res.status(400).json({ message: 'Phone number is already registered' });
-        return res.status(400).json({ message: 'Email is already registered' });
+        return res.status(400).json({ message: 'Gmail is already registered' });
       }
 
       const hashedPassword = await bcrypt.hash(password, 10);
-      const user = await User.create({ name: name.trim(), email: cleanEmail, password: hashedPassword, phone: cleanPhone, addresses: [] });
-      const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ token, user: { id: user._id, name: user.name, email: user.email, phone: user.phone, gender: user.gender || '', avatar: user.avatar || '', role: user.role, addresses: user.addresses } });
-    } else {
-      const existing = memoryUsers.find(u => u.email === cleanEmail || (u.phone && u.phone === cleanPhone));
-      if (existing) {
-        if (existing.phone === cleanPhone) return res.status(400).json({ message: 'Phone number is already registered' });
-        return res.status(400).json({ message: 'Email is already registered' });
-      }
+      const user = await User.create({
+        name: name.trim(),
+        email: cleanEmail,
+        password: hashedPassword,
+        phone: phone.trim(),
+        addresses: []
+      });
 
+      // Delete verified OTP record
+      await OTP.deleteMany({ email: cleanEmail });
+
+      const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+      return res.json({
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          gender: user.gender || '',
+          avatar: user.avatar || '',
+          role: user.role,
+          addresses: user.addresses
+        }
+      });
+    } else {
       const newUser = {
         _id: 'u_' + Date.now(),
         name: name.trim(),
         email: cleanEmail,
-        phone: cleanPhone,
+        phone: phone.trim(),
         password,
         role: 'user',
         addresses: []
       };
       memoryUsers.push(newUser);
       const token = jwt.sign({ userId: newUser._id, role: newUser.role }, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ token, user: { id: newUser._id, name: newUser.name, email: newUser.email, phone: newUser.phone, gender: newUser.gender || '', avatar: newUser.avatar || '', role: newUser.role, addresses: newUser.addresses } });
+      return res.json({
+        token,
+        user: {
+          id: newUser._id,
+          name: newUser.name,
+          email: newUser.email,
+          phone: newUser.phone,
+          gender: '',
+          avatar: '',
+          role: newUser.role,
+          addresses: []
+        }
+      });
     }
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+// 3. LOGIN PRE-CHECK (EMAIL & PASSWORD) & OTP SENT
+app.post('/api/auth/login-check', async (req, res) => {
   try {
-    const { phone, password } = req.body;
-    if (!phone || !password) return res.status(400).json({ message: 'Phone number and password are required' });
-    if (password.length < 8) return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+    const { email, password } = req.body;
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Gmail address and password are required' });
+    }
 
-    const cleanPhone = phone.trim();
+    const cleanEmail = email.trim().toLowerCase();
+    if (!emailRegex.test(cleanEmail)) {
+      return res.status(400).json({ message: 'Invalid email address format' });
+    }
 
     if (isMongoConnected()) {
-      // Find user by phone number (exact or stripped match)
-      const user = await User.findOne({
-        $or: [
-          { phone: cleanPhone },
-          { phone: cleanPhone.replace(/\s+/g, '') }
-        ]
-      });
-      if (!user) return res.status(400).json({ message: 'No registered user found with this phone number' });
+      const user = await User.findOne({ email: cleanEmail });
+      if (!user) {
+        return res.status(400).json({ message: 'No registered user found with this Gmail address' });
+      }
 
       const isMatch = await bcrypt.compare(password, user.password);
-      if (!isMatch) return res.status(400).json({ message: 'Incorrect password entered' });
+      if (!isMatch) {
+        return res.status(400).json({ message: 'Incorrect password entered' });
+      }
+    }
+
+    // Credentials match -> Generate 6-digit OTP & Send to Gmail
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+
+    if (isMongoConnected()) {
+      await OTP.deleteMany({ email: cleanEmail });
+      await OTP.create({ email: cleanEmail, otp: otpCode });
+    }
+
+    try {
+      await sendOTPEmail(cleanEmail, otpCode, 'Account Login');
+    } catch (mailErr) {
+      console.error('[NODEMAILER ERROR]', mailErr);
+      return res.status(500).json({ message: 'Failed to send OTP email. Please try again.' });
+    }
+
+    return res.json({ success: true, message: `Login credentials verified. 6-digit OTP sent to ${cleanEmail}` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// 4. VERIFY LOGIN OTP & ISSUE JWT
+app.post('/api/auth/verify-login-otp', async (req, res) => {
+  try {
+    const { email, otp } = req.body;
+    if (!email || !otp) {
+      return res.status(400).json({ message: 'Gmail address and 6-digit OTP are required' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!emailRegex.test(cleanEmail)) {
+      return res.status(400).json({ message: 'Invalid email address format' });
+    }
+
+    if (isMongoConnected()) {
+      const otpRecord = await OTP.findOne({ email: cleanEmail, otp: otp.trim() });
+      if (!otpRecord) {
+        return res.status(400).json({ message: 'Invalid or expired OTP. Please try again.' });
+      }
+
+      const user = await User.findOne({ email: cleanEmail });
+      if (!user) {
+        return res.status(404).json({ message: 'User not found' });
+      }
+
+      await OTP.deleteMany({ email: cleanEmail });
 
       const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ token, user: { id: user._id, name: user.name, email: user.email, phone: user.phone, gender: user.gender || '', avatar: user.avatar || user.profilePicture || '', profilePicture: user.profilePicture || user.avatar || '', role: user.role, addresses: user.addresses } });
-    } else {
-      let user = memoryUsers.find(u => u.phone && (u.phone === cleanPhone || u.phone.replace(/\s+/g, '') === cleanPhone.replace(/\s+/g, '')));
-      if (!user) {
-        user = {
-          _id: 'u_' + Date.now(),
-          name: 'Customer',
-          email: 'customer@diptofashion.com',
-          phone: cleanPhone,
-          password,
-          role: 'user',
-          addresses: []
-        };
-        memoryUsers.push(user);
-      } else {
-        if (user.password !== password) {
-          return res.status(400).json({ message: 'Incorrect password entered' });
+      return res.json({
+        token,
+        user: {
+          id: user._id,
+          name: user.name,
+          email: user.email,
+          phone: user.phone,
+          gender: user.gender || '',
+          avatar: user.avatar || user.profilePicture || '',
+          profilePicture: user.profilePicture || user.avatar || '',
+          role: user.role,
+          addresses: user.addresses
         }
+      });
+    } else {
+      let user = memoryUsers.find(u => u.email === cleanEmail);
+      if (!user) {
+        user = { _id: 'u_' + Date.now(), name: 'Customer', email: cleanEmail, phone: '', role: 'user', addresses: [] };
+        memoryUsers.push(user);
       }
       const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
-      return res.json({ token, user: { id: user._id, name: user.name, email: user.email, phone: user.phone, gender: user.gender || '', avatar: user.avatar || user.profilePicture || '', profilePicture: user.profilePicture || user.avatar || '', role: user.role, addresses: user.addresses } });
+      return res.json({ token, user: { id: user._id, name: user.name, email: user.email, phone: user.phone || '', gender: '', avatar: '', role: user.role, addresses: [] } });
     }
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
 });
 
-// FORGOT PASSWORD / RESET PASSWORD ROUTE
-app.post('/api/auth/reset-password', async (req, res) => {
+// 5. FORGOT PASSWORD PRE-CHECK & OTP SENT
+app.post('/api/auth/forgot-password-check', async (req, res) => {
   try {
-    const { phone, newPassword } = req.body;
-    if (!phone || !newPassword) {
-      return res.status(400).json({ message: 'Phone number and new password are required' });
+    const { email, newPassword } = req.body;
+    if (!email || !newPassword) {
+      return res.status(400).json({ message: 'Gmail address and new password are required' });
     }
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!emailRegex.test(cleanEmail)) {
+      return res.status(400).json({ message: 'Invalid email address format' });
+    }
+
     if (newPassword.length < 8) {
       return res.status(400).json({ message: 'Password must be at least 8 characters long' });
     }
 
-    const cleanPhone = phone.trim();
+    if (isMongoConnected()) {
+      const user = await User.findOne({ email: cleanEmail });
+      if (!user) {
+        return res.status(404).json({ message: 'No registered user found with this Gmail address' });
+      }
+    }
+
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
 
     if (isMongoConnected()) {
-      const user = await User.findOne({
-        $or: [
-          { phone: cleanPhone },
-          { phone: cleanPhone.replace(/\s+/g, '') }
-        ]
-      });
+      await OTP.deleteMany({ email: cleanEmail });
+      await OTP.create({ email: cleanEmail, otp: otpCode });
+    }
+
+    try {
+      await sendOTPEmail(cleanEmail, otpCode, 'Password Reset');
+    } catch (mailErr) {
+      console.error('[NODEMAILER ERROR]', mailErr);
+      return res.status(500).json({ message: 'Failed to send OTP email. Please try again.' });
+    }
+
+    return res.json({ success: true, message: `6-digit OTP sent to ${cleanEmail}` });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+// 6. VERIFY FORGOT PASSWORD OTP & UPDATE BCRYPT HASHED PASSWORD IN MONGODB
+app.post('/api/auth/verify-reset-password', async (req, res) => {
+  try {
+    const { email, newPassword, otp } = req.body;
+    if (!email || !newPassword || !otp) {
+      return res.status(400).json({ message: 'Gmail address, new password, and 6-digit OTP are required' });
+    }
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!emailRegex.test(cleanEmail)) {
+      return res.status(400).json({ message: 'Invalid email address format' });
+    }
+
+    if (newPassword.length < 8) {
+      return res.status(400).json({ message: 'Password must be at least 8 characters long' });
+    }
+
+    if (isMongoConnected()) {
+      const otpRecord = await OTP.findOne({ email: cleanEmail, otp: otp.trim() });
+      if (!otpRecord) {
+        return res.status(400).json({ message: 'Invalid or expired OTP. Please try again.' });
+      }
+
+      const user = await User.findOne({ email: cleanEmail });
       if (!user) {
-        return res.status(404).json({ message: 'No account found with this registered phone number' });
+        return res.status(404).json({ message: 'No account found with this Gmail address' });
       }
 
       const hashedPassword = await bcrypt.hash(newPassword, 10);
       user.password = hashedPassword;
       await user.save();
 
+      await OTP.deleteMany({ email: cleanEmail });
+
       return res.json({ success: true, message: 'Password updated successfully in database' });
     } else {
-      const user = memoryUsers.find(u => u.phone && (u.phone === cleanPhone || u.phone.replace(/\s+/g, '') === cleanPhone.replace(/\s+/g, '')));
-      if (!user) {
-        return res.status(404).json({ message: 'No account found with this registered phone number' });
+      const user = memoryUsers.find(u => u.email === cleanEmail);
+      if (user) {
+        user.password = newPassword;
       }
-
-      user.password = newPassword;
       return res.json({ success: true, message: 'Password updated successfully' });
     }
   } catch (err) {
@@ -412,14 +567,6 @@ app.post('/api/auth/reset-password', async (req, res) => {
   }
 });
 
-// ============================================================
-// OTP SYSTEM — Firebase Phone Auth (Client-Side)
-// OTP sending and verification is handled entirely on the
-// frontend using Firebase signInWithPhoneNumber + RecaptchaVerifier.
-// The backend does NOT send or verify OTPs.
-// After Firebase verifies the phone, the frontend calls
-// /api/auth/register, /api/auth/login, or /api/auth/reset-password.
-// ============================================================
 
 // --- UPDATE USER PROFILE (name, gender, avatar/profilePicture — email/phone immutable) ---
 app.put(['/api/user/profile', '/api/users/profile', '/api/auth/profile'], async (req, res) => {
@@ -2489,15 +2636,17 @@ app.use((err, req, res, next) => {
 });
 
 const startServer = (portToTry) => {
-  httpServer.listen(portToTry, () => {
+  const serverInstance = httpServer.listen(portToTry, () => {
     console.log(`Dipto Fashion backend running on http://localhost:${portToTry}`);
     console.log(`[SOCKET.IO] WebSocket server ready on port ${portToTry}`);
   });
-  httpServer.on('error', (err) => {
+  
+  serverInstance.once('error', (err) => {
     if (err.code === 'EADDRINUSE') {
-     
-      console.log(`Port ${portToTry} in use, trying port ${portToTry + 1}...`);
-      startServer(portToTry + 1);
+      console.log(`Port ${portToTry} in use, closing socket and trying port ${portToTry + 1}...`);
+      serverInstance.close(() => {
+        startServer(portToTry + 1);
+      });
     } else {
       console.error('Server error:', err);
     }
@@ -2505,3 +2654,4 @@ const startServer = (portToTry) => {
 };
 
 startServer(Number(PORT) || 5000);
+

@@ -27,20 +27,21 @@ const maskPhoneNumber = (fullPhone) => {
   return clean;
 };
 
+const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
   // Modes: 'login' | 'signup' | 'forgot' | 'otp'
   const [mode, setMode] = useState('login');
   
   // State for OTP flow origin: 'login' | 'signup' | 'forgot'
   const [otpOrigin, setOtpOrigin] = useState('signup');
-  const [otpTargetPhone, setOtpTargetPhone] = useState('');
+  const [otpTargetEmail, setOtpTargetEmail] = useState('');
   const [otpValues, setOtpValues] = useState(['', '', '', '', '', '']);
   const [resendTimer, setResendTimer] = useState(30);
   const otpInputRefs = useRef([]);
 
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [countryCode, setCountryCode] = useState('+91');
 
   const [formData, setFormData] = useState({
     name: '',
@@ -56,9 +57,6 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [loading, setLoading] = useState(false);
-  const [pendingAuthData, setPendingAuthData] = useState(null);
-  const [confirmationResult, setConfirmationResult] = useState(null);
-  const recaptchaVerifierRef = useRef(null);
 
   // Automatically reset all form fields whenever the modal opens
   useEffect(() => {
@@ -66,45 +64,6 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
       resetForm();
     }
   }, [isOpen]);
-
-  // Helper: send OTP via Firebase Phone Auth
-  const sendOtpViaFirebase = async (formattedPhone) => {
-    // ─── DEV MODE: Bypass Firebase SMS ───────────────────────────────────────
-    // Comment out the block below and uncomment the Firebase block to go live.
-    const DEV_MODE_OTP = true;
-    if (DEV_MODE_OTP) {
-      console.log('[DEV MODE] Skipping Firebase SMS. OTP screen will open immediately.');
-      console.log('[DEV MODE] Accept any 6-digit code (e.g. 123456) on the next screen.');
-      setConfirmationResult('DEV_MODE'); // dummy sentinel so verify check passes
-      return;
-    }
-    // ─── END DEV MODE ────────────────────────────────────────────────────────
-
-    // ── LIVE Firebase Phone Auth (restore when billing is active) ────────────
-    // Clear any existing reCAPTCHA widget first
-    // if (recaptchaVerifierRef.current) {
-    //   try { recaptchaVerifierRef.current.clear(); } catch (_) {}
-    //   recaptchaVerifierRef.current = null;
-    // }
-    //
-    // // Ensure the invisible reCAPTCHA container exists in the DOM
-    // let container = document.getElementById('recaptcha-container');
-    // if (!container) {
-    //   container = document.createElement('div');
-    //   container.id = 'recaptcha-container';
-    //   document.body.appendChild(container);
-    // }
-    //
-    // recaptchaVerifierRef.current = new RecaptchaVerifier(auth, 'recaptcha-container', {
-    //   size: 'invisible',
-    //   callback: () => {}
-    // });
-    //
-    // const result = await signInWithPhoneNumber(auth, formattedPhone, recaptchaVerifierRef.current);
-    // setConfirmationResult(result);
-    // return result;
-    // ─────────────────────────────────────────────────────────────────────────
-  };
 
   // Resend Timer Countdown for OTP
   useEffect(() => {
@@ -118,7 +77,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
   const resetForm = () => {
     setMode('login');
     setOtpOrigin('signup');
-    setOtpTargetPhone('');
+    setOtpTargetEmail('');
     setOtpValues(['', '', '', '', '', '']);
     setResendTimer(30);
     setFormData({
@@ -135,12 +94,6 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     setSuccessMsg('');
     setShowPassword(false);
     setShowConfirmPassword(false);
-    setPendingAuthData(null);
-    setConfirmationResult(null);
-    if (recaptchaVerifierRef.current) {
-      try { recaptchaVerifierRef.current.clear(); } catch (_) {}
-      recaptchaVerifierRef.current = null;
-    }
   };
 
   if (!isOpen) return null;
@@ -158,7 +111,12 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
 
     if (mode === 'signup') {
       if (!formData.name.trim()) errors.name = 'Full Name is required';
-      if (!formData.email.trim()) errors.email = 'Email Address is required';
+
+      if (!formData.email.trim()) {
+        errors.email = 'Email Address is required';
+      } else if (!emailRegex.test(formData.email.trim())) {
+        errors.email = 'Please enter a valid email format (e.g., user@domain.com)';
+      }
       
       const cleanPhone = formData.phone.trim().replace(/\D/g, '');
       if (!cleanPhone) {
@@ -179,11 +137,10 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         errors.confirmPassword = 'Passwords do not match';
       }
     } else if (mode === 'login') {
-      const cleanPhone = formData.phone.trim().replace(/\D/g, '');
-      if (!cleanPhone) {
-        errors.phone = 'Mobile Number is required';
-      } else if (cleanPhone.length !== 10) {
-        errors.phone = 'Mobile Number must be exactly 10 digits';
+      if (!formData.email.trim()) {
+        errors.email = 'Gmail Address is required';
+      } else if (!emailRegex.test(formData.email.trim())) {
+        errors.email = 'Please enter a valid email format (e.g., user@domain.com)';
       }
 
       if (!formData.password) {
@@ -192,9 +149,10 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         errors.password = 'Password must be at least 8 characters';
       }
     } else if (mode === 'forgot') {
-      const cleanPhone = formData.phone.trim().replace(/\D/g, '');
-      if (!formData.phone.trim() || cleanPhone.length < 7 || cleanPhone.length > 15) {
-        errors.phone = 'Registered Mobile Number is required';
+      if (!formData.email.trim()) {
+        errors.email = 'Registered Gmail Address is required';
+      } else if (!emailRegex.test(formData.email.trim())) {
+        errors.email = 'Please enter a valid email format (e.g., user@domain.com)';
       }
 
       if (!formData.newPassword) {
@@ -215,7 +173,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
   };
 
   // -------------------------------------------------------------
-  // Form Submit Handler (Triggers Firebase OTP Flow)
+  // Form Submit Handler (Triggers Nodemailer OTP Generation & Sending)
   // -------------------------------------------------------------
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -225,76 +183,54 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     if (!validateForm()) return;
 
     setLoading(true);
-
-    const cleanRawPhone = formData.phone.trim().replace(/\D/g, '');
-    const formattedPhone = countryCode && !formData.phone.trim().startsWith('+')
-      ? `${countryCode}${cleanRawPhone}`
-      : formData.phone.trim();
+    const cleanEmail = formData.email.trim().toLowerCase();
 
     try {
       if (mode === 'signup') {
-        // Pre-check signup credentials (email/phone uniqueness) WITHOUT creating database record
-        const payload = {
-          name: formData.name.trim(),
-          email: formData.email.trim(),
-          password: formData.password,
-          phone: formattedPhone
-        };
-
-        const res = await fetch(`${API_URL}/api/auth/pre-check-signup`, {
+        const res = await fetch(`${API_URL}/api/auth/send-otp`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({ email: cleanEmail, type: 'signup' })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Signup validation failed');
+        if (!res.ok) throw new Error(data.message || 'Failed to send OTP to Gmail');
 
-        // Send OTP via Firebase Phone Auth
-        await sendOtpViaFirebase(formattedPhone);
-
-        setPendingAuthData({ type: 'signup', payload });
-        setOtpTargetPhone(formattedPhone);
+        setOtpTargetEmail(cleanEmail);
         setOtpOrigin('signup');
         setOtpValues(['', '', '', '', '', '']);
         setResendTimer(30);
         setMode('otp');
+        setSuccessMsg(`A 6-digit OTP code has been sent to ${cleanEmail}`);
       } else if (mode === 'login') {
-        const payload = {
-          phone: formattedPhone,
-          password: formData.password
-        };
-
-        const res = await fetch(`${API_URL}/api/auth/login`, {
+        const res = await fetch(`${API_URL}/api/auth/login-check`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
+          body: JSON.stringify({ email: cleanEmail, password: formData.password })
         });
         const data = await res.json();
         if (!res.ok) throw new Error(data.message || 'Login failed');
 
-        // Send OTP via Firebase Phone Auth
-        await sendOtpViaFirebase(formattedPhone);
-
-        setPendingAuthData({ type: 'login', data });
-        setOtpTargetPhone(formattedPhone);
+        setOtpTargetEmail(cleanEmail);
         setOtpOrigin('login');
         setOtpValues(['', '', '', '', '', '']);
         setResendTimer(30);
         setMode('otp');
+        setSuccessMsg(`Credentials verified! A 6-digit OTP code has been sent to ${cleanEmail}`);
       } else if (mode === 'forgot') {
-        // Send OTP via Firebase Phone Auth
-        await sendOtpViaFirebase(formattedPhone);
-
-        setPendingAuthData({
-          type: 'forgot',
-          phone: formattedPhone,
-          newPassword: formData.newPassword
+        const res = await fetch(`${API_URL}/api/auth/forgot-password-check`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email: cleanEmail, newPassword: formData.newPassword })
         });
-        setOtpTargetPhone(formattedPhone);
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Failed to process request');
+
+        setOtpTargetEmail(cleanEmail);
         setOtpOrigin('forgot');
         setOtpValues(['', '', '', '', '', '']);
         setResendTimer(30);
         setMode('otp');
+        setSuccessMsg(`A 6-digit OTP code has been sent to ${cleanEmail}`);
       }
     } catch (err) {
       setError(err.message);
@@ -304,7 +240,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
   };
 
   // -------------------------------------------------------------
-  // OTP Verification Handler (Firebase confirmationResult.confirm)
+  // OTP Verification Handler (Verifies 6-digit OTP with Backend)
   // -------------------------------------------------------------
   const handleVerifyOtp = async (e) => {
     e.preventDefault();
@@ -316,92 +252,74 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
       return;
     }
 
-    if (!confirmationResult) {
-      setError('OTP session expired. Please go back and request a new OTP.');
-      return;
-    }
-
     setLoading(true);
 
-    try {
-      // ─── DEV MODE: Accept any 6-digit code ─────────────────────────────────
-      if (confirmationResult === 'DEV_MODE') {
-        console.log('[DEV MODE] OTP accepted without Firebase verification.');
-        // Falls through to the success logic below — no Firebase call made.
-      } else {
-        // ── LIVE: Verify OTP via Firebase (restore when billing is active) ────
-        // await confirmationResult.confirm(otpCode);
-        // ─────────────────────────────────────────────────────────────────────
-        await confirmationResult.confirm(otpCode);
+    const sanitizeForStorage = (u) => {
+      if (!u) return u;
+      const clone = { ...u };
+      if (clone.avatar && clone.avatar.startsWith('data:')) {
+        clone.avatar = '';
       }
-      // ─── END DEV MODE ──────────────────────────────────────────────────────
+      if (clone.profilePicture && clone.profilePicture.startsWith('data:')) {
+        clone.profilePicture = '';
+      }
+      return clone;
+    };
 
+    try {
       if (otpOrigin === 'signup') {
-        // ONLY AFTER OTP VERIFICATION: Register user and save to database
-        const res = await fetch(`${API_URL}/api/auth/register`, {
+        const res = await fetch(`${API_URL}/api/auth/verify-signup`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(pendingAuthData.payload)
+          body: JSON.stringify({
+            name: formData.name.trim(),
+            email: otpTargetEmail,
+            phone: formData.phone.trim(),
+            password: formData.password,
+            otp: otpCode
+          })
         });
         const data = await res.json();
-        if (!res.ok) throw new Error(data.message || 'Registration failed');
-
-        // Create a lightweight user clone for localStorage (stripping heavy base64 strings)
-        const sanitizeForStorage = (u) => {
-          if (!u) return u;
-          const clone = { ...u };
-          if (clone.avatar && clone.avatar.startsWith('data:')) {
-            clone.avatar = '';
-          }
-          if (clone.profilePicture && clone.profilePicture.startsWith('data:')) {
-            clone.profilePicture = '';
-          }
-          return clone;
-        };
+        if (!res.ok) throw new Error(data.message || 'Signup verification failed');
 
         try {
           localStorage.setItem('df_token', data.token);
           localStorage.setItem('df_user', JSON.stringify(sanitizeForStorage(data.user)));
         } catch (e) {
-          console.warn('LocalStorage limit reached when saving user session, keeping session in memory.', e);
+          console.warn('LocalStorage error:', e);
         }
 
         onAuthSuccess(data.user);
         onClose();
       } else if (otpOrigin === 'login') {
-        if (pendingAuthData && pendingAuthData.data && pendingAuthData.data.token) {
-          const sanitizeForStorage = (u) => {
-            if (!u) return u;
-            const clone = { ...u };
-            if (clone.avatar && clone.avatar.startsWith('data:')) {
-              clone.avatar = '';
-            }
-            if (clone.profilePicture && clone.profilePicture.startsWith('data:')) {
-              clone.profilePicture = '';
-            }
-            return clone;
-          };
-
-          try {
-            localStorage.setItem('df_token', pendingAuthData.data.token);
-            localStorage.setItem('df_user', JSON.stringify(sanitizeForStorage(pendingAuthData.data.user)));
-          } catch (e) {
-            console.warn('LocalStorage limit reached when saving user session, keeping session in memory.', e);
-          }
-
-          onAuthSuccess(pendingAuthData.data.user);
-          onClose();
-        } else {
-          throw new Error('Authentication state invalid. Please try again.');
-        }
-      } else if (otpOrigin === 'forgot') {
-        // Call backend reset-password endpoint
-        const res = await fetch(`${API_URL}/api/auth/reset-password`, {
+        const res = await fetch(`${API_URL}/api/auth/verify-login-otp`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            phone: pendingAuthData.phone,
-            newPassword: pendingAuthData.newPassword
+            email: otpTargetEmail,
+            otp: otpCode
+          })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.message || 'Login OTP verification failed');
+
+        try {
+          localStorage.setItem('df_token', data.token);
+          localStorage.setItem('df_user', JSON.stringify(sanitizeForStorage(data.user)));
+        } catch (e) {
+          console.warn('LocalStorage error:', e);
+        }
+
+        onAuthSuccess(data.user);
+        onClose();
+      } else if (otpOrigin === 'forgot') {
+        const res = await fetch(`${API_URL}/api/auth/verify-reset-password`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            email: otpTargetEmail,
+            newPassword: formData.newPassword,
+            otp: otpCode
           })
         });
         const data = await res.json();
@@ -445,13 +363,20 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     setResendTimer(30);
     setError('');
     try {
-      await sendOtpViaFirebase(otpTargetPhone);
-      setSuccessMsg('A new 6-digit OTP has been sent to your mobile number!');
+      const res = await fetch(`${API_URL}/api/auth/send-otp`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: otpTargetEmail, type: otpOrigin })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message || 'Failed to resend OTP');
+      setSuccessMsg(`A new 6-digit OTP has been sent to ${otpTargetEmail}`);
       setTimeout(() => setSuccessMsg(''), 3000);
     } catch (err) {
       setError(err.message || 'Failed to resend OTP. Please try again.');
     }
   };
+
 
   const inputStyle = (hasError) => ({
     width: '100%',
@@ -615,7 +540,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
                     Enter 6-Digit OTP
                   </h3>
                   <p style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '0.35rem' }}>
-                    OTP sent to <strong style={{ color: '#c026d3' }}>{maskPhoneNumber(otpTargetPhone)}</strong>
+                    OTP sent to <strong style={{ color: '#c026d3' }}>{otpTargetEmail}</strong>
                   </p>
                 </div>
 
@@ -665,7 +590,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
                     onClick={() => { setMode(otpOrigin); setError(''); }}
                     style={{ background: 'none', border: 'none', color: '#475569', fontWeight: '700', cursor: 'pointer', textDecoration: 'underline' }}
                   >
-                    Change Phone Number
+                    Change Email Address
                   </button>
                 </div>
 
@@ -699,41 +624,20 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
               <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 <div className="form-group" style={{ margin: 0 }}>
                   <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
-                    Registered Mobile Number *
+                    Registered Gmail Address *
                   </label>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <select
-                      value={countryCode}
-                      onChange={(e) => setCountryCode(e.target.value)}
-                      style={{
-                        width: '105px',
-                        height: '46px',
-                        borderRadius: '8px',
-                        border: '1.5px solid #cbd5e1',
-                        background: '#f8fafc',
-                        fontSize: '0.82rem',
-                        fontWeight: '600',
-                        padding: '0 0.4rem',
-                        outline: 'none'
-                      }}
-                    >
-                      {COUNTRY_CODES.map((c) => (
-                        <option key={c.code} value={c.code}>{c.code} ({c.country})</option>
-                      ))}
-                    </select>
-                    <div style={{ position: 'relative', flex: 1 }}>
-                      <input
-                        type="text"
-                        name="phone"
-                        placeholder="Mobile Number"
-                        value={formData.phone}
-                        onChange={handleChange}
-                        style={{ ...inputStyle(fieldErrors.phone), width: '100%' }}
-                      />
-                      <Phone size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                    </div>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="email"
+                      name="email"
+                      placeholder="user@domain.com"
+                      value={formData.email}
+                      onChange={handleChange}
+                      style={{ ...inputStyle(fieldErrors.email), width: '100%' }}
+                    />
+                    <Mail size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                   </div>
-                  {fieldErrors.phone && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.phone}</span>}
+                  {fieldErrors.email && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.email}</span>}
                 </div>
 
                 <div className="form-group" style={{ margin: 0 }}>
@@ -786,8 +690,6 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
                   {fieldErrors.confirmNewPassword && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.confirmNewPassword}</span>}
                 </div>
 
-
-
                 <button
                   type="submit"
                   className="btn-primary blink-green auth-submit-btn"
@@ -807,95 +709,75 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
                   }}
                   disabled={loading}
                 >
-                  {loading ? 'SAVING...' : 'SAVE & VERIFY OTP'}
+                  {loading ? 'SENDING OTP...' : 'SEND OTP'}
                 </button>
               </form>
             ) : (
               /* MODE 3 & 4: LOGIN & SIGNUP VIEWS */
               <form onSubmit={handleSubmit} noValidate style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
                 {mode === 'signup' && (
-                  <>
-                    <div className="form-group" style={{ margin: 0 }}>
-                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
-                        Enter Full Name *
-                      </label>
-                      <div style={{ position: 'relative' }}>
-                        <input
-                          type="text"
-                          name="name"
-                          placeholder="Full Name"
-                          value={formData.name}
-                          onChange={handleChange}
-                          autoComplete="off"
-                          style={inputStyle(fieldErrors.name)}
-                        />
-                        <User size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                      </div>
-                      {fieldErrors.name && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.name}</span>}
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
+                      Enter Full Name *
+                    </label>
+                    <div style={{ position: 'relative' }}>
+                      <input
+                        type="text"
+                        name="name"
+                        placeholder="Full Name"
+                        value={formData.name}
+                        onChange={handleChange}
+                        autoComplete="off"
+                        style={inputStyle(fieldErrors.name)}
+                      />
+                      <User size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                     </div>
-
-                    <div className="form-group" style={{ margin: 0 }}>
-                      <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
-                        Enter Email Address *
-                      </label>
-                      <div style={{ position: 'relative' }}>
-                        <input
-                          type="email"
-                          name="email"
-                          placeholder="name@example.com"
-                          value={formData.email}
-                          onChange={handleChange}
-                          autoComplete="off"
-                          style={inputStyle(fieldErrors.email)}
-                        />
-                        <Mail size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
-                      </div>
-                      {fieldErrors.email && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.email}</span>}
-                    </div>
-                  </>
+                    {fieldErrors.name && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.name}</span>}
+                  </div>
                 )}
 
-                {/* PHONE NUMBER FIELD FOR LOGIN & SIGNUP */}
+                {/* EMAIL FIELD FOR LOGIN & SIGNUP */}
                 <div className="form-group" style={{ margin: 0 }}>
                   <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
-                    {mode === 'login' ? 'Enter Registered Mobile Number *' : 'Enter Mobile Number *'}
+                    {mode === 'login' ? 'Enter Registered Gmail *' : 'Enter Gmail Address *'}
                   </label>
-                  <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <select
-                      value={countryCode}
-                      onChange={(e) => setCountryCode(e.target.value)}
-                      style={{
-                        width: '105px',
-                        height: '46px',
-                        borderRadius: '8px',
-                        border: '1.5px solid #cbd5e1',
-                        background: '#f8fafc',
-                        fontSize: '0.82rem',
-                        fontWeight: '600',
-                        padding: '0 0.4rem',
-                        outline: 'none'
-                      }}
-                    >
-                      {COUNTRY_CODES.map((c) => (
-                        <option key={c.code} value={c.code}>{c.code} ({c.country})</option>
-                      ))}
-                    </select>
-                    <div style={{ position: 'relative', flex: 1 }}>
+                  <div style={{ position: 'relative' }}>
+                    <input
+                      type="email"
+                      name="email"
+                      placeholder="user@domain.com"
+                      value={formData.email}
+                      onChange={handleChange}
+                      autoComplete="off"
+                      style={inputStyle(fieldErrors.email)}
+                    />
+                    <Mail size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
+                  </div>
+                  {fieldErrors.email && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.email}</span>}
+                </div>
+
+                {/* MOBILE NUMBER FIELD FOR SIGNUP */}
+                {mode === 'signup' && (
+                  <div className="form-group" style={{ margin: 0 }}>
+                    <label style={{ fontSize: '0.82rem', fontWeight: '700', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
+                      Enter Mobile Number *
+                    </label>
+                    <div style={{ position: 'relative' }}>
                       <input
                         type="text"
                         name="phone"
-                        placeholder="Mobile Phone Number"
+                        placeholder="10-digit mobile number"
                         value={formData.phone}
                         onChange={handleChange}
                         inputMode="numeric"
                         maxLength={10}
-                        style={{ ...inputStyle(fieldErrors.phone), width: '100%' }}
+                        style={inputStyle(fieldErrors.phone)}
                       />
                       <Phone size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
                     </div>
+                    {fieldErrors.phone && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.phone}</span>}
                   </div>
-                  {fieldErrors.phone && <span style={{ color: '#ef4444', fontSize: '0.75rem', marginTop: '3px', display: 'block', fontWeight: '600' }}>{fieldErrors.phone}</span>}
-                </div>
+                )}
 
                 {/* PASSWORD FIELD */}
                 <div className="form-group" style={{ margin: 0 }}>
@@ -972,8 +854,6 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
                   <span style={{ color: '#c026d3', fontWeight: '700', cursor: 'pointer' }}>Terms of Use</span> and{' '}
                   <span style={{ color: '#c026d3', fontWeight: '700', cursor: 'pointer' }}>Privacy Policy</span>.
                 </p>
-
-
 
                 <button
                   type="submit"
