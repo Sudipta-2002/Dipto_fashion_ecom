@@ -1,6 +1,7 @@
 const getSanitizedApiUrl = () => {
-  let url = import.meta.env.VITE_API_URL || 'https://dipto-fashion-backend.onrender.com';
+  let url = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:5000' : 'https://dipto-fashion-backend.onrender.com');
   url = url.trim();
+
 
   // Fix protocol typo with missing slash (e.g., https:/ vs https://)
   if (url.startsWith('https:/') && !url.startsWith('https://')) {
