@@ -161,8 +161,10 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
       if (!formData.email.trim()) errors.email = 'Email Address is required';
       
       const cleanPhone = formData.phone.trim().replace(/\D/g, '');
-      if (!cleanPhone || cleanPhone.length < 7 || cleanPhone.length > 15) {
-        errors.phone = 'Valid Mobile Number is required';
+      if (!cleanPhone) {
+        errors.phone = 'Mobile Number is required';
+      } else if (cleanPhone.length !== 10) {
+        errors.phone = 'Mobile Number must be exactly 10 digits';
       }
 
       if (!formData.password) {
@@ -178,14 +180,16 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
       }
     } else if (mode === 'login') {
       const cleanPhone = formData.phone.trim().replace(/\D/g, '');
-      if (!formData.phone.trim() || cleanPhone.length < 7 || cleanPhone.length > 15) {
-        errors.phone = 'Enter registered Mobile Number';
+      if (!cleanPhone) {
+        errors.phone = 'Mobile Number is required';
+      } else if (cleanPhone.length !== 10) {
+        errors.phone = 'Mobile Number must be exactly 10 digits';
       }
 
       if (!formData.password) {
         errors.password = 'Password is required';
       } else if (formData.password.length < 8) {
-        errors.password = 'Password must be at least 8 characters long';
+        errors.password = 'Password must be at least 8 characters';
       }
     } else if (mode === 'forgot') {
       const cleanPhone = formData.phone.trim().replace(/\D/g, '');
