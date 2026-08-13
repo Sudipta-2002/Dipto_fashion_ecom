@@ -8,6 +8,7 @@ import {
   RotateCcw,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   Ruler,
   Maximize2,
   AlertCircle,
@@ -43,6 +44,7 @@ const ProductDetailModal = ({
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isSizeChartOpen, setIsSizeChartOpen] = useState(false);
   const [isFullViewOpen, setIsFullViewOpen] = useState(false);
+  const [isDetailsExpanded, setIsDetailsExpanded] = useState(true);
 
   // Available Sizes Calculation
   const sizesList = (product?.availableSizes && product.availableSizes.length > 0)
@@ -57,6 +59,7 @@ const ProductDetailModal = ({
       setActiveImageIndex(0);
       setIsFullViewOpen(false);
       setSizeError(false);
+      setIsDetailsExpanded(true);
       // Default to first size if available, or force pick if multiple
       setSelectedSize(sizesList.length === 1 ? sizesList[0] : '');
 
@@ -240,13 +243,16 @@ const ProductDetailModal = ({
                 overflow: 'hidden',
                 background: '#f8fafc',
                 border: '1.5px solid #e2e8f0',
-                boxShadow: '0 10px 30px rgba(0,0,0,0.06)'
+                boxShadow: '0 10px 30px rgba(0,0,0,0.06)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
               }}
             >
               <img
                 src={currentImage}
                 alt={name}
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                style={{ width: '100%', height: '100%', objectFit: 'contain' }}
               />
 
               {/* Fullscreen view overlay button */}
@@ -456,10 +462,76 @@ const ProductDetailModal = ({
               )}
             </div>
 
-            {/* DESCRIPTION */}
-            <p style={{ fontSize: '0.9rem', color: '#475569', lineHeight: '1.6', marginBottom: '1.25rem' }}>
-              {description || 'Exclusive designer collection by Dipto Fashion. High-quality fabric, authentic craftsmanship, and vibrant style.'}
-            </p>
+            {/* EXPANDABLE PRODUCT DETAILS ACCORDION / DROPDOWN */}
+            <div
+              style={{
+                border: '1.5px solid #e2e8f0',
+                borderRadius: '14px',
+                backgroundColor: '#ffffff',
+                marginBottom: '1.25rem',
+                overflow: 'hidden',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.03)',
+                transition: 'all 0.3s ease'
+              }}
+            >
+              <button
+                type="button"
+                onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                  padding: '0.9rem 1.1rem',
+                  backgroundColor: isDetailsExpanded ? '#fdf4ff' : '#f8fafc',
+                  border: 'none',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  transition: 'background-color 0.2s ease',
+                  borderBottom: isDetailsExpanded ? '1px solid #f5d0fe' : 'none'
+                }}
+                aria-expanded={isDetailsExpanded}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                  <Sparkles size={18} color="#c026d3" />
+                  <span style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a', letterSpacing: '0.2px' }}>
+                    All Details & Product Specifications
+                  </span>
+                </div>
+                <div
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    width: '28px',
+                    height: '28px',
+                    borderRadius: '50%',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #cbd5e1',
+                    transform: isDetailsExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
+                    transition: 'transform 0.3s ease'
+                  }}
+                >
+                  <ChevronDown size={16} color="#475569" />
+                </div>
+              </button>
+
+              {isDetailsExpanded && (
+                <div
+                  style={{
+                    padding: '1.1rem 1.25rem',
+                    fontSize: '0.92rem',
+                    color: '#334155',
+                    lineHeight: '1.75',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    backgroundColor: '#ffffff'
+                  }}
+                >
+                  {description || 'Exclusive designer collection by Dipto Fashion. High-quality fabric, authentic craftsmanship, and vibrant style.'}
+                </div>
+              )}
+            </div>
 
             {/* Features list */}
             {(() => {
