@@ -15,6 +15,9 @@ import AdminPanel from './components/Admin/AdminPanel';
 import MobileBottomNav from './components/MobileBottomNav';
 import ProductGridSkeleton from './components/Skeletons/ProductGridSkeleton';
 import ProductFilterModal from './components/ProductFilterModal';
+import Footer from './components/Footer';
+import AboutUsModal from './components/AboutUsModal';
+import TermsPrivacyModal from './components/TermsPrivacyModal';
 import { SlidersHorizontal, X, RotateCcw, Filter } from 'lucide-react';
 import { fetchWithCache } from './utils/cache';
 import { API_URL, apiFetch, parseResponseSafely } from './api';
@@ -56,6 +59,9 @@ function App() {
 
   // Store Notifications & Real-Time SSE Listener
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isAboutUsOpen, setIsAboutUsOpen] = useState(false);
+  const [isTermsOpen, setIsTermsOpen] = useState(false);
+  const [termsTab, setTermsTab] = useState('privacy');
   const [notifications, setNotifications] = useState([]);
   const [readNotificationIds, setReadNotificationIds] = useState(() => {
     const saved = localStorage.getItem('df_read_notifications');
@@ -966,16 +972,18 @@ function App() {
       {currentView === 'admin' ? (
         <AdminPanel onExitAdmin={() => setView('shop')} />
       ) : (
-        <div className="main-layout">
-          {/* Left Category Sidebar */}
-          <CategorySidebar
-            categories={categories}
-            selectedCategory={selectedCategory}
-            onSelectCategory={(catName) => setSelectedCategory(catName)}
-          />
+        <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', width: '100%' }}>
+          {/* Top Section: Sidebar + Main Products Grid */}
+          <div className="main-layout" style={{ flex: '1 0 auto' }}>
+            {/* Left Category Sidebar */}
+            <CategorySidebar
+              categories={categories}
+              selectedCategory={selectedCategory}
+              onSelectCategory={(catName) => setSelectedCategory(catName)}
+            />
 
-          {/* Products Grid */}
-          <main className="products-section">
+            {/* Products Grid */}
+            <main className="products-section">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
               <h2>
                 <span>{selectedCategory === 'All' ? 'All Collections' : selectedCategory}</span>
@@ -1152,7 +1160,17 @@ function App() {
             )}
           </main>
         </div>
-      )}
+
+        {/* STOREFRONT FOOTER - OUTSIDE MAIN-LAYOUT GRID */}
+        <Footer
+          onOpenAboutUs={() => setIsAboutUsOpen(true)}
+          onOpenTermsPrivacy={(tab) => {
+            setTermsTab(tab);
+            setIsTermsOpen(true);
+          }}
+        />
+      </div>
+    )}
 
       {/* Product Detail Modal */}
       <ProductDetailModal
@@ -1288,6 +1306,19 @@ function App() {
         currentFilters={appliedFilters}
         onApplyFilters={(newFilters) => setAppliedFilters(newFilters)}
         onResetFilters={() => setAppliedFilters(DEFAULT_FILTERS)}
+      />
+
+      {/* About Us Modal */}
+      <AboutUsModal
+        isOpen={isAboutUsOpen}
+        onClose={() => setIsAboutUsOpen(false)}
+      />
+
+      {/* Terms & Privacy Policy Modal */}
+      <TermsPrivacyModal
+        isOpen={isTermsOpen}
+        onClose={() => setIsTermsOpen(false)}
+        initialTab={termsTab}
       />
     </div>
   );

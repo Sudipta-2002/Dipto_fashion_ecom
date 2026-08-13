@@ -1391,10 +1391,26 @@ table.admin-table th {
     -webkit-overflow-scrolling: touch;
   }
 
+  .about-us-modal-body {
+    padding-bottom: 1.5rem !important;
+    overflow-y: auto !important;
+    -webkit-overflow-scrolling: touch;
+  }
+
   /* Add padding at the bottom of main body so content is not hidden behind the fixed bottom navbar */
   body, main, .main-layout-container, .footer {
     padding-bottom: calc(50px + env(safe-area-inset-bottom)) !important;
   }
+}
+
+/* FULL-WIDTH FOOTER UNCONSTRAINED RULE */
+footer.footer {
+  width: 100% !important;
+  max-width: 100% !important;
+  box-sizing: border-box;
+  flex-shrink: 0;
+  margin-left: 0 !important;
+  margin-right: 0 !important;
 }
 
 

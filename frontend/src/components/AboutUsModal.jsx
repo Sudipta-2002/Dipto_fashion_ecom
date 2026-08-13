@@ -13,8 +13,8 @@ import {
   Phone,
   Mail,
   ShoppingBag,
-  ArrowLeft
 } from 'lucide-react';
+import Footer from './Footer';
 
 const AboutUsModal = ({ isOpen, onClose }) => {
   if (!isOpen) return null;
@@ -95,10 +95,12 @@ const AboutUsModal = ({ isOpen, onClose }) => {
 
         {/* SCROLLABLE BODY */}
         <div
-          className="modal-body"
+          className="about-us-modal-body"
           style={{
             padding: '1.25rem',
+            paddingBottom: '1.5rem',
             overflowY: 'auto',
+            flex: 1,
             display: 'flex',
             flexDirection: 'column',
             gap: '1.25rem',
@@ -115,68 +117,57 @@ const AboutUsModal = ({ isOpen, onClose }) => {
               boxShadow: '0 2px 8px rgba(192, 38, 211, 0.06)'
             }}
           >
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.65rem' }}>
-              <Award size={20} color="#c026d3" />
-              <h3 style={{ fontSize: '1.05rem', fontWeight: '800', color: '#701a75', margin: 0 }}>
-                Our Heritage & Vision
-              </h3>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.65rem', color: '#701a75', fontWeight: '800', fontSize: '0.95rem' }}>
+              <Heart size={18} color="#c026d3" fill="#c026d3" />
+              <span>Our Story & Commitment</span>
             </div>
             <p style={{ fontSize: '0.88rem', color: '#475569', lineHeight: '1.65', margin: 0 }}>
-              Welcome to <strong>Dipto Fashion</strong> — your premier destination for authentic Indian ethnic apparel.
-              We specialize in exquisite Kanjivaram & Banarasi Silk Sarees, designer Punjabi suits, embroidered Kurtas,
-              and contemporary women’s wear. Every garment in our collection is handpicked for exceptional fabric quality,
-              vibrant color palettes, and intricate craftsmanship.
+              Welcome to <strong>Dipto Fashion</strong>, your trusted destination for authentic royal ethnic wear, Banarasi sarees, and designer festive outfits. We blend traditional Indian heritage with modern elegance to bring you high-quality fabrics, exquisite embroideries, and handpicked collections for every occasion.
             </p>
           </div>
 
-          {/* 4 CORE VALUE PILLARS */}
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
-              gap: '0.75rem'
-            }}
-          >
-            <div style={{ background: '#fdf4ff', border: '1px solid #f5d0fe', padding: '0.85rem', borderRadius: '12px', textAlign: 'center' }}>
-              <ShieldCheck size={26} color="#c026d3" style={{ margin: '0 auto 0.4rem' }} />
-              <div style={{ fontSize: '0.82rem', fontWeight: '800', color: '#701a75' }}>100% Authentic</div>
-              <div style={{ fontSize: '0.72rem', color: '#a855f7', marginTop: '2px' }}>Genuine Weaver Quality</div>
+          {/* BRAND HIGHLIGHTS GRID */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: '0.75rem' }}>
+            <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.85rem', textAlign: 'center' }}>
+              <Award size={24} color="#c026d3" style={{ margin: '0 auto 0.35rem' }} />
+              <div style={{ fontSize: '0.82rem', fontWeight: '800', color: '#0f172a' }}>100% Authentic</div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Premium Quality</div>
             </div>
 
-            <div style={{ background: '#eff6ff', border: '1px solid #bfdbfe', padding: '0.85rem', borderRadius: '12px', textAlign: 'center' }}>
-              <Truck size={26} color="#2563eb" style={{ margin: '0 auto 0.4rem' }} />
-              <div style={{ fontSize: '0.82rem', fontWeight: '800', color: '#1e40af' }}>Express Shipping</div>
-              <div style={{ fontSize: '0.72rem', color: '#3b82f6', marginTop: '2px' }}>Fast Delivery Across India</div>
+            <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.85rem', textAlign: 'center' }}>
+              <Truck size={24} color="#0284c7" style={{ margin: '0 auto 0.35rem' }} />
+              <div style={{ fontSize: '0.82rem', fontWeight: '800', color: '#0f172a' }}>Fast Shipping</div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>All-India Delivery</div>
             </div>
 
-            <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', padding: '0.85rem', borderRadius: '12px', textAlign: 'center' }}>
-              <RotateCcw size={26} color="#16a34a" style={{ margin: '0 auto 0.4rem' }} />
-              <div style={{ fontSize: '0.82rem', fontWeight: '800', color: '#15803d' }}>7-Day Returns</div>
-              <div style={{ fontSize: '0.72rem', color: '#22c55e', marginTop: '2px' }}>Easy Pickup Guarantee</div>
+            <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.85rem', textAlign: 'center' }}>
+              <RotateCcw size={24} color="#16a34a" style={{ margin: '0 auto 0.35rem' }} />
+              <div style={{ fontSize: '0.82rem', fontWeight: '800', color: '#0f172a' }}>7-Day Returns</div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Easy Replacement</div>
             </div>
 
-            <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', padding: '0.85rem', borderRadius: '12px', textAlign: 'center' }}>
-              <Heart size={26} color="#ea580c" style={{ margin: '0 auto 0.4rem' }} />
-              <div style={{ fontSize: '0.82rem', fontWeight: '800', color: '#c2410c' }}>10K+ Happy Shoppers</div>
-              <div style={{ fontSize: '0.72rem', color: '#f97316', marginTop: '2px' }}>Verified High Ratings</div>
+            <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: '12px', padding: '0.85rem', textAlign: 'center' }}>
+              <ShieldCheck size={24} color="#d97706" style={{ margin: '0 auto 0.35rem' }} />
+              <div style={{ fontSize: '0.82rem', fontWeight: '800', color: '#0f172a' }}>Safe Payments</div>
+              <div style={{ fontSize: '0.72rem', color: '#64748b' }}>Razorpay Secured</div>
             </div>
           </div>
 
-          {/* WHY CHOOSE DIPTO FASHION */}
+          {/* WHY CHOOSE US */}
           <div
             style={{
               background: 'white',
-              border: '1.5px solid #e2e8f0',
+              border: '1px solid #e2e8f0',
               borderRadius: '16px',
-              padding: '1.25rem'
+              padding: '1.1rem'
             }}
           >
-            <h4 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.85rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <CheckCircle2 size={18} color="#16a34a" /> Why Shop With Dipto Fashion?
-            </h4>
-            <ul style={{ margin: 0, paddingLeft: '1.1rem', fontSize: '0.85rem', color: '#475569', display: 'flex', flexDirection: 'column', gap: '0.55rem', lineHeight: '1.5' }}>
-              <li><strong>Direct Manufacturer Pricing:</strong> Premium sarees and Punjabi suits at wholesale prices.</li>
-              <li><strong>Rigorous Quality Check:</strong> Every saree & suit undergoes a 3-step quality inspection before dispatch.</li>
+            <div style={{ fontSize: '0.92rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+              <CheckCircle2 size={18} color="#16a34a" /> Why Shop with Dipto Fashion?
+            </div>
+            <ul style={{ paddingLeft: '1.2rem', margin: 0, fontSize: '0.85rem', color: '#475569', lineHeight: '1.7' }}>
+              <li><strong>Curated Collections:</strong> Banarasi Sarees, Royal Kurtas, Anarkalis & Festive Wear.</li>
+              <li><strong>Direct Customer Pricing:</strong> Unmatched value with high-grade fabrics and stitching.</li>
               <li><strong>Secure Razorpay Payments:</strong> 100% safe online payment gateways + Cash on Delivery options.</li>
               <li><strong>Instant AI & Customer Support:</strong> 24/7 shopping assistance for sizing, order tracking, and queries.</li>
             </ul>
@@ -201,8 +192,13 @@ const AboutUsModal = ({ isOpen, onClose }) => {
               <MapPin size={16} color="#c026d3" /> <span>Dipto Fashion Outlet & Online Store, India</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', fontSize: '0.83rem', color: '#475569' }}>
-              <Mail size={16} color="#c026d3" /> <span>support@diptofashion.com</span>
+              <Mail size={16} color="#c026d3" /> <span>support@diptofashion.in</span>
             </div>
+          </div>
+
+          {/* INTEGRATED FULL FOOTER */}
+          <div style={{ margin: '1rem -1.25rem -1.25rem -1.25rem' }}>
+            <Footer isEmbedded={true} />
           </div>
         </div>
 

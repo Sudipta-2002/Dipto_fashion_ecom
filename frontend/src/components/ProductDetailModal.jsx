@@ -44,7 +44,7 @@ const ProductDetailModal = ({
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [isSizeChartOpen, setIsSizeChartOpen] = useState(false);
   const [isFullViewOpen, setIsFullViewOpen] = useState(false);
-  const [isDetailsExpanded, setIsDetailsExpanded] = useState(true);
+  const [isDetailsExpanded, setIsDetailsExpanded] = useState(false);
 
   // Available Sizes Calculation
   const sizesList = (product?.availableSizes && product.availableSizes.length > 0)
@@ -59,7 +59,7 @@ const ProductDetailModal = ({
       setActiveImageIndex(0);
       setIsFullViewOpen(false);
       setSizeError(false);
-      setIsDetailsExpanded(true);
+      setIsDetailsExpanded(false);
       // Default to first size if available, or force pick if multiple
       setSelectedSize(sizesList.length === 1 ? sizesList[0] : '');
 
@@ -474,9 +474,20 @@ const ProductDetailModal = ({
                 transition: 'all 0.3s ease'
               }}
             >
-              <button
-                type="button"
-                onClick={() => setIsDetailsExpanded(!isDetailsExpanded)}
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  setIsDetailsExpanded((prev) => !prev);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setIsDetailsExpanded((prev) => !prev);
+                  }
+                }}
                 style={{
                   width: '100%',
                   display: 'flex',
@@ -484,15 +495,14 @@ const ProductDetailModal = ({
                   justifyContent: 'space-between',
                   padding: '0.9rem 1.1rem',
                   backgroundColor: isDetailsExpanded ? '#fdf4ff' : '#f8fafc',
-                  border: 'none',
                   cursor: 'pointer',
-                  textAlign: 'left',
+                  userSelect: 'none',
                   transition: 'background-color 0.2s ease',
                   borderBottom: isDetailsExpanded ? '1px solid #f5d0fe' : 'none'
                 }}
                 aria-expanded={isDetailsExpanded}
               >
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', pointerEvents: 'none' }}>
                   <Sparkles size={18} color="#c026d3" />
                   <span style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a', letterSpacing: '0.2px' }}>
                     All Details & Product Specifications
@@ -509,12 +519,13 @@ const ProductDetailModal = ({
                     backgroundColor: '#ffffff',
                     border: '1px solid #cbd5e1',
                     transform: isDetailsExpanded ? 'rotate(180deg)' : 'rotate(0deg)',
-                    transition: 'transform 0.3s ease'
+                    transition: 'transform 0.3s ease',
+                    pointerEvents: 'none'
                   }}
                 >
                   <ChevronDown size={16} color="#475569" />
                 </div>
-              </button>
+              </div>
 
               {isDetailsExpanded && (
                 <div
