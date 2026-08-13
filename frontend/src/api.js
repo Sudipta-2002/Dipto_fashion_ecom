@@ -1,5 +1,5 @@
 const getSanitizedApiUrl = () => {
-  let url = import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:5000' : 'https://dipto-fashion-backend.onrender.com');
+  let url = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_API_URL || (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1' ? 'http://localhost:5000' : 'https://dipto-fashion-backend.onrender.com');
   url = url.trim();
 
 

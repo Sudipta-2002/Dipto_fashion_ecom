@@ -607,10 +607,20 @@ function App() {
   const fetchAllProducts = async () => {
     try {
       const { data } = await fetchWithCache('all_products', async () => {
-        const res = await fetch(`${API_URL}/api/products`);
+        const res = await fetch(`${API_URL}/api/products?t=${Date.now()}`);
+        if (!res.ok) {
+          console.error(`[API ERROR] fetchAllProducts failed with HTTP status: ${res.status} (${res.statusText})`);
+          return [];
+        }
         return await res.json();
       });
-      if (data) setAllProducts(data);
+
+      const fetchedProducts = Array.isArray(data)
+        ? data
+        : (data?.products || data?.data || []);
+
+      console.log("Storefront fetched products (all):", fetchedProducts);
+      setAllProducts(fetchedProducts);
     } catch (e) {
       console.error('Error loading all products:', e);
     }
@@ -619,28 +629,40 @@ function App() {
   const fetchProducts = async (forceRefresh = false) => {
     const cacheKey = `products_${selectedCategory}_${searchTerm.trim()}`;
     
-    // Check if we have cached data to prevent flash loading spinner
-    const { data: cachedData, isCached } = await fetchWithCache(
-      cacheKey,
-      async () => {
-        let url = `${API_URL}/api/products?category=${encodeURIComponent(selectedCategory)}`;
-        if (searchTerm.trim()) {
-          url += `&search=${encodeURIComponent(searchTerm.trim())}`;
-        }
-        const res = await fetch(url);
-        return await res.json();
-      },
-      { forceRefresh }
-    );
-
-    if (cachedData) {
-      setProducts(cachedData);
-      setLoading(false);
-      if (selectedCategory === 'All' && !searchTerm.trim()) {
-        setAllProducts(cachedData);
-      }
-    } else {
+    try {
       setLoading(true);
+      // Check if we have cached data to prevent flash loading spinner
+      const { data: rawResponse } = await fetchWithCache(
+        cacheKey,
+        async () => {
+          let url = `${API_URL}/api/products?category=${encodeURIComponent(selectedCategory)}&t=${Date.now()}`;
+          if (searchTerm.trim()) {
+            url += `&search=${encodeURIComponent(searchTerm.trim())}`;
+          }
+          const res = await fetch(url);
+          if (!res.ok) {
+            console.error(`[API ERROR] fetchProducts failed with HTTP status: ${res.status} (${res.statusText}) for URL: ${url}`);
+            return null;
+          }
+          return await res.json();
+        },
+        { forceRefresh }
+      );
+
+      const fetchedProducts = Array.isArray(rawResponse)
+        ? rawResponse
+        : (rawResponse?.products || rawResponse?.data || []);
+
+      console.log("Storefront fetched products:", fetchedProducts);
+
+      setProducts(fetchedProducts);
+      if (selectedCategory === 'All' && !searchTerm.trim()) {
+        setAllProducts(fetchedProducts);
+      }
+    } catch (e) {
+      console.error('Error fetching products:', e);
+    } finally {
+      setLoading(false);
     }
   };
 

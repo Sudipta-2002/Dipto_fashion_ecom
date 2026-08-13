@@ -26,6 +26,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
 import appRoutes from './routes/appRoutes.js';
+import productRoutes from './routes/productRoutes.js';
 import { sendOTPEmail, firebaseAdminApp } from './config/emailAndFirebaseConfig.js';
 
 
@@ -44,6 +45,8 @@ const io = new SocketIOServer(httpServer, {
   },
   transports: ['websocket', 'polling']
 });
+
+app.set('io', io);
 
 io.on('connection', (socket) => {
   console.log(`[SOCKET.IO] Client connected: ${socket.id}`);
@@ -71,8 +74,8 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cache-Control', 'Accept']
 }));
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ limit: '50mb', extended: true }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
 // Global POST Request Diagnostics Logger
 app.use((req, res, next) => {
@@ -83,7 +86,10 @@ app.use((req, res, next) => {
   next();
 });
 
-// Register Notification & Report API Routers (Top Priority BEFORE Health or Fallbacks)
+// Register Notification, Report & Product API Routers (Top Priority BEFORE Health or Fallbacks)
+app.use('/api/products', productRoutes);
+app.use('/products', productRoutes);
+
 app.use('/api/notifications', notificationRoutes);
 app.use('/notifications', notificationRoutes);
 app.use('/api/admin/notifications', notificationRoutes);
