@@ -25,6 +25,7 @@ import Coupon from './models/Coupon.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
 import reportRoutes from './routes/reportRoutes.js';
+import appRoutes from './routes/appRoutes.js';
 import { sendOTPEmail, firebaseAdminApp } from './config/emailAndFirebaseConfig.js';
 
 
@@ -90,6 +91,9 @@ app.use('/api/admin/notifications', notificationRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/admin/reports', reportRoutes);
 app.use('/reports', reportRoutes);
+
+app.use('/api/app', appRoutes);
+app.use('/app', appRoutes);
 
 // Root Health Check Endpoints
 app.get(['/', '/health'], (req, res) => {

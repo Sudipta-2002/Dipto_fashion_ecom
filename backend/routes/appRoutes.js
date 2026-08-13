@@ -1,0 +1,16 @@
+import express from 'express';
+
+const router = express.Router();
+
+// GET /api/app/version - App Version Update API for mobile app updates
+router.get(['/version', '/api/app/version'], (req, res) => {
+  res.json({
+    latestVersion: "1.0.1",
+    versionCode: 2,
+    downloadUrl: "https://diptofashion.in/download/latest-app.apk",
+    forceUpdate: false,
+    releaseNotes: "Bug fixes and performance improvements."
+  });
+});
+
+export default router;
