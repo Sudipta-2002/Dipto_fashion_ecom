@@ -2611,11 +2611,129 @@ app.get('/api/admin/returns', async (req, res) => {
   }
 });
 
+// // --- ADMIN DASHBOARD & ANALYTICS ROUTES ---
+// app.get('/api/admin/analytics', async (req, res) => {
+//   const { startDate, endDate } = req.query;
+//   try {
+//     let ordersList = [];
+//     if (isMongoConnected()) {
+//       let filter = {};
+//       if (startDate && endDate) {
+//         const start = new Date(startDate);
+//         const end = new Date(endDate);
+//         end.setHours(23, 59, 59, 999);
+//         filter = { createdAt: { $gte: start, $lte: end } };
+//       }
+//       ordersList = await Order.find(filter)
+//         .select('orderId user userName userEmail email shippingAddress items totalAmount paymentMethod status createdAt updatedAt')
+//         .lean();
+//     } else {
+//       ordersList = memoryOrders;
+//       if (startDate && endDate) {
+//         const start = new Date(startDate);
+//         const end = new Date(endDate);
+//         end.setHours(23, 59, 59, 999);
+//         ordersList = ordersList.filter(o => {
+//           const d = new Date(o.createdAt);
+//           return d >= start && d <= end;
+//         });
+//       }
+//     }
+
+//     const pendingOrdersCount = ordersList.filter(o => o.status === 'Pending Verification' || !o.status).length;
+//     const acceptedOrdersCount = ordersList.filter(o => o.status === 'Accepted').length;
+
+//     const todayStr = new Date().toISOString().split('T')[0];
+//     const currentMonth = new Date().getMonth();
+//     const currentYear = new Date().getFullYear();
+
+//     let todaySales = 0;
+//     let monthlySales = 0;
+//     let totalSales = 0;
+
+//     let dailyReturnQty = 0;
+//     let dailyReturnAmount = 0;
+//     let monthlyReturnQty = 0;
+//     let monthlyReturnAmount = 0;
+
+//     const dailySalesMap = {};
+//     const dailyReturnsMap = {};
+
+//     const pendingReturns = ordersList.filter(o => o.status === 'Return Requested');
+
+//     ordersList.forEach(o => {
+//       const amount = o.totalAmount || 0;
+//       const dateObj = new Date(o.updatedAt || o.createdAt);
+//       const dateStr = dateObj.toISOString().split('T')[0];
+//       const isReturn = ['Return Requested', 'Return Approved', 'Refund Completed'].includes(o.status);
+
+//       if (['Accepted', 'Shipped', 'Out for Delivery', 'Delivered'].includes(o.status)) {
+//         totalSales += amount;
+//         if (dateStr === todayStr) todaySales += amount;
+//         if (dateObj.getMonth() === currentMonth && dateObj.getFullYear() === currentYear) {
+//           monthlySales += amount;
+//         }
+//         dailySalesMap[dateStr] = (dailySalesMap[dateStr] || 0) + amount;
+//       }
+
+//       if (isReturn) {
+//         const itemQty = o.items?.reduce((sum, i) => sum + (i.quantity || 1), 0) || 1;
+//         if (dateStr === todayStr) {
+//           dailyReturnQty += itemQty;
+//           dailyReturnAmount += amount;
+//         }
+//         if (dateObj.getMonth() === currentMonth && dateObj.getFullYear() === currentYear) {
+//           monthlyReturnQty += itemQty;
+//           monthlyReturnAmount += amount;
+//         }
+//         if (!dailyReturnsMap[dateStr]) dailyReturnsMap[dateStr] = { qty: 0, amount: 0 };
+//         dailyReturnsMap[dateStr].qty += itemQty;
+//         dailyReturnsMap[dateStr].amount += amount;
+//       }
+//     });
+
+//     const chartData = Object.keys(dailySalesMap).sort().map(date => ({
+//       date,
+//       sales: dailySalesMap[date]
+//     }));
+
+//     const returnChartData = Object.keys(dailyReturnsMap).sort().map(date => ({
+//       date,
+//       returnQty: dailyReturnsMap[date].qty,
+//       returnAmount: dailyReturnsMap[date].amount
+//     }));
+
+//     res.json({
+//       todaySales,
+//       monthlySales,
+//       totalSales,
+//       totalOrders: ordersList.length,
+//       acceptedOrdersCount,
+//       pendingOrdersCount,
+//       dailyReturnQty,
+//       dailyReturnAmount,
+//       monthlyReturnQty,
+//       monthlyReturnAmount,
+//       pendingReturnsCount: pendingReturns.length,
+//       pendingReturns,
+//       chartData,
+//       returnChartData
+//     });
+//   } catch (err) {
+//     res.status(500).json({ message: err.message });
+//   }
+// });
+
+
+
+
+
 // --- ADMIN DASHBOARD & ANALYTICS ROUTES ---
 app.get('/api/admin/analytics', async (req, res) => {
   const { startDate, endDate } = req.query;
   try {
     let ordersList = [];
+
     if (isMongoConnected()) {
       let filter = {};
       if (startDate && endDate) {
@@ -2624,50 +2742,69 @@ app.get('/api/admin/analytics', async (req, res) => {
         end.setHours(23, 59, 59, 999);
         filter = { createdAt: { $gte: start, $lte: end } };
       }
+
+      // অপ্রয়োজনীয় ফিল্ড বাদ দিয়ে শুধু এনালাইটিক্সের প্রয়োজনীয় ফিল্ড আনা হচ্ছে (সুপার ফাস্ট)
       ordersList = await Order.find(filter)
-        .select('orderId user userName userEmail email shippingAddress items totalAmount paymentMethod status createdAt updatedAt')
-        .lean();
+        .select('totalAmount status orderStatus createdAt updatedAt items.quantity')
+        .sort({ createdAt: -1 })
+        .lean()
+        .maxTimeMS(5000);
     } else {
-      ordersList = memoryOrders;
+      ordersList = Array.isArray(memoryOrders) ? [...memoryOrders] : [];
       if (startDate && endDate) {
         const start = new Date(startDate);
         const end = new Date(endDate);
         end.setHours(23, 59, 59, 999);
         ordersList = ordersList.filter(o => {
-          const d = new Date(o.createdAt);
+          const d = new Date(o?.createdAt || 0);
           return d >= start && d <= end;
         });
       }
     }
 
-    const pendingOrdersCount = ordersList.filter(o => o.status === 'Pending Verification' || !o.status).length;
-    const acceptedOrdersCount = ordersList.filter(o => o.status === 'Accepted').length;
-
     const todayStr = new Date().toISOString().split('T')[0];
-    const currentMonth = new Date().getMonth();
-    const currentYear = new Date().getFullYear();
+    const now = new Date();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
 
+    let pendingOrdersCount = 0;
+    let acceptedOrdersCount = 0;
     let todaySales = 0;
     let monthlySales = 0;
     let totalSales = 0;
-
     let dailyReturnQty = 0;
     let dailyReturnAmount = 0;
     let monthlyReturnQty = 0;
     let monthlyReturnAmount = 0;
+    let pendingReturnsCount = 0;
 
     const dailySalesMap = {};
     const dailyReturnsMap = {};
 
-    const pendingReturns = ordersList.filter(o => o.status === 'Return Requested');
+    (ordersList || []).forEach(o => {
+      if (!o) return;
 
-    ordersList.forEach(o => {
-      const amount = o.totalAmount || 0;
-      const dateObj = new Date(o.updatedAt || o.createdAt);
-      const dateStr = dateObj.toISOString().split('T')[0];
-      const isReturn = ['Return Requested', 'Return Approved', 'Refund Completed'].includes(o.status);
+      const rawStatus = String(o.status || o.orderStatus || '').trim();
+      const statusLower = rawStatus.toLowerCase();
+      const amount = Number(o.totalAmount || o.amount || 0);
 
-      if (['Accepted', 'Shipped', 'Out for Delivery', 'Delivered'].includes(o.status)) {
+      const dateObj = new Date(o.updatedAt || o.createdAt || Date.now());
+      const dateStr = !isNaN(dateObj.getTime()) ? dateObj.toISOString().split('T')[0] : todayStr;
+
+      // Pending & Accepted Counters
+      if (['pending verification', 'pending', ''].includes(statusLower)) {
+        pendingOrdersCount++;
+      } else if (['accepted'].includes(statusLower)) {
+        acceptedOrdersCount++;
+      }
+
+      if (['return requested'].includes(statusLower)) {
+        pendingReturnsCount++;
+      }
+
+      // Sales Calculation (Accepted / Shipped / Delivered)
+      const isSales = ['accepted', 'shipped', 'out for delivery', 'delivered'].includes(statusLower);
+      if (isSales) {
         totalSales += amount;
         if (dateStr === todayStr) todaySales += amount;
         if (dateObj.getMonth() === currentMonth && dateObj.getFullYear() === currentYear) {
@@ -2676,8 +2813,15 @@ app.get('/api/admin/analytics', async (req, res) => {
         dailySalesMap[dateStr] = (dailySalesMap[dateStr] || 0) + amount;
       }
 
+      // Return Calculation
+      const isReturn = ['return requested', 'return approved', 'refund completed', 'returned', 'refunded'].includes(statusLower);
       if (isReturn) {
-        const itemQty = o.items?.reduce((sum, i) => sum + (i.quantity || 1), 0) || 1;
+        // সেফ কোয়ান্টিটি গণনা
+        let itemQty = 1;
+        if (Array.isArray(o.items) && o.items.length > 0) {
+          itemQty = o.items.reduce((sum, item) => sum + (Number(item?.quantity) || 1), 0);
+        }
+
         if (dateStr === todayStr) {
           dailyReturnQty += itemQty;
           dailyReturnAmount += amount;
@@ -2686,6 +2830,7 @@ app.get('/api/admin/analytics', async (req, res) => {
           monthlyReturnQty += itemQty;
           monthlyReturnAmount += amount;
         }
+
         if (!dailyReturnsMap[dateStr]) dailyReturnsMap[dateStr] = { qty: 0, amount: 0 };
         dailyReturnsMap[dateStr].qty += itemQty;
         dailyReturnsMap[dateStr].amount += amount;
@@ -2703,7 +2848,8 @@ app.get('/api/admin/analytics', async (req, res) => {
       returnAmount: dailyReturnsMap[date].amount
     }));
 
-    res.json({
+    return res.status(200).json({
+      success: true,
       todaySales,
       monthlySales,
       totalSales,
@@ -2714,13 +2860,30 @@ app.get('/api/admin/analytics', async (req, res) => {
       dailyReturnAmount,
       monthlyReturnQty,
       monthlyReturnAmount,
-      pendingReturnsCount: pendingReturns.length,
-      pendingReturns,
+      pendingReturnsCount,
       chartData,
       returnChartData
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error("Analytics Error:", err.message);
+    // ক্র্যাশ না করে নিরাপদে 200 রেসপন্স দেওয়া যাতে ফ্রন্টএন্ড আটকে না থাকে
+    return res.status(200).json({
+      success: false,
+      message: err.message,
+      todaySales: 0,
+      monthlySales: 0,
+      totalSales: 0,
+      totalOrders: 0,
+      acceptedOrdersCount: 0,
+      pendingOrdersCount: 0,
+      dailyReturnQty: 0,
+      dailyReturnAmount: 0,
+      monthlyReturnQty: 0,
+      monthlyReturnAmount: 0,
+      pendingReturnsCount: 0,
+      chartData: [],
+      returnChartData: []
+    });
   }
 });
 
