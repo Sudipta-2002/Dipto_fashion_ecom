@@ -399,7 +399,8 @@ app.post('/api/auth/login-check', async (req, res) => {
     }
 
     if (isMongoConnected()) {
-      const user = await User.findOne({ email: cleanEmail });
+      // Lean projection fetching ONLY email, password, _id for fast auth check
+      const user = await User.findOne({ email: cleanEmail }).select('_id email password').lean();
       if (!user) {
         return res.status(400).json({ message: 'No registered user found with this Gmail address' });
       }
@@ -448,12 +449,12 @@ app.post('/api/auth/verify-login-otp', async (req, res) => {
     }
 
     if (isMongoConnected()) {
-      const otpRecord = await OTP.findOne({ email: cleanEmail, otp: otp.trim() });
+      const otpRecord = await OTP.findOne({ email: cleanEmail, otp: otp.trim() }).lean();
       if (!otpRecord) {
         return res.status(400).json({ message: 'Invalid or expired OTP. Please try again.' });
       }
 
-      const user = await User.findOne({ email: cleanEmail });
+      const user = await User.findOne({ email: cleanEmail }).select('-password').lean();
       if (!user) {
         return res.status(404).json({ message: 'User not found' });
       }
@@ -472,7 +473,7 @@ app.post('/api/auth/verify-login-otp', async (req, res) => {
           avatar: user.avatar || user.profilePicture || '',
           profilePicture: user.profilePicture || user.avatar || '',
           role: user.role,
-          addresses: user.addresses
+          addresses: user.addresses || []
         }
       });
     } else {
@@ -579,7 +580,7 @@ app.post('/api/auth/verify-reset-password', async (req, res) => {
 
 
 // --- UPDATE USER PROFILE (name, gender, avatar/profilePicture — email/phone immutable) ---
-app.put(['/api/user/profile', '/api/users/profile', '/api/auth/profile'], async (req, res) => {
+app.put(['/api/user/profile', '/api/users/profile', '/api/auth/profile'], upload.single('avatar'), async (req, res) => {
   let userId = null;
   const authHeader = req.headers.authorization;
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -594,7 +595,13 @@ app.put(['/api/user/profile', '/api/users/profile', '/api/auth/profile'], async 
 
   try {
     const { name, gender, avatar, profilePicture } = req.body;
-    const pictureVal = profilePicture !== undefined ? profilePicture : avatar;
+    let pictureVal = profilePicture !== undefined ? profilePicture : avatar;
+
+    if (req.file && req.file.path) {
+      pictureVal = req.file.path;
+    } else if (typeof pictureVal === 'string' && pictureVal.startsWith('data:image')) {
+      pictureVal = await uploadBase64ToCloudinary(pictureVal, 'avatars');
+    }
 
     if (!name || !name.trim()) {
       return res.status(400).json({ success: false, message: 'Name is required' });
@@ -613,7 +620,7 @@ app.put(['/api/user/profile', '/api/users/profile', '/api/auth/profile'], async 
       // Explicit field assignment & save
       user.name = name.trim();
       if (gender !== undefined) user.gender = gender;
-      if (pictureVal !== undefined) {
+      if (pictureVal !== undefined && pictureVal !== null) {
         user.avatar = pictureVal;
         user.profilePicture = pictureVal;
       }
