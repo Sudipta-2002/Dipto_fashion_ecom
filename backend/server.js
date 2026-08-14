@@ -1003,8 +1003,11 @@ app.get(['/api/products', '/products'], async (req, res) => {
       }
 
       let totalProducts = 0;
+      let totalInDb = 0;
       try {
+        totalInDb = await Product.estimatedDocumentCount().catch(() => 0);
         totalProducts = await Product.countDocuments(query);
+        console.log(`[PRODUCTS API] Total in DB: ${totalInDb} | Matched Filter: ${totalProducts} | Page: ${pageNum} | Skip: ${skip} | Limit: ${limitNum}`);
       } catch (countErr) {
         console.error('[MONGODB COUNT ERROR]', countErr);
       }
