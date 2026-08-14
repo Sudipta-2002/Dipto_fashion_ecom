@@ -2743,31 +2743,35 @@ app.get('/api/admin/billing', async (req, res) => {
 
     // Process orders to build transaction ledger
     ordersList.forEach((order) => {
-      const isShippedOrDelivered = ['Shipped', 'Delivered'].includes(order.status);
-      const isReturnedOrCancelledApproved = ['Returned', 'Cancelled', 'Return Approved', 'Refund Completed'].includes(order.status);
+      const amt = order.totalAmount || 0;
+      const wasShipped = ['Shipped', 'Out for Delivery', 'Delivered', 'Return Requested', 'Return Approved', 'Refund Completed', 'Cancellation Requested', 'Cancelled', 'Returned'].includes(order.status) || order.stockDeducted;
+      const isShippedCurrent = ['Shipped', 'Out for Delivery', 'Delivered'].includes(order.status);
+      const isApprovedRefund = ['Returned', 'Cancelled', 'Return Approved', 'Refund Completed'].includes(order.status);
 
-      if (isShippedOrDelivered) {
-        const amt = order.totalAmount || 0;
+      // 1. If order was shipped (or current status is Shipped/Delivered), record + (positive credit)
+      if (wasShipped || isShippedCurrent) {
         totalCredit += amt;
         ledger.push({
           id: order._id || order.orderId,
-          date: order.updatedAt || order.createdAt,
+          date: order.createdAt || order.updatedAt,
           orderId: order.orderId,
           customerName: order.shippingAddress?.userName || order.userName || 'Customer',
           userEmail: order.userEmail || order.email || order.shippingAddress?.email || '',
           utrNumber: order.utrNumber || 'N/A',
           type: 'credit',
           sign: '+',
-          label: `Sale (${order.status})`,
+          label: `Sale (Shipped)`,
           amount: amt,
-          status: order.status
+          status: isApprovedRefund ? 'Shipped (Past)' : order.status
         });
-      } else if (isReturnedOrCancelledApproved) {
-        const amt = order.totalAmount || 0;
+      }
+
+      // 2. If return or cancellation was submitted & approved by admin, record - (negative debit)
+      if (isApprovedRefund) {
         totalDebit += amt;
         ledger.push({
           id: (order._id || order.orderId) + '_refund',
-          date: order.returnDetails?.requestedAt || order.cancellationDetails?.requestedAt || order.updatedAt || order.createdAt,
+          date: order.returnDetails?.returnedAt || order.cancellationDetails?.cancelledAt || order.updatedAt || order.createdAt,
           orderId: order.orderId,
           customerName: order.shippingAddress?.userName || order.userName || 'Customer',
           userEmail: order.userEmail || order.email || order.shippingAddress?.email || '',
