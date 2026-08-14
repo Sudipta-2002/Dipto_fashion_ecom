@@ -18,7 +18,7 @@ import ProductFilterModal from './components/ProductFilterModal';
 import Footer from './components/Footer';
 import AboutUsModal from './components/AboutUsModal';
 import TermsPrivacyModal from './components/TermsPrivacyModal';
-import { SlidersHorizontal, X, RotateCcw, Filter } from 'lucide-react';
+import { SlidersHorizontal, X, RotateCcw, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { fetchWithCache } from './utils/cache';
 import { API_URL, apiFetch, parseResponseSafely } from './api';
 import { useSocket } from './context/SocketContext.jsx';
@@ -358,10 +358,11 @@ function App() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalProductsCount, setTotalProductsCount] = useState(0);
   const [apiError, setApiError] = useState(null);
 
-  const loaderRef = useRef(null);
+  const catalogRef = useRef(null);
   const isFetchingRef = useRef(false);
 
   const fetchCategories = async () => {
@@ -397,7 +398,7 @@ function App() {
         if (sanitizedCat) params.append('category', sanitizedCat);
         if (searchTerm.trim()) params.append('search', searchTerm.trim());
         params.append('page', p);
-        params.append('limit', limitNum);
+        params.append('limit', 20); // 20 Products Per Page (4x5 desktop, 2x10 mobile)
         params.append('t', Date.now());
         return `${API_URL}/api/products?${params.toString()}`;
       };
@@ -416,38 +417,27 @@ function App() {
       );
 
       let fetchedProducts = [];
-      let moreAvailable = false;
+      let totalPagesVal = 1;
+      let totalProductsVal = 0;
 
       if (rawResponse && typeof rawResponse === 'object' && !Array.isArray(rawResponse)) {
         fetchedProducts = rawResponse.products || [];
-        moreAvailable = rawResponse.hasMore !== undefined ? rawResponse.hasMore : (pageNum < (rawResponse.totalPages || 1));
+        totalPagesVal = rawResponse.totalPages || 1;
+        totalProductsVal = rawResponse.totalProducts !== undefined ? rawResponse.totalProducts : fetchedProducts.length;
       } else if (Array.isArray(rawResponse)) {
         fetchedProducts = rawResponse;
-        moreAvailable = false;
+        totalPagesVal = Math.ceil(fetchedProducts.length / 20) || 1;
+        totalProductsVal = fetchedProducts.length;
       }
 
-      if (fetchedProducts.length === 0) {
-        moreAvailable = false;
-      }
-
-      if (pageNum === 1) {
-        setProducts(fetchedProducts);
-      } else {
-        setProducts((prev) => {
-          const existingIds = new Set(prev.map(p => p._id || p.id));
-          const newItems = fetchedProducts.filter(p => !existingIds.has(p._id || p.id));
-          return [...prev, ...newItems];
-        });
-      }
-
-      setHasMore(moreAvailable);
+      setProducts(fetchedProducts);
+      setTotalPages(totalPagesVal);
+      setTotalProductsCount(totalProductsVal);
       setPage(pageNum);
       setApiError(null);
     } catch (e) {
       console.error('Error fetching products:', e);
-      if (pageNum === 1) {
-        setApiError('Unable to load products. Please check your connection or try again.');
-      }
+      setApiError('Unable to load products. Please check your connection or try again.');
     } finally {
       setLoading(false);
       setLoadingMore(false);
@@ -679,34 +669,8 @@ function App() {
   // Reset pagination to page 1 on category or search term change
   useEffect(() => {
     setPage(1);
-    setHasMore(true);
     fetchProducts(1, true);
   }, [selectedCategory, searchTerm]);
-
-  // IntersectionObserver for Infinite Scroll
-  useEffect(() => {
-    if (loading || loadingMore || !hasMore || apiError) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading && !isFetchingRef.current) {
-          fetchProducts(page + 1);
-        }
-      },
-      { threshold: 0.1, rootMargin: '300px' }
-    );
-
-    const currentLoader = loaderRef.current;
-    if (currentLoader) {
-      observer.observe(currentLoader);
-    }
-
-    return () => {
-      if (currentLoader) {
-        observer.unobserve(currentLoader);
-      }
-    };
-  }, [page, hasMore, loading, loadingMore, apiError, selectedCategory, searchTerm]);
 
   // Restore opened Product Detail Page if page was refreshed
   useEffect(() => {
@@ -1046,7 +1010,7 @@ function App() {
             />
 
             {/* Products Grid */}
-            <main className="products-section">
+            <main ref={catalogRef} className="products-section">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
               <h2>
                 <span>{selectedCategory === 'All' ? 'All Collections' : selectedCategory}</span>
@@ -1211,18 +1175,146 @@ function App() {
                   })}
                 </div>
 
-                {/* Infinite Scroll Trigger & Skeleton Spinner for Next Page */}
-                <div ref={loaderRef} style={{ width: '100%', minHeight: '40px', marginTop: '1.5rem', textAlign: 'center' }}>
-                  {loadingMore ? (
-                    <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}>
-                      <ProductGridSkeleton count={4} />
+                {/* Server-Side Pagination Bar */}
+                {totalPages > 1 && (
+                  <div className="w-full flex flex-col items-center justify-center my-12 py-6 gap-4">
+                    {/* Pagination Buttons Row */}
+                    <div className="flex items-center justify-center gap-2 flex-wrap bg-white px-4 py-3 rounded-2xl shadow-sm border border-purple-100">
+                      {/* Prev Button */}
+                      <button
+                        type="button"
+                        disabled={page <= 1 || loading}
+                        onClick={() => {
+                          if (page > 1) {
+                            const newPage = page - 1;
+                            setPage(newPage);
+                            fetchProducts(newPage);
+                            window.scrollTo({ top: catalogRef.current?.offsetTop || 0, behavior: 'smooth' });
+                          }
+                        }}
+                        className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
+                          page <= 1 || loading
+                            ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed opacity-50'
+                            : 'bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white border border-purple-200 active:scale-95 shadow-sm'
+                        }`}
+                      >
+                        Prev
+                      </button>
+
+                      {/* Step Back Arrow ‹ */}
+                      <button
+                        type="button"
+                        disabled={page <= 1 || loading}
+                        onClick={() => {
+                          if (page > 1) {
+                            const newPage = page - 1;
+                            setPage(newPage);
+                            fetchProducts(newPage);
+                            window.scrollTo({ top: catalogRef.current?.offsetTop || 0, behavior: 'smooth' });
+                          }
+                        }}
+                        className={`w-9 h-9 flex items-center justify-center rounded-xl font-bold text-sm bg-white border border-gray-200 text-gray-700 hover:border-purple-300 hover:text-purple-600 hover:bg-purple-50 transition ${
+                          page <= 1 || loading ? 'opacity-40 cursor-not-allowed' : ''
+                        }`}
+                        title="Previous Page"
+                      >
+                        ‹
+                      </button>
+
+                      {/* Numbered Page Buttons */}
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter((p) => {
+                          if (totalPages <= 7) return true;
+                          return p === 1 || p === totalPages || Math.abs(p - page) <= 1;
+                        })
+                        .reduce((acc, curr, idx, src) => {
+                          if (idx > 0 && curr - src[idx - 1] > 1) {
+                            acc.push('ellipsis-' + curr);
+                          }
+                          acc.push(curr);
+                          return acc;
+                        }, [])
+                        .map((item) => {
+                          if (typeof item === 'string' && item.startsWith('ellipsis')) {
+                            return (
+                              <span key={item} className="px-1 text-gray-400 font-bold select-none">
+                                ...
+                              </span>
+                            );
+                          }
+
+                          const isCurrent = item === page;
+                          return (
+                            <button
+                              key={item}
+                              type="button"
+                              disabled={loading}
+                              onClick={() => {
+                                if (item !== page) {
+                                  setPage(item);
+                                  fetchProducts(item);
+                                  window.scrollTo({ top: catalogRef.current?.offsetTop || 0, behavior: 'smooth' });
+                                }
+                              }}
+                              className={`w-9 h-9 flex items-center justify-center rounded-xl text-sm font-semibold transition-all duration-200 ${
+                                isCurrent
+                                  ? 'bg-purple-600 text-white shadow-md shadow-purple-200 scale-105 ring-2 ring-purple-400/40'
+                                  : 'bg-white text-gray-600 hover:bg-purple-50 hover:text-purple-600 border border-gray-200'
+                              }`}
+                            >
+                              {item}
+                            </button>
+                          );
+                        })}
+
+                      {/* Step Forward Arrow › */}
+                      <button
+                        type="button"
+                        disabled={page >= totalPages || loading}
+                        onClick={() => {
+                          if (page < totalPages) {
+                            const newPage = page + 1;
+                            setPage(newPage);
+                            fetchProducts(newPage);
+                            window.scrollTo({ top: catalogRef.current?.offsetTop || 0, behavior: 'smooth' });
+                          }
+                        }}
+                        className={`w-9 h-9 flex items-center justify-center rounded-xl font-bold text-sm bg-white border border-gray-200 text-gray-700 hover:border-purple-300 hover:text-purple-600 hover:bg-purple-50 transition ${
+                          page >= totalPages || loading ? 'opacity-40 cursor-not-allowed' : ''
+                        }`}
+                        title="Next Page"
+                      >
+                        ›
+                      </button>
+
+                      {/* Next Button */}
+                      <button
+                        type="button"
+                        disabled={page >= totalPages || loading}
+                        onClick={() => {
+                          if (page < totalPages) {
+                            const newPage = page + 1;
+                            setPage(newPage);
+                            fetchProducts(newPage);
+                            window.scrollTo({ top: catalogRef.current?.offsetTop || 0, behavior: 'smooth' });
+                          }
+                        }}
+                        className={`px-4 py-2 rounded-xl text-xs font-semibold uppercase tracking-wider transition-all duration-200 ${
+                          page >= totalPages || loading
+                            ? 'bg-gray-100 text-gray-400 border border-gray-200 cursor-not-allowed opacity-50'
+                            : 'bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white border border-purple-200 active:scale-95 shadow-sm'
+                        }`}
+                      >
+                        Next
+                      </button>
                     </div>
-                  ) : !hasMore && displayedProducts.length > 0 ? (
-                    <div style={{ padding: '1.5rem 0', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>
-                      ✨ You've reached the end of the collection
-                    </div>
-                  ) : null}
-                </div>
+
+                    {/* Summary Text */}
+                    <p className="text-xs text-gray-500 font-medium tracking-wide">
+                      Showing page <span className="font-semibold text-purple-700">{page}</span> of <span className="font-semibold text-purple-700">{totalPages}</span> • <span className="font-semibold text-gray-700">{totalProductsCount}</span> total products
+                    </p>
+                  </div>
+                )}
               </>
             )}
           </main>

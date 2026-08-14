@@ -59,19 +59,23 @@ const AdminProducts = () => {
 
   const fetchProducts = async (forceRefresh = false) => {
     try {
-      const { data } = await fetchWithCache(
-        'admin_products',
-        async () => {
-          const res = await fetch(`${API_URL}/api/products`);
-          return await res.json();
-        },
-        { forceRefresh }
-      );
+      if (forceRefresh) clearCache('admin_products');
+      const res = await fetch(`${API_URL}/api/products?t=${Date.now()}`);
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      const data = await res.json();
       const productList = Array.isArray(data) ? data : (data?.products || data?.data || []);
       setProducts(productList);
     } catch (e) {
       console.error('Error fetching products:', e);
-      setProducts([]);
+      // Fallback attempt without cache wrapper
+      try {
+        const res = await fetch(`${API_URL}/api/products`);
+        const data = await res.json();
+        const productList = Array.isArray(data) ? data : (data?.products || data?.data || []);
+        setProducts(productList);
+      } catch (err) {
+        console.error('Fallback fetch error:', err);
+      }
     }
   };
 
