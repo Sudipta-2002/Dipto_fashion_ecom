@@ -352,11 +352,8 @@ function App() {
 
   // Data States
   const [categories, setCategories] = useState([]);
-  const [products, setProducts] = useState([]);
-  const [allProducts, setAllProducts] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
-  const [loading, setLoading] = useState(true);
 
   // Flipkart-Style Product Filter State System
   const DEFAULT_FILTERS = {
@@ -384,9 +381,7 @@ function App() {
   }, [appliedFilters]);
 
   const displayedProducts = useMemo(() => {
-    const validAll = Array.isArray(allProducts) ? allProducts : [];
-    const validProds = Array.isArray(products) ? products : [];
-    let list = validAll.length > 0 ? validAll : validProds;
+    let list = Array.isArray(products) ? products : [];
 
     // 1. Category Filter (from Category Sidebar OR Filter Modal)
     if (selectedCategory && selectedCategory !== 'All') {
@@ -445,7 +440,7 @@ function App() {
     }
 
     return list;
-  }, [allProducts, products, selectedCategory, searchTerm, appliedFilters]);
+  }, [products, selectedCategory, searchTerm, appliedFilters]);
 
   const [visibleCount, setVisibleCount] = useState(16);
 
@@ -585,14 +580,120 @@ function App() {
     });
   };
 
-  useEffect(() => {
-    fetchCategories();
-    fetchAllProducts();
-  }, []);
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [apiError, setApiError] = useState(null);
+
+  const loaderRef = useRef(null);
+
+  const fetchProducts = async (pageNum = 1, forceRefresh = false) => {
+    const sanitizedCat = (!selectedCategory || selectedCategory === 'All') ? '' : selectedCategory.trim();
+    const cacheKey = `products_cat_${sanitizedCat || 'all'}_search_${searchTerm.trim()}_p${pageNum}`;
+    
+    try {
+      if (pageNum === 1) {
+        setLoading(true);
+        setApiError(null);
+      } else {
+        setLoadingMore(true);
+      }
+
+      const buildUrl = (p) => {
+        let params = new URLSearchParams();
+        if (sanitizedCat) params.append('category', sanitizedCat);
+        if (searchTerm.trim()) params.append('search', searchTerm.trim());
+        params.append('page', p);
+        params.append('limit', 12);
+        params.append('t', Date.now());
+        return `${API_URL}/api/products?${params.toString()}`;
+      };
+
+      const { data: rawResponse } = await fetchWithCache(
+        cacheKey,
+        async () => {
+          const url = buildUrl(pageNum);
+          const res = await fetch(url);
+          if (!res.ok) {
+            throw new Error(`Server returned status ${res.status}`);
+          }
+          return await res.json();
+        },
+        { forceRefresh }
+      );
+
+      let fetchedProducts = [];
+      let moreAvailable = false;
+
+      if (rawResponse && typeof rawResponse === 'object' && !Array.isArray(rawResponse)) {
+        fetchedProducts = rawResponse.products || [];
+        moreAvailable = rawResponse.hasMore !== undefined ? rawResponse.hasMore : (pageNum < (rawResponse.totalPages || 1));
+      } else if (Array.isArray(rawResponse)) {
+        fetchedProducts = rawResponse;
+        moreAvailable = false;
+      }
+
+      if (pageNum === 1) {
+        setProducts(fetchedProducts);
+      } else {
+        setProducts((prev) => {
+          const existingIds = new Set(prev.map(p => p._id || p.id));
+          const newItems = fetchedProducts.filter(p => !existingIds.has(p._id || p.id));
+          return [...prev, ...newItems];
+        });
+      }
+
+      setHasMore(moreAvailable);
+      setPage(pageNum);
+      setApiError(null);
+    } catch (e) {
+      console.error('Error fetching products:', e);
+      if (pageNum === 1) {
+        setApiError('Unable to load products. Please check your connection or try again.');
+      }
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
 
   useEffect(() => {
-    fetchProducts();
+    fetchCategories();
+  }, []);
+
+  // Reset pagination to page 1 on category or search term change
+  useEffect(() => {
+    setPage(1);
+    setHasMore(true);
+    fetchProducts(1, true);
   }, [selectedCategory, searchTerm]);
+
+  // IntersectionObserver for Infinite Scroll
+  useEffect(() => {
+    if (loading || loadingMore || !hasMore || apiError) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+          fetchProducts(page + 1);
+        }
+      },
+      { threshold: 0.1, rootMargin: '200px' }
+    );
+
+    const currentLoader = loaderRef.current;
+    if (currentLoader) {
+      observer.observe(currentLoader);
+    }
+
+    return () => {
+      if (currentLoader) {
+        observer.unobserve(currentLoader);
+      }
+    };
+  }, [page, hasMore, loading, loadingMore, apiError, selectedCategory, searchTerm]);
 
   const fetchCategories = async () => {
     try {
@@ -606,84 +707,21 @@ function App() {
     }
   };
 
-  const fetchAllProducts = async () => {
-    try {
-      const { data } = await fetchWithCache('all_products', async () => {
-        const res = await fetch(`${API_URL}/api/products?t=${Date.now()}`);
-        if (!res.ok) {
-          console.error(`[API ERROR] fetchAllProducts failed with HTTP status: ${res.status} (${res.statusText})`);
-          return [];
-        }
-        return await res.json();
-      });
-
-      const fetchedProducts = Array.isArray(data)
-        ? data
-        : (data?.products || data?.data || []);
-
-      console.log("Storefront fetched products (all):", fetchedProducts);
-      setAllProducts(fetchedProducts);
-    } catch (e) {
-      console.error('Error loading all products:', e);
-    }
-  };
-
-  const fetchProducts = async (forceRefresh = false) => {
-    const cacheKey = `products_${selectedCategory}_${searchTerm.trim()}`;
-    
-    try {
-      setLoading(true);
-      // Check if we have cached data to prevent flash loading spinner
-      const { data: rawResponse } = await fetchWithCache(
-        cacheKey,
-        async () => {
-          let url = `${API_URL}/api/products?category=${encodeURIComponent(selectedCategory)}&t=${Date.now()}`;
-          if (searchTerm.trim()) {
-            url += `&search=${encodeURIComponent(searchTerm.trim())}`;
-          }
-          const res = await fetch(url);
-          if (!res.ok) {
-            console.error(`[API ERROR] fetchProducts failed with HTTP status: ${res.status} (${res.statusText}) for URL: ${url}`);
-            return null;
-          }
-          return await res.json();
-        },
-        { forceRefresh }
-      );
-
-      const fetchedProducts = Array.isArray(rawResponse)
-        ? rawResponse
-        : (rawResponse?.products || rawResponse?.data || []);
-
-      console.log("Storefront fetched products:", fetchedProducts);
-
-      setProducts(fetchedProducts);
-      if (selectedCategory === 'All' && !searchTerm.trim()) {
-        setAllProducts(fetchedProducts);
-      }
-    } catch (e) {
-      console.error('Error fetching products:', e);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Restore opened Product Detail Page if page was refreshed
   useEffect(() => {
     const hash = window.location.hash;
     const match = hash.match(/#product=([^&]+)/);
     const savedProdId = match ? match[1] : sessionStorage.getItem('df_opened_product_id');
 
-    if (savedProdId && (allProducts.length > 0 || products.length > 0)) {
-      const pool = allProducts.length > 0 ? allProducts : products;
-      const found = pool.find((p) => String(p._id || p.id) === String(savedProdId));
+    if (savedProdId && products.length > 0) {
+      const found = products.find((p) => String(p._id || p.id) === String(savedProdId));
       if (found) {
         setSelectedProduct(found);
         updateProductHistory([found]);
         setIsDetailOpen(true);
       }
     }
-  }, [allProducts, products]);
+  }, [products]);
 
   // Click Title or Catalogue Picture -> Open Full Product Details Modal
   const handleOpenProductDetail = (product) => {
@@ -1117,7 +1155,21 @@ function App() {
               </div>
             )}
 
-            {loading ? (
+            {apiError ? (
+              <div style={{ background: 'white', padding: '3rem', textAlign: 'center', borderRadius: '12px', border: '1px solid #fee2e2' }}>
+                <h3 style={{ color: '#dc2626' }}>Failed to Load Products</h3>
+                <p style={{ color: '#64748b', marginTop: '0.5rem' }}>
+                  {apiError}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => fetchProducts(1, true)}
+                  style={{ marginTop: '1rem', background: '#c026d3', color: 'white', border: 'none', padding: '0.65rem 1.2rem', borderRadius: '10px', fontWeight: '800', cursor: 'pointer' }}
+                >
+                  Retry Loading
+                </button>
+              </div>
+            ) : loading ? (
               <ProductGridSkeleton count={8} />
             ) : displayedProducts.length === 0 ? (
               <div style={{ background: 'white', padding: '3rem', textAlign: 'center', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
@@ -1140,7 +1192,7 @@ function App() {
             ) : (
               <>
                 <div className="product-grid">
-                  {visibleProducts.map((product) => {
+                  {displayedProducts.map((product) => {
                     const isWishlisted = wishlist.some(w => (w._id || w.id) === (product._id || product.id));
                     return (
                       <ProductCard
@@ -1158,28 +1210,14 @@ function App() {
                   })}
                 </div>
 
-                {displayedProducts.length > visibleCount && (
-                  <div style={{ textAlign: 'center', marginTop: '2.5rem', marginBottom: '2rem' }}>
-                    <button
-                      type="button"
-                      onClick={() => setVisibleCount((prev) => prev + 16)}
-                      style={{
-                        background: 'linear-gradient(135deg, #c026d3 0%, #a21caf 100%)',
-                        color: 'white',
-                        border: 'none',
-                        padding: '0.8rem 2.2rem',
-                        borderRadius: '24px',
-                        fontWeight: '800',
-                        fontSize: '0.95rem',
-                        cursor: 'pointer',
-                        boxShadow: '0 4px 14px rgba(192, 38, 211, 0.25)',
-                        transition: 'all 0.2s ease'
-                      }}
-                    >
-                      Show More Products ({displayedProducts.length - visibleCount} Remaining)
-                    </button>
-                  </div>
-                )}
+                {/* Infinite Scroll Trigger & Skeleton Spinner for Next Page */}
+                <div ref={loaderRef} style={{ width: '100%', minHeight: '60px', marginTop: '1.5rem', textAlign: 'center' }}>
+                  {loadingMore && (
+                    <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}>
+                      <ProductGridSkeleton count={4} />
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </main>

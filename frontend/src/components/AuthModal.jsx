@@ -188,7 +188,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     try {
       if (mode === 'signup') {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
 
         const res = await fetch(`${API_URL}/api/auth/send-otp`, {
           method: 'POST',
@@ -201,6 +201,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         const data = await res.json().catch(() => ({ message: `Server error (${res.status})` }));
         if (!res.ok) throw new Error(data.message || 'Failed to send OTP to Gmail');
 
+        setError('');
         setOtpTargetEmail(cleanEmail);
         setOtpOrigin('signup');
         setOtpValues(['', '', '', '', '', '']);
@@ -209,7 +210,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         setSuccessMsg(`A 6-digit OTP code has been sent to ${cleanEmail}`);
       } else if (mode === 'login') {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
 
         const res = await fetch(`${API_URL}/api/auth/login-check`, {
           method: 'POST',
@@ -222,15 +223,20 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         const data = await res.json().catch(() => ({ message: `Server error (${res.status})` }));
         if (!res.ok) throw new Error(data.message || 'Login failed');
 
-        setOtpTargetEmail(cleanEmail);
-        setOtpOrigin('login');
-        setOtpValues(['', '', '', '', '', '']);
-        setResendTimer(30);
-        setMode('otp');
-        setSuccessMsg(`Credentials verified! A 6-digit OTP code has been sent to ${cleanEmail}`);
+        if (data.success || data.requireOtp) {
+          setError('');
+          setOtpTargetEmail(data.email || cleanEmail);
+          setOtpOrigin('login');
+          setOtpValues(['', '', '', '', '', '']);
+          setResendTimer(30);
+          setMode('otp');
+          setSuccessMsg(data.message || `Credentials verified! A 6-digit OTP code has been sent to ${cleanEmail}`);
+        } else {
+          throw new Error(data.message || 'Login pre-check failed');
+        }
       } else if (mode === 'forgot') {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 10000);
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
 
         const res = await fetch(`${API_URL}/api/auth/forgot-password-check`, {
           method: 'POST',
@@ -243,7 +249,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         const data = await res.json().catch(() => ({ message: `Server error (${res.status})` }));
         if (!res.ok) throw new Error(data.message || 'Failed to process request');
 
-
+        setError('');
         setOtpTargetEmail(cleanEmail);
         setOtpOrigin('forgot');
         setOtpValues(['', '', '', '', '', '']);

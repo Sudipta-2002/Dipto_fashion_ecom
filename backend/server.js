@@ -427,7 +427,12 @@ app.post('/api/auth/login-check', async (req, res) => {
       return res.status(500).json({ message: 'Failed to send OTP email. Please try again.' });
     }
 
-    return res.json({ success: true, message: `Login credentials verified. 6-digit OTP sent to ${cleanEmail}` });
+    return res.status(200).json({
+      success: true,
+      requireOtp: true,
+      message: `Login credentials verified. 6-digit OTP sent to ${cleanEmail}`,
+      email: cleanEmail
+    });
   } catch (err) {
     res.status(500).json({ message: err.message });
   }
@@ -955,16 +960,23 @@ app.delete(['/api/categories/:id', '/categories/:id'], async (req, res) => {
 // --- PRODUCT ROUTES ---
 
 app.get(['/api/products', '/products'], async (req, res) => {
-  const { category, search } = req.query;
-  const cacheKey = `products_${category || 'all'}_${search || 'none'}`;
+  const { category, search, page, limit } = req.query;
+  const isPaginated = page !== undefined || limit !== undefined;
+  const pageNum = Math.max(1, parseInt(page, 10) || 1);
+  const limitNum = Math.max(1, parseInt(limit, 10) || 12);
+  const skip = (pageNum - 1) * limitNum;
+
+  const cacheKey = `products_${category || 'all'}_${search || 'none'}_p${isPaginated ? pageNum : 'all'}_l${isPaginated ? limitNum : 'all'}`;
   const cached = apiCache.get(cacheKey);
-  if (cached) return res.json(cached);
+  if (cached && !req.query.t) return res.json(cached);
 
   try {
+    const isAllCategory = !category || category.trim() === '' || category.trim().toLowerCase() === 'all';
+
     if (isMongoConnected()) {
       let query = {};
-      if (category && category !== 'All' && !search) {
-        query.category = category;
+      if (!isAllCategory) {
+        query.category = { $regex: new RegExp(`^${category.trim()}$`, 'i') };
       }
       if (search && search.trim()) {
         const searchRegex = new RegExp(search.trim(), 'i');
@@ -973,24 +985,47 @@ app.get(['/api/products', '/products'], async (req, res) => {
           { category: searchRegex },
           { description: searchRegex }
         ];
-        if (category && category !== 'All') {
-          query.category = category;
+        if (!isAllCategory) {
+          query.category = { $regex: new RegExp(`^${category.trim()}$`, 'i') };
         }
       }
-      let prods = await Product.find(query).sort({ createdAt: -1 }).lean();
-      if (prods.length === 0 && !category && !search) {
+
+      let totalProducts = await Product.countDocuments(query);
+
+      let queryExec = Product.find(query).sort({ createdAt: -1 });
+      if (isPaginated) {
+        queryExec = queryExec.skip(skip).limit(limitNum);
+      }
+
+      let prods = await queryExec.lean();
+
+      if (prods.length === 0 && isAllCategory && !search && totalProducts === 0) {
         const inserted = await Product.insertMany(memoryProducts.map(p => {
           const { _id, ...rest } = p;
           return rest;
         }));
         prods = inserted.map(doc => doc.toObject());
+        totalProducts = prods.length;
+        if (isPaginated) {
+          prods = prods.slice(skip, skip + limitNum);
+        }
       }
-      apiCache.set(cacheKey, prods);
-      return res.json(prods);
+
+      const totalPages = Math.ceil(totalProducts / limitNum) || 1;
+      const responseData = isPaginated ? {
+        products: prods,
+        currentPage: pageNum,
+        totalPages: totalPages,
+        totalProducts: totalProducts,
+        hasMore: pageNum < totalPages
+      } : prods;
+
+      apiCache.set(cacheKey, responseData);
+      return res.json(responseData);
     } else {
       let filtered = [...memoryProducts];
-      if (category && category !== 'All' && !search) {
-        filtered = filtered.filter(p => p.category.toLowerCase() === category.toLowerCase());
+      if (!isAllCategory) {
+        filtered = filtered.filter(p => p.category.toLowerCase() === category.trim().toLowerCase());
       }
       if (search && search.trim()) {
         const s = search.trim().toLowerCase();
@@ -1000,11 +1035,28 @@ app.get(['/api/products', '/products'], async (req, res) => {
           (p.description && p.description.toLowerCase().includes(s))
         );
       }
-      apiCache.set(cacheKey, filtered);
-      return res.json(filtered);
+
+      const totalProducts = filtered.length;
+      let prods = filtered;
+
+      if (isPaginated) {
+        prods = filtered.slice(skip, skip + limitNum);
+      }
+
+      const totalPages = Math.ceil(totalProducts / limitNum) || 1;
+      const responseData = isPaginated ? {
+        products: prods,
+        currentPage: pageNum,
+        totalPages: totalPages,
+        totalProducts: totalProducts,
+        hasMore: pageNum < totalPages
+      } : prods;
+
+      apiCache.set(cacheKey, responseData);
+      return res.json(responseData);
     }
   } catch (err) {
-    res.json(memoryProducts);
+    res.status(500).json({ message: err.message });
   }
 });
 
