@@ -2533,6 +2533,79 @@ app.get(['/api/orders', '/orders', '/api/admin/orders', '/admin/orders'], async 
 
 
 // GET LOGGED-IN USER ORDERS FOR PROFILE PAGE
+// app.get([
+//   '/api/user/my-orders',
+//   '/api/orders/my-orders',
+//   '/api/orders/user',
+//   '/api/orders/user/:email',
+//   '/api/orders/by-email',
+//   '/user/my-orders'
+// ], async (req, res) => {
+//   try {
+//     let userId = null;
+//     let tokenEmail = null;
+
+//     const authHeader = req.headers.authorization;
+//     if (authHeader && authHeader.startsWith('Bearer ')) {
+//       try {
+//         const token = authHeader.split(' ')[1];
+//         const decoded = jwt.verify(token, JWT_SECRET);
+//         userId = decoded.userId;
+//         tokenEmail = decoded.email;
+//       } catch (tokenErr) {}
+//     }
+
+//     const emailParam = req.params.email || req.query.email || req.query.userEmail || tokenEmail;
+    
+//     const orConditions = [];
+
+//     if (userId) {
+//       orConditions.push({ user: userId });
+//       orConditions.push({ user: String(userId) });
+//     }
+
+//     if (emailParam && emailParam.trim()) {
+//       const cleanEmail = emailParam.trim();
+//       const emailRegex = new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
+//       orConditions.push({ userEmail: emailRegex });
+//       orConditions.push({ email: emailRegex });
+//       orConditions.push({ 'shippingAddress.email': emailRegex });
+//     }
+
+//     let filter = {};
+//     if (orConditions.length > 0) {
+//       filter = { $or: orConditions };
+//     } else if (!authHeader && !emailParam) {
+//       return res.status(400).json({ success: false, message: 'User identification (token or email) required to fetch user orders' });
+//     }
+
+//     if (isMongoConnected()) {
+//       const userOrders = await Order.find(filter)
+//         .select('orderId user userName userEmail email shippingAddress items totalAmount couponCode couponDiscount utrNumber paymentMethod status cancellationDetails returnDetails createdAt updatedAt')
+//         .sort({ createdAt: -1 })
+//         .limit(50)
+//         .lean();
+//       console.log(`Fetched orders for user (${userId || emailParam || 'filter'}):`, userOrders.length);
+//       return res.json(userOrders);
+//     } else {
+//       const cleanEmail = emailParam ? emailParam.trim().toLowerCase() : '';
+//       const userOrders = memoryOrders.filter(o => {
+//         if (userId && String(o.user) === String(userId)) return true;
+//         if (cleanEmail && ((o.userEmail && o.userEmail.toLowerCase() === cleanEmail) || (o.email && o.email.toLowerCase() === cleanEmail) || (o.shippingAddress?.email && o.shippingAddress.email.toLowerCase() === cleanEmail))) return true;
+//         return false;
+//       });
+//       console.log(`Fetched orders for user memory (${userId || emailParam}):`, userOrders.length);
+//       return res.json(userOrders);
+//     }
+//   } catch (err) {
+//     console.error('Error fetching user orders:', err);
+//     return res.status(500).json({ success: false, message: err.message || 'Failed to fetch user orders' });
+//   }
+// });
+
+
+
+// GET /api/user/my-orders (Optimized Fast Query with Index-friendly lookup)
 app.get([
   '/api/user/my-orders',
   '/api/orders/my-orders',
@@ -2550,58 +2623,66 @@ app.get([
       try {
         const token = authHeader.split(' ')[1];
         const decoded = jwt.verify(token, JWT_SECRET);
-        userId = decoded.userId;
+        userId = decoded.userId || decoded.id;
         tokenEmail = decoded.email;
       } catch (tokenErr) {}
     }
 
-    const emailParam = req.params.email || req.query.email || req.query.userEmail || tokenEmail;
-    
+    const rawEmail = req.params.email || req.query.email || req.query.userEmail || tokenEmail;
+    const cleanEmail = rawEmail ? String(rawEmail).trim().toLowerCase() : '';
+
     const orConditions = [];
 
+    // 1. Direct indexed ID match
     if (userId) {
       orConditions.push({ user: userId });
-      orConditions.push({ user: String(userId) });
+      if (mongoose.Types.ObjectId.isValid(userId)) {
+        orConditions.push({ user: new mongoose.Types.ObjectId(userId) });
+      }
     }
 
-    if (emailParam && emailParam.trim()) {
-      const cleanEmail = emailParam.trim();
-      const emailRegex = new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
-      orConditions.push({ userEmail: emailRegex });
-      orConditions.push({ email: emailRegex });
-      orConditions.push({ 'shippingAddress.email': emailRegex });
+    // 2. Fast Exact String Matches (Avoid Heavy Regex Table Scans)
+    if (cleanEmail) {
+      orConditions.push({ userEmail: cleanEmail });
+      orConditions.push({ email: cleanEmail });
+      orConditions.push({ 'shippingAddress.email': cleanEmail });
     }
 
-    let filter = {};
-    if (orConditions.length > 0) {
-      filter = { $or: orConditions };
-    } else if (!authHeader && !emailParam) {
-      return res.status(400).json({ success: false, message: 'User identification (token or email) required to fetch user orders' });
+    if (orConditions.length === 0) {
+      return res.status(200).json([]);
     }
+
+    const filter = orConditions.length === 1 ? orConditions[0] : { $or: orConditions };
 
     if (isMongoConnected()) {
       const userOrders = await Order.find(filter)
-        .select('orderId user userName userEmail email shippingAddress items totalAmount couponCode couponDiscount utrNumber paymentMethod status cancellationDetails returnDetails createdAt updatedAt')
+        .select('orderId userName userEmail email shippingAddress items totalAmount couponCode couponDiscount utrNumber paymentMethod status cancellationDetails returnDetails createdAt updatedAt')
         .sort({ createdAt: -1 })
-        .limit(50)
-        .lean();
-      console.log(`Fetched orders for user (${userId || emailParam || 'filter'}):`, userOrders.length);
-      return res.json(userOrders);
+        .limit(40)
+        .lean()
+        .maxTimeMS(2500); // 2.5s Hard timeout safeguard
+
+      res.setHeader('Cache-Control', 'private, max-age=15'); // 15s browser caching
+      return res.json(userOrders || []);
     } else {
-      const cleanEmail = emailParam ? emailParam.trim().toLowerCase() : '';
-      const userOrders = memoryOrders.filter(o => {
+      const userOrders = (memoryOrders || []).filter(o => {
         if (userId && String(o.user) === String(userId)) return true;
-        if (cleanEmail && ((o.userEmail && o.userEmail.toLowerCase() === cleanEmail) || (o.email && o.email.toLowerCase() === cleanEmail) || (o.shippingAddress?.email && o.shippingAddress.email.toLowerCase() === cleanEmail))) return true;
+        if (cleanEmail && (
+          (o.userEmail && o.userEmail.toLowerCase() === cleanEmail) ||
+          (o.email && o.email.toLowerCase() === cleanEmail) ||
+          (o.shippingAddress?.email && o.shippingAddress.email.toLowerCase() === cleanEmail)
+        )) return true;
         return false;
       });
-      console.log(`Fetched orders for user memory (${userId || emailParam}):`, userOrders.length);
       return res.json(userOrders);
     }
   } catch (err) {
-    console.error('Error fetching user orders:', err);
-    return res.status(500).json({ success: false, message: err.message || 'Failed to fetch user orders' });
+    console.error('[ORDERS FETCH ERROR]', err.message);
+    return res.status(200).json([]); // Always return clean empty array without hanging UI
   }
 });
+
+
 
 // POST ADD NEW ADDRESS FOR USER
 app.post('/api/user/address', async (req, res) => {
