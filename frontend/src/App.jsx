@@ -354,6 +354,96 @@ function App() {
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
+  const [products, setProducts] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [apiError, setApiError] = useState(null);
+
+  const loaderRef = useRef(null);
+
+  const fetchCategories = async () => {
+    try {
+      const { data } = await fetchWithCache('categories', async () => {
+        const res = await fetch(`${API_URL}/api/categories`);
+        return await res.json();
+      });
+      if (data) setCategories(data);
+    } catch (e) {
+      console.error('Error loading categories:', e);
+    }
+  };
+
+  const fetchProducts = async (pageNum = 1, forceRefresh = false) => {
+    const sanitizedCat = (!selectedCategory || selectedCategory === 'All') ? '' : selectedCategory.trim();
+    const cacheKey = `products_cat_${sanitizedCat || 'all'}_search_${searchTerm.trim()}_p${pageNum}`;
+    
+    try {
+      if (pageNum === 1) {
+        setLoading(true);
+        setApiError(null);
+      } else {
+        setLoadingMore(true);
+      }
+
+      const buildUrl = (p) => {
+        let params = new URLSearchParams();
+        if (sanitizedCat) params.append('category', sanitizedCat);
+        if (searchTerm.trim()) params.append('search', searchTerm.trim());
+        params.append('page', p);
+        params.append('limit', 12);
+        params.append('t', Date.now());
+        return `${API_URL}/api/products?${params.toString()}`;
+      };
+
+      const { data: rawResponse } = await fetchWithCache(
+        cacheKey,
+        async () => {
+          const url = buildUrl(pageNum);
+          const res = await fetch(url);
+          if (!res.ok) {
+            throw new Error(`Server returned status ${res.status}`);
+          }
+          return await res.json();
+        },
+        { forceRefresh }
+      );
+
+      let fetchedProducts = [];
+      let moreAvailable = false;
+
+      if (rawResponse && typeof rawResponse === 'object' && !Array.isArray(rawResponse)) {
+        fetchedProducts = rawResponse.products || [];
+        moreAvailable = rawResponse.hasMore !== undefined ? rawResponse.hasMore : (pageNum < (rawResponse.totalPages || 1));
+      } else if (Array.isArray(rawResponse)) {
+        fetchedProducts = rawResponse;
+        moreAvailable = false;
+      }
+
+      if (pageNum === 1) {
+        setProducts(fetchedProducts);
+      } else {
+        setProducts((prev) => {
+          const existingIds = new Set(prev.map(p => p._id || p.id));
+          const newItems = fetchedProducts.filter(p => !existingIds.has(p._id || p.id));
+          return [...prev, ...newItems];
+        });
+      }
+
+      setHasMore(moreAvailable);
+      setPage(pageNum);
+      setApiError(null);
+    } catch (e) {
+      console.error('Error fetching products:', e);
+      if (pageNum === 1) {
+        setApiError('Unable to load products. Please check your connection or try again.');
+      }
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  };
 
   // Flipkart-Style Product Filter State System
   const DEFAULT_FILTERS = {
@@ -580,85 +670,6 @@ function App() {
     });
   };
 
-  const [products, setProducts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [page, setPage] = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [apiError, setApiError] = useState(null);
-
-  const loaderRef = useRef(null);
-
-  const fetchProducts = async (pageNum = 1, forceRefresh = false) => {
-    const sanitizedCat = (!selectedCategory || selectedCategory === 'All') ? '' : selectedCategory.trim();
-    const cacheKey = `products_cat_${sanitizedCat || 'all'}_search_${searchTerm.trim()}_p${pageNum}`;
-    
-    try {
-      if (pageNum === 1) {
-        setLoading(true);
-        setApiError(null);
-      } else {
-        setLoadingMore(true);
-      }
-
-      const buildUrl = (p) => {
-        let params = new URLSearchParams();
-        if (sanitizedCat) params.append('category', sanitizedCat);
-        if (searchTerm.trim()) params.append('search', searchTerm.trim());
-        params.append('page', p);
-        params.append('limit', 12);
-        params.append('t', Date.now());
-        return `${API_URL}/api/products?${params.toString()}`;
-      };
-
-      const { data: rawResponse } = await fetchWithCache(
-        cacheKey,
-        async () => {
-          const url = buildUrl(pageNum);
-          const res = await fetch(url);
-          if (!res.ok) {
-            throw new Error(`Server returned status ${res.status}`);
-          }
-          return await res.json();
-        },
-        { forceRefresh }
-      );
-
-      let fetchedProducts = [];
-      let moreAvailable = false;
-
-      if (rawResponse && typeof rawResponse === 'object' && !Array.isArray(rawResponse)) {
-        fetchedProducts = rawResponse.products || [];
-        moreAvailable = rawResponse.hasMore !== undefined ? rawResponse.hasMore : (pageNum < (rawResponse.totalPages || 1));
-      } else if (Array.isArray(rawResponse)) {
-        fetchedProducts = rawResponse;
-        moreAvailable = false;
-      }
-
-      if (pageNum === 1) {
-        setProducts(fetchedProducts);
-      } else {
-        setProducts((prev) => {
-          const existingIds = new Set(prev.map(p => p._id || p.id));
-          const newItems = fetchedProducts.filter(p => !existingIds.has(p._id || p.id));
-          return [...prev, ...newItems];
-        });
-      }
-
-      setHasMore(moreAvailable);
-      setPage(pageNum);
-      setApiError(null);
-    } catch (e) {
-      console.error('Error fetching products:', e);
-      if (pageNum === 1) {
-        setApiError('Unable to load products. Please check your connection or try again.');
-      }
-    } finally {
-      setLoading(false);
-      setLoadingMore(false);
-    }
-  };
-
   useEffect(() => {
     fetchCategories();
   }, []);
@@ -694,18 +705,6 @@ function App() {
       }
     };
   }, [page, hasMore, loading, loadingMore, apiError, selectedCategory, searchTerm]);
-
-  const fetchCategories = async () => {
-    try {
-      const { data } = await fetchWithCache('categories', async () => {
-        const res = await fetch(`${API_URL}/api/categories`);
-        return await res.json();
-      });
-      if (data) setCategories(data);
-    } catch (e) {
-      console.error('Error loading categories:', e);
-    }
-  };
 
   // Restore opened Product Detail Page if page was refreshed
   useEffect(() => {
