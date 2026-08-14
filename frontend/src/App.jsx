@@ -1019,7 +1019,7 @@ function App() {
         currentView={currentView}
         setCurrentView={setView}
         categories={categories}
-        allProducts={allProducts.length > 0 ? allProducts : products}
+        allProducts={products}
         onSelectProduct={handleOpenProductDetail}
         unreadNotificationCount={unreadNotificationCount}
         showNotificationBubble={showNotificationBubble}
@@ -1239,7 +1239,7 @@ function App() {
         isOpen={isDetailOpen}
         onClose={handleCloseProductDetail}
         onAddToCart={handleAddToCart}
-        allProducts={allProducts.length > 0 ? allProducts : products}
+        allProducts={products}
         onSelectProduct={handleSelectRelatedProduct}
         isWishlisted={wishlist.some(w => (w._id || w.id) === (selectedProduct?._id || selectedProduct?.id))}
         onToggleWishlist={handleToggleWishlist}
@@ -1363,7 +1363,7 @@ function App() {
         isOpen={isFilterModalOpen}
         onClose={() => setIsFilterModalOpen(false)}
         categories={categories}
-        allProducts={allProducts.length > 0 ? allProducts : products}
+        allProducts={products}
         currentFilters={appliedFilters}
         onApplyFilters={(newFilters) => setAppliedFilters(newFilters)}
         onResetFilters={() => setAppliedFilters(DEFAULT_FILTERS)}
