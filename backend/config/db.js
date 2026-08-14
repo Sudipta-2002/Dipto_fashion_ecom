@@ -18,9 +18,11 @@ const connectDB = async () => {
       family: 4
     });
     console.log(`MongoDB Connected: ${conn.connection.host} / Database: ${conn.connection.name}`);
+    return conn;
   } catch (error) {
-    console.error(`MongoDB Connection Error: ${error.message}`);
+    console.error(`MongoDB Connection Failed: ${error.message}`);
     console.log('Falling back to local in-memory/mock storage if Atlas is unreachable.');
+    throw error;
   }
 };
 
