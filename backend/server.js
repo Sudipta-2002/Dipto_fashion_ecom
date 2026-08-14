@@ -1696,22 +1696,34 @@ let memoryLiveSale = {
 // });
 
 
-// --- LIVE SALE MULTI-BANNER SCHEMA & MODEL ---
-const liveSaleBannerSchema = new mongoose.Schema(
-  {
-    title: { type: String, default: '🔥 MEGA FESTIVE SALE IS LIVE!' },
-    offerDetails: { type: String, default: 'Up to 50% OFF on Selected Items' },
-    targetCategory: { type: String, default: 'All' },
-    endTime: { type: Date, default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) },
-    isActive: { type: Boolean, default: true },
-    order: { type: Number, default: 0 }
-  },
-  { timestamps: true }
-);
+// ==========================================
+// LIVE SALE MULTI-BANNER MANAGEMENT (1-3 BANNERS)
+// ==========================================
 
-const LiveSale = mongoose.models.LiveSale || mongoose.model('LiveSale', liveSaleBannerSchema);
+// 1. Safe Schema & Model Resolution (Prevents Duplicate Identifier Error)
+let LiveSaleModel;
+try {
+  if (mongoose.models && mongoose.models.LiveSale) {
+    LiveSaleModel = mongoose.models.LiveSale;
+  } else {
+    const liveSaleBannerSchema = new mongoose.Schema(
+      {
+        title: { type: String, default: '🔥 MEGA FESTIVE SALE IS LIVE!' },
+        offerDetails: { type: String, default: 'Up to 50% OFF on Selected Items' },
+        targetCategory: { type: String, default: 'All' },
+        endTime: { type: Date, default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) },
+        isActive: { type: Boolean, default: true },
+        order: { type: Number, default: 0 }
+      },
+      { timestamps: true }
+    );
+    LiveSaleModel = mongoose.model('LiveSale', liveSaleBannerSchema);
+  }
+} catch (e) {
+  console.warn('LiveSale Model initialization warning:', e.message);
+}
 
-// In-Memory Multi-banner Fallback
+// 2. In-Memory Fallback List
 let memoryLiveSales = [
   {
     _id: 'sale_1',
@@ -1724,43 +1736,52 @@ let memoryLiveSales = [
   }
 ];
 
-// GET ALL LIVE SALE BANNERS (STOREFRONT / PUBLIC)
+// 3. GET ACTIVE LIVE SALE BANNERS (STOREFRONT / PUBLIC)
 app.get(['/api/live-sale', '/live-sale', '/api/live-sale/active', '/live-sale/active'], async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   try {
-    if (mongoose.connection.readyState === 1) {
-      const sales = await LiveSale.find({ isActive: true }).sort({ order: 1, updatedAt: -1 }).lean().maxTimeMS(3000);
+    if (mongoose.connection.readyState === 1 && LiveSaleModel) {
+      const sales = await LiveSaleModel.find({ isActive: true })
+        .sort({ order: 1, updatedAt: -1 })
+        .lean()
+        .maxTimeMS(3000);
       return res.status(200).json(sales || []);
     } else {
-      const activeMem = memoryLiveSales.filter(s => s.isActive);
+      const activeMem = memoryLiveSales.filter((s) => s.isActive);
       return res.status(200).json(activeMem);
     }
   } catch (err) {
-    return res.status(200).json(memoryLiveSales.filter(s => s.isActive));
+    console.error('Error fetching storefront live sale banners:', err.message);
+    const activeMem = memoryLiveSales.filter((s) => s.isActive);
+    return res.status(200).json(activeMem);
   }
 });
 
-// GET ALL BANNERS FOR ADMIN (ACTIVE & INACTIVE)
+// 4. GET ALL BANNERS FOR ADMIN (ACTIVE & INACTIVE)
 app.get(['/api/admin/live-sales', '/admin/live-sales'], async (req, res) => {
   try {
-    if (mongoose.connection.readyState === 1) {
-      const sales = await LiveSale.find().sort({ order: 1, createdAt: -1 }).lean().maxTimeMS(3000);
+    if (mongoose.connection.readyState === 1 && LiveSaleModel) {
+      const sales = await LiveSaleModel.find()
+        .sort({ order: 1, createdAt: -1 })
+        .lean()
+        .maxTimeMS(3000);
       return res.status(200).json(sales || []);
     } else {
       return res.status(200).json(memoryLiveSales);
     }
   } catch (err) {
+    console.error('Error fetching admin live sale banners:', err.message);
     return res.status(200).json(memoryLiveSales);
   }
 });
 
-// SAVE / CREATE / UPDATE BANNERS ARRAY (UP TO 3 BANNERS)
+// 5. SAVE / CREATE / UPDATE BANNERS (UP TO 3 BANNERS)
 app.post(['/api/admin/live-sale', '/admin/live-sale', '/api/live-sale', '/live-sale'], async (req, res) => {
   try {
-    const { banners } = req.body; // Expecting array of banners (1 to 3)
+    const { banners } = req.body;
     let bannerList = Array.isArray(banners) ? banners : [req.body];
 
-    // Restrict to max 3 banners
+    // Restrict strictly to max 3 banners
     bannerList = bannerList.slice(0, 3).map((b, idx) => ({
       title: b.title ? b.title.trim() : '🔥 SPECIAL SALE IS LIVE!',
       offerDetails: b.offerDetails ? b.offerDetails.trim() : 'Exclusive Discounts Available',
@@ -1770,14 +1791,15 @@ app.post(['/api/admin/live-sale', '/admin/live-sale', '/api/live-sale', '/live-s
       order: idx + 1
     }));
 
-    if (mongoose.connection.readyState === 1) {
-      // Overwrite/sync banner collection with updated 1-3 banners
-      await LiveSale.deleteMany({});
-      const savedDocs = await LiveSale.insertMany(bannerList);
+    if (mongoose.connection.readyState === 1 && LiveSaleModel) {
+      // Overwrite/sync banner collection with clean 1-3 banners
+      await LiveSaleModel.deleteMany({});
+      const savedDocs = await LiveSaleModel.insertMany(bannerList);
 
       try {
-        const activeDocs = savedDocs.filter(d => d.isActive);
-        io.emit('live_sale_updated', activeDocs);
+        const activeDocs = savedDocs.filter((d) => d.isActive);
+        const socketServer = typeof io !== 'undefined' ? io : req.app?.get('io');
+        if (socketServer) socketServer.emit('live_sale_updated', activeDocs);
       } catch (e) {}
 
       return res.status(200).json({ success: true, message: 'All banners updated successfully!', data: savedDocs });
@@ -1789,18 +1811,18 @@ app.post(['/api/admin/live-sale', '/admin/live-sale', '/api/live-sale', '/live-s
       }));
 
       try {
-        io.emit('live_sale_updated', memoryLiveSales.filter(d => d.isActive));
+        const activeMem = memoryLiveSales.filter((d) => d.isActive);
+        const socketServer = typeof io !== 'undefined' ? io : req.app?.get('io');
+        if (socketServer) socketServer.emit('live_sale_updated', activeMem);
       } catch (e) {}
 
       return res.status(200).json({ success: true, message: 'Saved to memory (DB offline)', data: memoryLiveSales });
     }
   } catch (err) {
-    console.error('Error in live-sale banner update:', err);
+    console.error('Error in live-sale banner update:', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
-
-
 // --- COUPON API ENDPOINTS ---
 app.use('/api/admin/coupons', couponRoutes);
 app.use('/api/coupons', couponRoutes);
