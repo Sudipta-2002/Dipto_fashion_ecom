@@ -12,11 +12,6 @@ const RETURN_REASONS = [
 
 const ProductReturnModal = ({ isOpen, onClose, order, onReturnSuccess }) => {
   const [reason, setReason] = useState(RETURN_REASONS[0]);
-  const [accountHolder, setAccountHolder] = useState('');
-  const [bankName, setBankName] = useState('');
-  const [accountNumber, setAccountNumber] = useState('');
-  const [ifscCode, setIfscCode] = useState('');
-  const [upiId, setUpiId] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
   const [confirmedReturn, setConfirmedReturn] = useState(null);
@@ -25,11 +20,6 @@ const ProductReturnModal = ({ isOpen, onClose, order, onReturnSuccess }) => {
 
   const handleSubmitReturn = async (e) => {
     e.preventDefault();
-    if (!upiId.trim() && (!accountNumber.trim() || !ifscCode.trim())) {
-      alert('Please enter either your Bank Account details or a valid UPI ID for the refund');
-      return;
-    }
-
     setLoading(true);
 
     try {
@@ -38,11 +28,6 @@ const ProductReturnModal = ({ isOpen, onClose, order, onReturnSuccess }) => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           reason,
-          accountHolder,
-          bankName,
-          accountNumber,
-          ifscCode,
-          upiId,
           notes
         })
       });
@@ -124,14 +109,19 @@ const ProductReturnModal = ({ isOpen, onClose, order, onReturnSuccess }) => {
               </select>
             </div>
 
-            {/* Refund Information Banner (No UPI Input required) */}
-            <div style={{ background: '#fdf4ff', border: '1.5px solid #f5d0fe', borderRadius: '10px', padding: '0.9rem', marginBottom: '1rem' }}>
-              <div style={{ fontSize: '0.88rem', fontWeight: '800', color: '#701a75', marginBottom: '0.35rem' }}>
-                💳 Automatic Refund to Original Account
-              </div>
-              <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0, lineHeight: '1.45' }}>
-                Upon pickup inspection and approval, your refund will be automatically credited back to the exact same account from which payment was made (UPI / Credit/Debit Card / Net Banking).
-              </p>
+            {/* Refund Information Banner (Fixed Refund Notice) */}
+            <div style={{ background: '#fdf4ff', border: '1.5px solid #c026d3', borderRadius: '10px', padding: '0.9rem', marginBottom: '1rem' }}>
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', cursor: 'default', margin: 0 }}>
+                <input type="radio" checked disabled readOnly style={{ accentColor: '#c026d3', marginTop: '3px' }} />
+                <div>
+                  <div style={{ fontSize: '0.88rem', fontWeight: '800', color: '#701a75', marginBottom: '0.2rem' }}>
+                    Refund to Original Payment Source
+                  </div>
+                  <p style={{ fontSize: '0.8rem', color: '#64748b', margin: 0, lineHeight: '1.45' }}>
+                    Refund amount will be refunded directly to the original payment source.
+                  </p>
+                </div>
+              </label>
             </div>
 
             <div className="form-group" style={{ marginBottom: '1rem' }}>

@@ -390,13 +390,12 @@ const AdminBilling = () => {
             <table className="admin-table">
               <thead>
                 <tr>
+                  <th>Order ID / Ref</th>
+                  <th>User Details</th>
                   <th>Date & Time</th>
-                  <th>Order ID</th>
-                  <th>Customer Name</th>
-                  <th>UTR Number</th>
-                  <th>Transaction Type</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Billing Amount (₹)</th>
+                  <th>Type</th>
+                  <th>Amount</th>
+                  <th style={{ textAlign: 'right' }}>Running Balance</th>
                 </tr>
               </thead>
               <tbody>
@@ -404,6 +403,11 @@ const AdminBilling = () => {
                   const isCredit = entry.type === 'credit';
                   return (
                     <tr key={entry.id}>
+                      <td style={{ fontWeight: '800', color: '#0f172a' }}>{entry.orderId}</td>
+                      <td style={{ fontSize: '0.85rem', color: '#334155' }}>
+                        <div style={{ fontWeight: '700' }}>{entry.customerName}</div>
+                        {entry.userEmail && <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{entry.userEmail}</div>}
+                      </td>
                       <td style={{ fontSize: '0.82rem', color: '#475569', fontWeight: '600' }}>
                         {new Date(entry.date).toLocaleDateString('en-GB', {
                           day: '2-digit',
@@ -412,13 +416,6 @@ const AdminBilling = () => {
                           hour: '2-digit',
                           minute: '2-digit'
                         })}
-                      </td>
-                      <td style={{ fontWeight: '800', color: '#0f172a' }}>{entry.orderId}</td>
-                      <td style={{ fontSize: '0.85rem', color: '#334155' }}>{entry.customerName}</td>
-                      <td>
-                        <span style={{ fontFamily: 'monospace', background: '#f1f5f9', padding: '3px 8px', borderRadius: '4px', fontSize: '0.8rem', fontWeight: '700' }}>
-                          {entry.utrNumber}
-                        </span>
                       </td>
                       <td>
                         <span
@@ -434,14 +431,14 @@ const AdminBilling = () => {
                             color: isCredit ? '#15803d' : '#b91c1c'
                           }}
                         >
-                          {isCredit ? '+ Sold Item Credit' : '- Return Refund Debit'}
+                          {entry.label || (isCredit ? 'Sale (Shipped)' : 'Refund (Return/Cancel)')}
                         </span>
                       </td>
-                      <td style={{ fontSize: '0.8rem', fontWeight: '700', color: '#64748b' }}>
-                        {entry.status}
-                      </td>
-                      <td style={{ textAlign: 'right', fontWeight: '800', fontSize: '0.95rem', color: isCredit ? '#15803d' : '#b91c1c' }}>
+                      <td style={{ fontWeight: '800', fontSize: '0.95rem', color: isCredit ? '#15803d' : '#b91c1c' }}>
                         {isCredit ? `+ ₹${entry.amount.toLocaleString('en-IN')}` : `- ₹${Math.abs(entry.amount).toLocaleString('en-IN')}`}
+                      </td>
+                      <td style={{ textAlign: 'right', fontWeight: '800', fontSize: '0.95rem', color: entry.runningBalance >= 0 ? '#0f172a' : '#b91c1c' }}>
+                        ₹{(entry.runningBalance || 0).toLocaleString('en-IN')}
                       </td>
                     </tr>
                   );
@@ -449,8 +446,8 @@ const AdminBilling = () => {
               </tbody>
               <tfoot>
                 <tr style={{ background: '#f8fafc', borderTop: '2px solid #e2e8f0' }}>
-                  <td colSpan={6} style={{ fontWeight: '900', fontSize: '0.95rem', color: '#0f172a', textAlign: 'right' }}>
-                    TOTAL NET BILL AMOUNT:
+                  <td colSpan={5} style={{ fontWeight: '900', fontSize: '0.95rem', color: '#0f172a', textAlign: 'right' }}>
+                    NET REVENUE BALANCE:
                   </td>
                   <td style={{ textAlign: 'right', fontWeight: '900', fontSize: '1.25rem', color: '#c026d3' }}>
                     ₹{netTotalBill.toLocaleString('en-IN')}

@@ -2280,17 +2280,12 @@ app.post('/api/user/address', async (req, res) => {
 app.post('/api/orders/:id/cancel', async (req, res) => {
   try {
     const { id } = req.params;
-    const { reason, refundToSource, upiId, accountHolder, bankName, accountNumber, ifscCode } = req.body;
+    const { reason } = req.body;
 
     const cancellationData = {
       reason: reason || 'Customer requested cancellation',
-      requestedAt: new Date(),
-      refundToSource: !!refundToSource,
-      upiId: upiId || '',
-      accountHolder: accountHolder || '',
-      bankName: bankName || '',
-      accountNumber: accountNumber || '',
-      ifscCode: ifscCode || ''
+      refundToSource: true,
+      cancelledAt: new Date()
     };
 
     if (isMongoConnected()) {
@@ -2510,20 +2505,15 @@ app.put('/api/orders/:id/status', async (req, res) => {
 app.post('/api/orders/:id/return', async (req, res) => {
   try {
     const { id } = req.params;
-    const { reason, accountHolder, bankName, accountNumber, ifscCode, upiId, notes } = req.body;
+    const { reason } = req.body;
 
     const pickupDateStr = new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
     const returnData = {
-      reason,
-      accountHolder: accountHolder || '',
-      bankName: bankName || '',
-      accountNumber: accountNumber || '',
-      ifscCode: ifscCode || '',
-      upiId: upiId || '',
-      notes: notes || '',
-      requestedAt: new Date().toISOString(),
-      pickupDate: pickupDateStr
+      reason: reason || 'Customer requested return',
+      refundToSource: true,
+      pickupDate: pickupDateStr,
+      returnedAt: new Date()
     };
 
     if (isMongoConnected()) {
@@ -2739,7 +2729,7 @@ app.get('/api/admin/billing', async (req, res) => {
     let ordersList = [];
     if (isMongoConnected()) {
       ordersList = await Order.find()
-        .select('orderId user userName userEmail email shippingAddress items totalAmount paymentMethod status utrNumber returnDetails createdAt updatedAt')
+        .select('orderId user userName userEmail email shippingAddress items totalAmount paymentMethod status cancellationDetails returnDetails createdAt updatedAt')
         .sort({ createdAt: -1 })
         .lean();
     } else {
@@ -2749,58 +2739,63 @@ app.get('/api/admin/billing', async (req, res) => {
     const ledger = [];
     let totalCredit = 0;
     let totalDebit = 0;
+    let runningBalance = 0;
 
+    // Process orders to build transaction ledger
     ordersList.forEach((order) => {
-      // EXCLUDE customer self-cancelled and rejected orders from Billing History!
-      if (['Cancelled', 'Rejected'].includes(order.status)) {
-        return;
-      }
+      const isShippedOrDelivered = ['Shipped', 'Delivered'].includes(order.status);
+      const isReturnedOrCancelledApproved = ['Returned', 'Cancelled', 'Return Approved', 'Refund Completed'].includes(order.status);
 
-      const isSold = ['Accepted', 'Shipped', 'Out for Delivery', 'Delivered'].includes(order.status);
-      const isReturned = ['Return Requested', 'Return Approved', 'Refund Completed'].includes(order.status);
-
-      if (isSold) {
-        totalCredit += order.totalAmount || 0;
+      if (isShippedOrDelivered) {
+        const amt = order.totalAmount || 0;
+        totalCredit += amt;
         ledger.push({
-          id: order._id,
+          id: order._id || order.orderId,
           date: order.updatedAt || order.createdAt,
           orderId: order.orderId,
           customerName: order.shippingAddress?.userName || order.userName || 'Customer',
+          userEmail: order.userEmail || order.email || order.shippingAddress?.email || '',
           utrNumber: order.utrNumber || 'N/A',
           type: 'credit',
           sign: '+',
-          label: 'Order Confirmed / Shipped',
-          amount: order.totalAmount || 0,
+          label: `Sale (${order.status})`,
+          amount: amt,
           status: order.status
         });
-      }
-
-      if (isReturned) {
-        totalDebit += order.totalAmount || 0;
+      } else if (isReturnedOrCancelledApproved) {
+        const amt = order.totalAmount || 0;
+        totalDebit += amt;
         ledger.push({
-          id: order._id + '_ret',
-          date: order.returnDetails?.requestedAt || order.updatedAt || order.createdAt,
+          id: (order._id || order.orderId) + '_refund',
+          date: order.returnDetails?.requestedAt || order.cancellationDetails?.requestedAt || order.updatedAt || order.createdAt,
           orderId: order.orderId,
           customerName: order.shippingAddress?.userName || order.userName || 'Customer',
+          userEmail: order.userEmail || order.email || order.shippingAddress?.email || '',
           utrNumber: order.utrNumber || 'N/A',
           type: 'debit',
           sign: '-',
-          label: 'Order Return / Refund',
-          amount: -(order.totalAmount || 0),
-          rawAmount: order.totalAmount || 0,
+          label: `Refund (${order.status})`,
+          amount: -amt,
+          rawAmount: amt,
           status: order.status
         });
       }
     });
 
-    // Sort ledger by date descending
+    // Sort ledger entries chronologically ascending to calculate running balance
+    ledger.sort((a, b) => new Date(a.date) - new Date(b.date));
+    ledger.forEach((entry) => {
+      runningBalance += entry.amount;
+      entry.runningBalance = runningBalance;
+    });
+
+    // Sort descending for UI presentation
     ledger.sort((a, b) => new Date(b.date) - new Date(a.date));
 
     res.json({
       totalCredit,
       totalDebit,
       netTotal: totalCredit - totalDebit,
-      totalEntries: ledger.length,
       ledger
     });
   } catch (err) {

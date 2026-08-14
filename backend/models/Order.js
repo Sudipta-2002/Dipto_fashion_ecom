@@ -13,11 +13,10 @@ const orderItemSchema = new mongoose.Schema({
 }, { _id: false });
 
 const orderSchema = new mongoose.Schema({
-  orderId: { type: String, required: true, index: true },
-  user: { type: mongoose.Schema.Types.Mixed, required: false, index: true },
+  orderId: { type: String, required: true },
+  user: { type: mongoose.Schema.Types.Mixed, required: false },
   userName: { type: String, default: 'Customer' },
-  userEmail: { type: String, default: '', index: true },
-  email: { type: String, default: '', index: true },
+  userEmail: { type: String, default: '' },
   shippingAddress: {
     userName: { type: String, default: 'Customer' },
     email: { type: String, default: '' },
@@ -47,31 +46,34 @@ const orderSchema = new mongoose.Schema({
   rejectionReason: { type: String, default: '' },
   cancellationDetails: {
     reason: { type: String, default: '' },
-    cancelledAt: { type: Date },
-    refundToSource: { type: Boolean, default: false },
-    upiId: { type: String, default: '' },
-    accountHolder: { type: String, default: '' },
-    bankName: { type: String, default: '' },
-    accountNumber: { type: String, default: '' },
-    ifscCode: { type: String, default: '' },
-    requestedAt: { type: Date }
+    refundToSource: { type: Boolean, default: true },
+    cancelledAt: { type: Date }
   },
   returnDetails: {
     reason: { type: String, default: '' },
-    accountHolder: { type: String, default: '' },
-    bankName: { type: String, default: '' },
-    accountNumber: { type: String, default: '' },
-    ifscCode: { type: String, default: '' },
-    upiId: { type: String, default: '' },
-    notes: { type: String, default: '' },
-    requestedAt: { type: Date },
-    pickupDate: { type: String, default: '' }
+    refundToSource: { type: Boolean, default: true },
+    pickupDate: { type: String, default: '' },
+    returnedAt: { type: Date }
   }
 }, { timestamps: true });
 
-orderSchema.index({ createdAt: -1, status: 1 });
+// Essential Clean High-Performance Indexes
+orderSchema.index({ orderId: 1 }, { unique: true });
 orderSchema.index({ user: 1, createdAt: -1 });
-orderSchema.index({ userEmail: 1, createdAt: -1 });
-orderSchema.index({ email: 1, createdAt: -1 });
+orderSchema.index({ status: 1, createdAt: -1 });
+orderSchema.index({ "items.status": 1 });
+orderSchema.index({ createdAt: -1 });
 
-export default mongoose.model('Order', orderSchema);
+const Order = mongoose.model('Order', orderSchema);
+
+// Safe syncIndexes helper function to automatically drop redundant/unused indexes from MongoDB
+Order.syncOrderIndexes = async () => {
+  try {
+    await Order.syncIndexes();
+    console.log('[MONGOOSE] Order schema indexes synchronized cleanly.');
+  } catch (err) {
+    console.error('[MONGOOSE INDEX SYNC WARN]', err.message);
+  }
+};
+
+export default Order;
