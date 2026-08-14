@@ -2851,11 +2851,145 @@ app.get('/api/admin/analytics', async (req, res) => {
 
 
 
+// app.get('/api/admin/billing', async (req, res) => {
+//   try {
+//     let ordersList = [];
+//     if (isMongoConnected()) {
+//       // 1. Direct indexed string matching (Super fast compared to regex)
+//       const targetStatuses = [
+//         'shipped', 'delivered', 'out for delivery',
+//         'cancelled', 'canceled', 'returned', 'return approved', 'refunded', 'refund completed', 'cancellation requested',
+//         'Shipped', 'Delivered', 'Out for Delivery',
+//         'Cancelled', 'Canceled', 'Returned', 'Return Approved', 'Refunded', 'Refund Completed', 'Cancellation Requested'
+//       ];
+
+//       ordersList = await Order.find({
+//         $or: [
+//           { status: { $in: targetStatuses } },
+//           { orderStatus: { $in: targetStatuses } },
+//           { stockDeducted: true }
+//         ]
+//       })
+//         .select('orderId totalAmount amount price status orderStatus createdAt updatedAt date user userEmail shippingAddress utrNumber paymentInfo returnDetails cancellationDetails stockDeducted')
+//         .sort({ createdAt: 1 }) // Chronologically ascending directly from DB
+//         .lean()
+//         .maxTimeMS(5000); // 5s safe query cap
+//     } else {
+//       ordersList = Array.isArray(memoryOrders) ? [...memoryOrders] : [];
+//     }
+
+//     const rawLedger = [];
+//     let totalCredit = 0;
+//     let totalDebit = 0;
+
+//     // Process orders to build transaction entries
+//     (ordersList || []).forEach((order) => {
+//       if (!order) return;
+
+//       const statusLower = String(order?.status || order?.orderStatus || '').trim().toLowerCase();
+//       const amt = Number(order?.totalAmount ?? order?.amount ?? order?.price) || 0;
+//       const orderIdStr = String(order?.orderId || order?._id || 'N/A');
+//       const custName = String(order?.shippingAddress?.userName || order?.shippingAddress?.fullName || order?.userName || 'Customer');
+//       const userMail = String(order?.userEmail || order?.email || order?.user || order?.shippingAddress?.email || 'N/A');
+//       const utrStr = String(order?.utrNumber || order?.paymentInfo?.utr || 'N/A');
+//       const createdDate = order?.createdAt || order?.date || new Date().toISOString();
+
+//       const isShippedOrDelivered = ['shipped', 'out for delivery', 'delivered'].includes(statusLower) || Boolean(order?.stockDeducted);
+//       const isDebitStatus = ['cancelled', 'canceled', 'returned', 'return approved', 'refund completed', 'refunded', 'cancellation requested'].includes(statusLower);
+
+//       // 1. Credit (+) Transaction: যখন প্রোডাক্ট Shipped বা Delivered হয়
+//       if (isShippedOrDelivered) {
+//         totalCredit += amt;
+//         rawLedger.push({
+//           id: String(order?._id || orderIdStr) + '_credit',
+//           date: createdDate,
+//           orderId: orderIdStr,
+//           customerName: custName,
+//           userEmail: userMail,
+//           utrNumber: utrStr,
+//           type: 'credit',
+//           sign: '+',
+//           label: `Sale (${order?.status || 'Shipped'})`,
+//           amount: amt,
+//           rawAmount: amt,
+//           status: order?.status || 'Shipped'
+//         });
+//       }
+
+//       // 2. Debit (-) Transaction: যখন প্রোডাক্ট Return বা Cancelled হয়
+//       if (isDebitStatus) {
+//         totalDebit += amt;
+//         const refundDate = order?.returnDetails?.returnedAt || order?.cancellationDetails?.cancelledAt || order?.updatedAt || createdDate;
+//         rawLedger.push({
+//           id: String(order?._id || orderIdStr) + '_debit',
+//           date: refundDate,
+//           orderId: orderIdStr,
+//           customerName: custName,
+//           userEmail: userMail,
+//           utrNumber: utrStr,
+//           type: 'debit',
+//           sign: '-',
+//           label: `Refund (${order?.status || 'Refunded'})`,
+//           amount: -amt,
+//           rawAmount: amt,
+//           status: order?.status || 'Refunded'
+//         });
+//       }
+//     });
+
+//     // Sort chronologically ascending to calculate accurate cumulative running balance
+//     rawLedger.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    
+//     let cumBalance = 0;
+//     const ledger = rawLedger.map((entry) => {
+//       cumBalance += Number(entry.amount) || 0;
+//       return {
+//         id: String(entry.id),
+//         date: String(entry.date),
+//         orderId: String(entry.orderId),
+//         userEmail: String(entry.userEmail),
+//         utrNumber: String(entry.utrNumber),
+//         status: String(entry.status),
+//         runningBalance: cumBalance,
+//         amount: Number(entry.amount),
+//         rawAmount: Number(entry.rawAmount),
+//         type: entry.type,
+//         sign: entry.sign,
+//         customerName: String(entry.customerName),
+//         label: String(entry.label)
+//       };
+//     });
+
+//     // Return newest transaction first for UI
+//     return res.status(200).json({
+//       success: true,
+//       totalCredit,
+//       totalDebit,
+//       netTotal: totalCredit - totalDebit,
+//       ledger: ledger.reverse()
+//     });
+
+//   } catch (err) {
+//     console.error('Error in GET /api/admin/billing (handled gracefully):', err.message);
+//     return res.status(200).json({
+//       success: false,
+//       message: err?.message || 'DB query error processing billing history',
+//       totalCredit: 0,
+//       totalDebit: 0,
+//       netTotal: 0,
+//       ledger: []
+//     });
+//   }
+// });
+
+
+
+
 app.get('/api/admin/billing', async (req, res) => {
   try {
     let ordersList = [];
+
     if (isMongoConnected()) {
-      // 1. Direct indexed string matching (Super fast compared to regex)
       const targetStatuses = [
         'shipped', 'delivered', 'out for delivery',
         'cancelled', 'canceled', 'returned', 'return approved', 'refunded', 'refund completed', 'cancellation requested',
@@ -2870,10 +3004,10 @@ app.get('/api/admin/billing', async (req, res) => {
           { stockDeducted: true }
         ]
       })
-        .select('orderId totalAmount amount price status orderStatus createdAt updatedAt date user userEmail shippingAddress utrNumber paymentInfo returnDetails cancellationDetails stockDeducted')
-        .sort({ createdAt: 1 }) // Chronologically ascending directly from DB
+        .select('orderId totalAmount amount price status orderStatus createdAt updatedAt date user userEmail email userName shippingAddress utrNumber paymentInfo returnDetails cancellationDetails stockDeducted')
+        .sort({ createdAt: 1 })
         .lean()
-        .maxTimeMS(5000); // 5s safe query cap
+        .maxTimeMS(5000);
     } else {
       ordersList = Array.isArray(memoryOrders) ? [...memoryOrders] : [];
     }
@@ -2882,26 +3016,26 @@ app.get('/api/admin/billing', async (req, res) => {
     let totalCredit = 0;
     let totalDebit = 0;
 
-    // Process orders to build transaction entries
     (ordersList || []).forEach((order) => {
       if (!order) return;
 
-      const statusLower = String(order?.status || order?.orderStatus || '').trim().toLowerCase();
-      const amt = Number(order?.totalAmount ?? order?.amount ?? order?.price) || 0;
-      const orderIdStr = String(order?.orderId || order?._id || 'N/A');
-      const custName = String(order?.shippingAddress?.userName || order?.shippingAddress?.fullName || order?.userName || 'Customer');
-      const userMail = String(order?.userEmail || order?.email || order?.user || order?.shippingAddress?.email || 'N/A');
-      const utrStr = String(order?.utrNumber || order?.paymentInfo?.utr || 'N/A');
-      const createdDate = order?.createdAt || order?.date || new Date().toISOString();
+      const rawStatus = String(order.status || order.orderStatus || '').trim();
+      const statusLower = rawStatus.toLowerCase();
+      const amt = Number(order.totalAmount ?? order.amount ?? order.price) || 0;
+      const orderIdStr = String(order.orderId || order._id || 'N/A');
+      const custName = String(order.shippingAddress?.userName || order.shippingAddress?.fullName || order.userName || 'Customer');
+      const userMail = String(order.userEmail || order.email || order.user || order.shippingAddress?.email || 'N/A');
+      const utrStr = String(order.utrNumber || order.paymentInfo?.utr || 'N/A');
+      const createdDate = order.createdAt || order.date || new Date().toISOString();
 
-      const isShippedOrDelivered = ['shipped', 'out for delivery', 'delivered'].includes(statusLower) || Boolean(order?.stockDeducted);
+      const isShippedOrDelivered = ['shipped', 'out for delivery', 'delivered'].includes(statusLower);
       const isDebitStatus = ['cancelled', 'canceled', 'returned', 'return approved', 'refund completed', 'refunded', 'cancellation requested'].includes(statusLower);
 
-      // 1. Credit (+) Transaction: যখন প্রোডাক্ট Shipped বা Delivered হয়
+      // Case 1: Active Shipped / Delivered Orders -> Credit Entry
       if (isShippedOrDelivered) {
         totalCredit += amt;
         rawLedger.push({
-          id: String(order?._id || orderIdStr) + '_credit',
+          id: `${order._id || orderIdStr}_credit`,
           date: createdDate,
           orderId: orderIdStr,
           customerName: custName,
@@ -2909,39 +3043,76 @@ app.get('/api/admin/billing', async (req, res) => {
           utrNumber: utrStr,
           type: 'credit',
           sign: '+',
-          label: `Sale (${order?.status || 'Shipped'})`,
+          label: `Sale (${rawStatus || 'Shipped'})`,
           amount: amt,
           rawAmount: amt,
-          status: order?.status || 'Shipped'
+          status: rawStatus || 'Shipped'
         });
       }
+      // Case 2: Returned / Cancelled Orders
+      else if (isDebitStatus) {
+        const refundDate = order.returnDetails?.returnedAt || order.cancellationDetails?.cancelledAt || order.updatedAt || createdDate;
 
-      // 2. Debit (-) Transaction: যখন প্রোডাক্ট Return বা Cancelled হয়
-      if (isDebitStatus) {
-        totalDebit += amt;
-        const refundDate = order?.returnDetails?.returnedAt || order?.cancellationDetails?.cancelledAt || order?.updatedAt || createdDate;
+        // যদি অর্ডারটি আগে Shipped হয়েছিল (যেমন stockDeducted true বা return), তবে হিসেবের সামঞ্জস্য বজায় রাখতে Credit ও Debit দুটোই তৈরি হবে
+        if (order.stockDeducted || ['returned', 'return approved', 'refund completed', 'refunded'].includes(statusLower)) {
+          totalCredit += amt;
+          rawLedger.push({
+            id: `${order._id || orderIdStr}_credit`,
+            date: createdDate,
+            orderId: orderIdStr,
+            customerName: custName,
+            userEmail: userMail,
+            utrNumber: utrStr,
+            type: 'credit',
+            sign: '+',
+            label: `Sale (Original Order)`,
+            amount: amt,
+            rawAmount: amt,
+            status: 'Original Sale'
+          });
+
+          totalDebit += amt;
+          rawLedger.push({
+            id: `${order._id || orderIdStr}_debit`,
+            date: refundDate,
+            orderId: orderIdStr,
+            customerName: custName,
+            userEmail: userMail,
+            utrNumber: utrStr,
+            type: 'debit',
+            sign: '-',
+            label: `Refund (${rawStatus || 'Refunded'})`,
+            amount: -amt,
+            rawAmount: amt,
+            status: rawStatus || 'Refunded'
+          });
+        }
+      }
+      // Case 3: Stock deducted but other custom status
+      else if (order.stockDeducted) {
+        totalCredit += amt;
         rawLedger.push({
-          id: String(order?._id || orderIdStr) + '_debit',
-          date: refundDate,
+          id: `${order._id || orderIdStr}_credit`,
+          date: createdDate,
           orderId: orderIdStr,
           customerName: custName,
           userEmail: userMail,
           utrNumber: utrStr,
-          type: 'debit',
-          sign: '-',
-          label: `Refund (${order?.status || 'Refunded'})`,
-          amount: -amt,
+          type: 'credit',
+          sign: '+',
+          label: `Sale (${rawStatus || 'Processed'})`,
+          amount: amt,
           rawAmount: amt,
-          status: order?.status || 'Refunded'
+          status: rawStatus || 'Processed'
         });
       }
     });
 
-    // Sort chronologically ascending to calculate accurate cumulative running balance
+    // সঠিক Cumulative Running Balance গণনার জন্য সময়ানুযায়ী সাজানো (Ascending)
     rawLedger.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-    
+
     let cumBalance = 0;
-    const ledger = rawLedger.map((entry) => {
+    const calculatedLedger = rawLedger.map((entry) => {
       cumBalance += Number(entry.amount) || 0;
       return {
         id: String(entry.id),
@@ -2960,18 +3131,18 @@ app.get('/api/admin/billing', async (req, res) => {
       };
     });
 
-    // Return newest transaction first for UI
+    // UI-এর জন্য লেটেস্ট ট্রানজ্যাকশন প্রথমে রেখে রেসপন্স পাঠানো
     return res.status(200).json({
       success: true,
       totalCredit,
       totalDebit,
       netTotal: totalCredit - totalDebit,
-      ledger: ledger.reverse()
+      ledger: calculatedLedger.reverse()
     });
 
   } catch (err) {
-    console.error('Error in GET /api/admin/billing (handled gracefully):', err.message);
-    return res.status(200).json({
+    console.error('Error in GET /api/admin/billing:', err.message);
+    return res.status(500).json({
       success: false,
       message: err?.message || 'DB query error processing billing history',
       totalCredit: 0,
@@ -2981,7 +3152,6 @@ app.get('/api/admin/billing', async (req, res) => {
     });
   }
 });
-
 // --- GLOBAL JSON 404 & ERROR HANDLING MIDDLEWARE ---
 app.use((req, res, next) => {
   res.status(404).json({
