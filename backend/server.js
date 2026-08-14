@@ -579,7 +579,112 @@ app.post('/api/auth/verify-reset-password', async (req, res) => {
 });
 
 
-// --- UPDATE USER PROFILE (name, gender, avatar/profilePicture — email/phone immutable) ---
+// // --- UPDATE USER PROFILE (name, gender, avatar/profilePicture — email/phone immutable) ---
+// app.put(['/api/user/profile', '/api/users/profile', '/api/auth/profile'], upload.single('avatar'), async (req, res) => {
+//   let userId = null;
+//   const authHeader = req.headers.authorization;
+//   if (authHeader && authHeader.startsWith('Bearer ')) {
+//     try {
+//       const token = authHeader.split(' ')[1];
+//       const decoded = jwt.verify(token, JWT_SECRET);
+//       userId = decoded.userId;
+//     } catch (e) {}
+//   }
+
+//   const emailParam = req.query.email || req.body.email;
+
+//   try {
+//     const { name, gender, avatar, profilePicture } = req.body;
+//     let pictureVal = profilePicture !== undefined ? profilePicture : avatar;
+
+//     if (req.file && req.file.path) {
+//       pictureVal = req.file.path;
+//     } else if (typeof pictureVal === 'string' && pictureVal.startsWith('data:image')) {
+//       pictureVal = await uploadBase64ToCloudinary(pictureVal, 'avatars');
+//     }
+
+//     if (!name || !name.trim()) {
+//       return res.status(400).json({ success: false, message: 'Name is required' });
+//     }
+
+//     if (isMongoConnected()) {
+//       let user = null;
+//       if (userId) {
+//         user = await User.findById(userId);
+//       } else if (emailParam) {
+//         user = await User.findOne({ email: new RegExp(`^${emailParam.trim()}$`, 'i') });
+//       }
+
+//       if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+//       // Explicit field assignment & save
+//       user.name = name.trim();
+//       if (gender !== undefined) user.gender = gender;
+//       if (pictureVal !== undefined && pictureVal !== null) {
+//         user.avatar = pictureVal;
+//         user.profilePicture = pictureVal;
+//       }
+
+//       await user.save();
+
+//       const safeUser = {
+//         id: user._id,
+//         _id: user._id,
+//         name: user.name,
+//         email: user.email,
+//         phone: user.phone || '',
+//         gender: user.gender || '',
+//         avatar: user.avatar || user.profilePicture || '',
+//         profilePicture: user.profilePicture || user.avatar || '',
+//         role: user.role,
+//         addresses: user.addresses || []
+//       };
+
+//       // Broadcast profile update via Socket.io for real-time cross-device sync
+//       emitUserProfileUpdated(safeUser);
+
+//       return res.json({ success: true, user: safeUser });
+//     } else {
+//       // In-memory fallback
+//       let user = null;
+//       if (userId) user = memoryUsers.find(u => u._id === userId);
+//       else if (emailParam) user = memoryUsers.find(u => u.email.toLowerCase() === emailParam.trim().toLowerCase());
+
+//       if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+
+//       user.name = name.trim();
+//       if (gender !== undefined) user.gender = gender;
+//       if (pictureVal !== undefined) {
+//         user.avatar = pictureVal;
+//         user.profilePicture = pictureVal;
+//       }
+
+//       const safeUser = {
+//         id: user._id,
+//         _id: user._id,
+//         name: user.name,
+//         email: user.email,
+//         phone: user.phone || '',
+//         gender: user.gender || '',
+//         avatar: user.avatar || user.profilePicture || '',
+//         profilePicture: user.profilePicture || user.avatar || '',
+//         role: user.role,
+//         addresses: user.addresses || []
+//       };
+
+//       emitUserProfileUpdated(safeUser);
+//       return res.json({ success: true, user: safeUser });
+//     }
+//   } catch (e) {
+//     console.error('Profile update error:', e);
+//     res.status(500).json({ success: false, message: e.message });
+//   }
+// });
+
+
+
+
+// --- UPDATE USER PROFILE (Optimized Fast Atomic Update) ---
 app.put(['/api/user/profile', '/api/users/profile', '/api/auth/profile'], upload.single('avatar'), async (req, res) => {
   let userId = null;
   const authHeader = req.headers.authorization;
@@ -587,11 +692,12 @@ app.put(['/api/user/profile', '/api/users/profile', '/api/auth/profile'], upload
     try {
       const token = authHeader.split(' ')[1];
       const decoded = jwt.verify(token, JWT_SECRET);
-      userId = decoded.userId;
+      userId = decoded.userId || decoded.id;
     } catch (e) {}
   }
 
-  const emailParam = req.query.email || req.body.email;
+  const rawEmail = req.query.email || req.body.email;
+  const cleanEmail = rawEmail ? String(rawEmail).trim().toLowerCase() : '';
 
   try {
     const { name, gender, avatar, profilePicture } = req.body;
@@ -607,48 +713,56 @@ app.put(['/api/user/profile', '/api/users/profile', '/api/auth/profile'], upload
       return res.status(400).json({ success: false, message: 'Name is required' });
     }
 
+    const updateFields = {
+      name: name.trim()
+    };
+    if (gender !== undefined) updateFields.gender = gender;
+    if (pictureVal !== undefined && pictureVal !== null) {
+      updateFields.avatar = pictureVal;
+      updateFields.profilePicture = pictureVal;
+    }
+
     if (isMongoConnected()) {
-      let user = null;
+      let query = {};
       if (userId) {
-        user = await User.findById(userId);
-      } else if (emailParam) {
-        user = await User.findOne({ email: new RegExp(`^${emailParam.trim()}$`, 'i') });
+        query = { _id: userId };
+      } else if (cleanEmail) {
+        query = { email: cleanEmail };
+      } else {
+        return res.status(400).json({ success: false, message: 'User identifier required' });
       }
 
-      if (!user) return res.status(404).json({ success: false, message: 'User not found' });
+      // Fast Atomic Update in a single database roundtrip
+      const updatedUser = await User.findOneAndUpdate(
+        query,
+        { $set: updateFields },
+        { new: true, runValidators: false }
+      ).select('-password').lean();
 
-      // Explicit field assignment & save
-      user.name = name.trim();
-      if (gender !== undefined) user.gender = gender;
-      if (pictureVal !== undefined && pictureVal !== null) {
-        user.avatar = pictureVal;
-        user.profilePicture = pictureVal;
+      if (!updatedUser) {
+        return res.status(404).json({ success: false, message: 'User not found' });
       }
-
-      await user.save();
 
       const safeUser = {
-        id: user._id,
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        phone: user.phone || '',
-        gender: user.gender || '',
-        avatar: user.avatar || user.profilePicture || '',
-        profilePicture: user.profilePicture || user.avatar || '',
-        role: user.role,
-        addresses: user.addresses || []
+        id: updatedUser._id,
+        _id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        phone: updatedUser.phone || '',
+        gender: updatedUser.gender || '',
+        avatar: updatedUser.avatar || updatedUser.profilePicture || '',
+        profilePicture: updatedUser.profilePicture || updatedUser.avatar || '',
+        role: updatedUser.role,
+        addresses: updatedUser.addresses || []
       };
 
-      // Broadcast profile update via Socket.io for real-time cross-device sync
+      // Broadcast update
       emitUserProfileUpdated(safeUser);
-
       return res.json({ success: true, user: safeUser });
     } else {
-      // In-memory fallback
       let user = null;
       if (userId) user = memoryUsers.find(u => u._id === userId);
-      else if (emailParam) user = memoryUsers.find(u => u.email.toLowerCase() === emailParam.trim().toLowerCase());
+      else if (cleanEmail) user = memoryUsers.find(u => u.email.toLowerCase() === cleanEmail);
 
       if (!user) return res.status(404).json({ success: false, message: 'User not found' });
 
@@ -677,7 +791,7 @@ app.put(['/api/user/profile', '/api/users/profile', '/api/auth/profile'], upload
     }
   } catch (e) {
     console.error('Profile update error:', e);
-    res.status(500).json({ success: false, message: e.message });
+    return res.status(500).json({ success: false, message: e.message });
   }
 });
 

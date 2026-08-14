@@ -59,11 +59,9 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
         className="modal-card"
         style={{
           maxWidth: '500px',
-          width: 'min(93%, calc(100vw - 1.5rem))',
+          width: 'min(94%, calc(100vw - 1rem))',
           borderRadius: '18px',
-          overflow: 'visible',
-          boxShadow: '0 24px 60px rgba(0,0,0,0.22)',
-          maxHeight: '80dvh',
+          maxHeight: '85dvh',
           overflowY: 'auto',
           WebkitOverflowScrolling: 'touch',
           display: 'flex',
@@ -72,13 +70,13 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div style={{ background: 'linear-gradient(135deg, #fff1f2, #fdf4ff)', borderBottom: '1px solid #fecdd3', padding: '0.85rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem' }}>
+        <div style={{ background: 'linear-gradient(135deg, #fff1f2, #fdf4ff)', borderBottom: '1px solid #fecdd3', padding: '0.85rem 1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.5rem', position: 'sticky', top: 0, zIndex: 10 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', minWidth: 0, flex: 1 }}>
             <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: '#ffe4e6', color: '#e11d48', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
               <Ban size={18} />
             </div>
             <div style={{ minWidth: 0 }}>
-              <h3 style={{ fontSize: '0.98rem', fontWeight: '800', color: '#be123c', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Request Order Cancellation</h3>
+              <h3 style={{ fontSize: 'clamp(0.9rem, 3.5vw, 0.98rem)', fontWeight: '800', color: '#be123c', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Request Order Cancellation</h3>
               <p style={{ fontSize: '0.72rem', color: '#e11d48', margin: 0, wordBreak: 'break-all' }}>Order: <strong>{order.orderId}</strong> &nbsp;•&nbsp; ₹{order.totalAmount?.toLocaleString('en-IN')}</p>
             </div>
           </div>
@@ -89,29 +87,29 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
 
         {/* Content */}
         {submitted ? (
-          <div style={{ padding: '2.5rem 1.5rem', textAlign: 'center' }}>
-            <div style={{ width: '64px', height: '64px', background: '#dcfce7', color: '#16a34a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
-              <CheckCircle2 size={38} />
+          <div style={{ padding: 'clamp(1.5rem, 5vw, 2.5rem) 1.25rem', textAlign: 'center' }}>
+            <div style={{ width: '56px', height: '56px', background: '#dcfce7', color: '#16a34a', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1rem' }}>
+              <CheckCircle2 size={34} />
             </div>
-            <h2 style={{ fontSize: '1.3rem', fontWeight: '900', color: '#15803d', marginBottom: '0.4rem' }}>
+            <h2 style={{ fontSize: 'clamp(1.1rem, 4vw, 1.3rem)', fontWeight: '900', color: '#15803d', marginBottom: '0.4rem' }}>
               Cancellation Request Submitted!
             </h2>
-            <p style={{ fontSize: '0.88rem', color: '#475569', margin: 0, lineHeight: '1.5' }}>
+            <p style={{ fontSize: '0.85rem', color: '#475569', margin: 0, lineHeight: '1.5' }}>
               Your cancellation for order <strong style={{ color: '#c026d3' }}>{order.orderId}</strong> is under review.
               Refund amount will be refunded directly to the original payment source.
             </p>
           </div>
         ) : (
-          <form onSubmit={handleConfirmCancel} style={{ padding: 'clamp(0.85rem, 4vw, 1.25rem)', display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+          <form onSubmit={handleConfirmCancel} style={{ padding: 'clamp(0.85rem, 4vw, 1.25rem)', paddingBottom: 'calc(env(safe-area-inset-bottom) + 1.25rem)', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
             {error && (
               <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', color: '#b91c1c', padding: '0.65rem 0.85rem', borderRadius: '8px', fontSize: '0.82rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <AlertCircle size={16} /> {error}
+                <AlertCircle size={16} style={{ flexShrink: 0 }} /> {error}
               </div>
             )}
 
             {/* Reason */}
-            <div className="form-group">
-              <label style={{ fontSize: '0.82rem', fontWeight: '800', color: '#334155' }}>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '0.82rem', fontWeight: '800', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
                 Cancellation Reason *
               </label>
               <select
@@ -125,8 +123,8 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
               </select>
             </div>
 
-            <div className="form-group">
-              <label style={{ fontSize: '0.82rem', fontWeight: '800', color: '#334155' }}>
+            <div className="form-group" style={{ margin: 0 }}>
+              <label style={{ fontSize: '0.82rem', fontWeight: '800', color: '#334155', display: 'block', marginBottom: '0.35rem' }}>
                 Additional Comments <span style={{ fontWeight: '400', color: '#94a3b8' }}>(Optional)</span>
               </label>
               <textarea
@@ -140,11 +138,11 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
 
             {/* Fixed Refund Source Pre-Selected Option */}
             <div style={{ background: '#fdf4ff', border: '1.5px solid #c026d3', borderRadius: '12px', padding: '0.85rem' }}>
-              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', cursor: 'default' }}>
-                <input type="radio" checked disabled readOnly style={{ accentColor: '#c026d3', marginTop: '3px' }} />
+              <label style={{ display: 'flex', alignItems: 'flex-start', gap: '0.65rem', cursor: 'default', margin: 0 }}>
+                <input type="radio" checked disabled readOnly style={{ accentColor: '#c026d3', marginTop: '3px', flexShrink: 0 }} />
                 <div>
-                  <div style={{ fontSize: '0.88rem', fontWeight: '800', color: '#701a75', display: 'flex', alignItems: 'center', gap: '5px' }}>
-                    <CreditCard size={16} /> Refund to Original Payment Source
+                  <div style={{ fontSize: '0.85rem', fontWeight: '800', color: '#701a75', display: 'flex', alignItems: 'center', gap: '5px' }}>
+                    <CreditCard size={16} style={{ flexShrink: 0 }} /> Refund to Original Payment Source
                   </div>
                   <p style={{ fontSize: '0.78rem', color: '#64748b', margin: '3px 0 0 0', lineHeight: '1.4' }}>
                     Refund amount will be refunded directly to the original payment source.
@@ -153,19 +151,19 @@ const OrderCancelModal = ({ isOpen, onClose, order, onCancelSuccess }) => {
               </label>
             </div>
 
-            <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap', marginTop: '0.25rem' }}>
               <button
                 type="button"
                 className="btn-outline"
                 onClick={onClose}
-                style={{ flex: '1 1 120px', justifyContent: 'center', minWidth: '100px' }}
+                style={{ flex: '1 1 120px', justifyContent: 'center', minWidth: '100px', padding: '0.75rem' }}
               >
                 Keep Order
               </button>
               <button
                 type="submit"
                 className="btn-primary"
-                style={{ flex: '1 1 150px', justifyContent: 'center', background: '#dc2626', borderColor: '#b91c1c', minWidth: '130px' }}
+                style={{ flex: '1 1 150px', justifyContent: 'center', background: '#dc2626', borderColor: '#b91c1c', minWidth: '130px', padding: '0.75rem' }}
                 disabled={loading}
               >
                 {loading ? 'Submitting...' : 'Request Cancellation'}
