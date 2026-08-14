@@ -1491,6 +1491,1336 @@
 
 
 
+// import React, { useState, useEffect, useRef, useMemo } from 'react';
+// import Navbar from './components/Navbar';
+// import CategorySidebar from './components/CategorySidebar';
+// import ProductCard from './components/ProductCard';
+// import ProductDetailModal from './components/ProductDetailModal';
+// import ImageLightboxModal from './components/ImageLightboxModal';
+// import AuthModal from './components/AuthModal';
+// import CartDrawer from './components/CartDrawer';
+// import CheckoutModal from './components/CheckoutModal';
+// import PaymentModal from './components/PaymentModal';
+// import UserProfileModal from './components/UserProfileModal';
+// import NotificationModal from './components/NotificationModal';
+// import LiveSaleBanner from './components/LiveSaleBanner';
+// import AdminPanel from './components/Admin/AdminPanel';
+// import MobileBottomNav from './components/MobileBottomNav';
+// import ProductGridSkeleton from './components/Skeletons/ProductGridSkeleton';
+// import ProductFilterModal from './components/ProductFilterModal';
+// import Footer from './components/Footer';
+// import AboutUsModal from './components/AboutUsModal';
+// import TermsPrivacyModal from './components/TermsPrivacyModal';
+// import { SlidersHorizontal, RotateCcw, Filter } from 'lucide-react';
+// import { fetchWithCache } from './utils/cache';
+// import { API_URL, apiFetch, parseResponseSafely } from './api';
+// import { useSocket } from './context/SocketContext.jsx';
+// import './App.css';
+
+// function App() {
+//   // Navigation / View State ('shop' or 'admin')
+//   const [currentView, setCurrentView] = useState('shop');
+
+//   // Check URL pathname for /admin or #/admin
+//   useEffect(() => {
+//     const handleLocation = () => {
+//       if (window.location.pathname === '/admin' || window.location.hash === '#/admin') {
+//         setCurrentView('admin');
+//       } else {
+//         setCurrentView('shop');
+//       }
+//     };
+//     handleLocation();
+//     window.addEventListener('popstate', handleLocation);
+//     return () => window.removeEventListener('popstate', handleLocation);
+//   }, []);
+
+//   const setView = (view) => {
+//     setCurrentView(view);
+//     if (view === 'admin') {
+//       window.history.pushState(null, '', '/admin');
+//     } else {
+//       window.history.pushState(null, '', '/');
+//     }
+//   };
+
+//   // Customer User State (Persistent Login)
+//   const [user, setUser] = useState(() => {
+//     try {
+//       const saved = localStorage.getItem('df_user');
+//       return saved ? JSON.parse(saved) : null;
+//     } catch (e) {
+//       return null;
+//     }
+//   });
+
+//   // Store Notifications & Real-Time Listeners
+//   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+//   const [isAboutUsOpen, setIsAboutUsOpen] = useState(false);
+//   const [isTermsOpen, setIsTermsOpen] = useState(false);
+//   const [termsTab, setTermsTab] = useState('privacy');
+//   const [notifications, setNotifications] = useState([]);
+//   const [readNotificationIds, setReadNotificationIds] = useState(() => {
+//     try {
+//       const saved = localStorage.getItem('df_read_notifications');
+//       return saved ? JSON.parse(saved) : [];
+//     } catch (e) {
+//       return [];
+//     }
+//   });
+//   const [showNotificationBubble, setShowNotificationBubble] = useState(false);
+//   const [latestNotificationTitle, setLatestNotificationTitle] = useState('');
+
+//   useEffect(() => {
+//     fetchNotifications();
+//     const interval = setInterval(fetchNotifications, 15000);
+//     const handleFocus = () => fetchNotifications();
+//     window.addEventListener('focus', handleFocus);
+//     return () => {
+//       clearInterval(interval);
+//       window.removeEventListener('focus', handleFocus);
+//     };
+//   }, []);
+
+//   const fetchNotifications = async () => {
+//     try {
+//       const res = await apiFetch('/api/notifications');
+//       const data = await parseResponseSafely(res);
+//       if (res.ok && Array.isArray(data)) {
+//         setNotifications(data);
+//       } else {
+//         const saved = localStorage.getItem('df_local_notifications');
+//         if (saved) setNotifications(JSON.parse(saved));
+//       }
+//     } catch (e) {
+//       const saved = localStorage.getItem('df_local_notifications');
+//       if (saved) setNotifications(JSON.parse(saved));
+//     }
+//   };
+
+//   // ============================================================
+//   // REAL-TIME SOCKET.IO LISTENERS
+//   // ============================================================
+//   const { socket } = useSocket();
+
+//   useEffect(() => {
+//     if (!socket) return;
+
+//     const onProductAdded = (newProduct) => {
+//       setProducts((prev) => [newProduct, ...prev.filter(p => (p._id || p.id) !== (newProduct._id || newProduct.id))]);
+//     };
+
+//     const onProductUpdated = (updated) => {
+//       const updId = updated._id || updated.id;
+//       setProducts((prev) => prev.map(p => (p._id || p.id) === updId ? { ...p, ...updated } : p));
+//       setSelectedProduct((prev) => prev && (prev._id || prev.id) === updId ? { ...prev, ...updated } : prev);
+//     };
+
+//     const onProductDeleted = (deletedId) => {
+//       setProducts((prev) => prev.filter(p => (p._id || p.id) !== deletedId));
+//     };
+
+//     const onNewOrderPlaced = (order) => {
+//       window.dispatchEvent(new CustomEvent('df_new_order_placed', { detail: order }));
+//       try {
+//         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+//         const osc = audioCtx.createOscillator();
+//         const gain = audioCtx.createGain();
+//         osc.type = 'sine';
+//         osc.frequency.setValueAtTime(659.25, audioCtx.currentTime);
+//         osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.15);
+//         gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
+//         osc.connect(gain);
+//         gain.connect(audioCtx.destination);
+//         osc.start();
+//         osc.stop(audioCtx.currentTime + 0.35);
+//       } catch (e) {}
+//     };
+
+//     const onOrderStatusUpdated = (updatedOrder) => {
+//       window.dispatchEvent(new CustomEvent('df_order_status_updated', { detail: updatedOrder }));
+//     };
+
+//     const sanitizeUserForStorage = (u) => {
+//       if (!u) return u;
+//       const clone = { ...u };
+//       if (clone.avatar && clone.avatar.startsWith('data:')) clone.avatar = '';
+//       if (clone.profilePicture && clone.profilePicture.startsWith('data:')) clone.profilePicture = '';
+//       return clone;
+//     };
+
+//     const onUserProfileUpdated = (updatedUser) => {
+//       setUser((prev) => {
+//         if (!prev) return prev;
+//         const prevId = prev._id || prev.id;
+//         const updId = updatedUser._id || updatedUser.id;
+//         if (prevId && updId && String(prevId) === String(updId)) {
+//           const merged = { ...prev, ...updatedUser };
+//           try { localStorage.setItem('df_user', JSON.stringify(sanitizeUserForStorage(merged))); } catch (e) {}
+//           return merged;
+//         }
+//         return prev;
+//       });
+//     };
+
+//     socket.on('product_added', onProductAdded);
+//     socket.on('product_updated', onProductUpdated);
+//     socket.on('product_deleted', onProductDeleted);
+//     socket.on('new_order_placed', onNewOrderPlaced);
+//     socket.on('order_status_updated', onOrderStatusUpdated);
+//     socket.on('user_profile_updated', onUserProfileUpdated);
+
+//     return () => {
+//       socket.off('product_added', onProductAdded);
+//       socket.off('product_updated', onProductUpdated);
+//       socket.off('product_deleted', onProductDeleted);
+//       socket.off('new_order_placed', onNewOrderPlaced);
+//       socket.off('order_status_updated', onOrderStatusUpdated);
+//       socket.off('user_profile_updated', onUserProfileUpdated);
+//     };
+//   }, [socket]);
+
+//   // LOCAL ANNOUNCEMENT EVENT LISTENER
+//   useEffect(() => {
+//     const handleLocalNotif = (e) => {
+//       if (e.detail) {
+//         const newNotif = e.detail;
+//         setNotifications((prev) => [newNotif, ...prev.filter(n => n._id !== newNotif._id)]);
+//         setLatestNotificationTitle(newNotif.title);
+//         setShowNotificationBubble(true);
+//       }
+//     };
+//     window.addEventListener('df_new_notification', handleLocalNotif);
+//     return () => window.removeEventListener('df_new_notification', handleLocalNotif);
+//   }, []);
+
+//   // LOCAL USER PROFILE UPDATE EVENT LISTENER
+//   useEffect(() => {
+//     const handleLocalProfileUpdate = (e) => {
+//       if (e.detail) {
+//         const updatedUser = e.detail;
+//         setUser((prev) => {
+//           const merged = { ...prev, ...updatedUser };
+//           try {
+//             const clone = { ...merged };
+//             if (clone.avatar && clone.avatar.startsWith('data:')) clone.avatar = '';
+//             if (clone.profilePicture && clone.profilePicture.startsWith('data:')) clone.profilePicture = '';
+//             localStorage.setItem('df_user', JSON.stringify(clone));
+//           } catch (err) {}
+//           return merged;
+//         });
+//       }
+//     };
+//     window.addEventListener('df_user_profile_updated', handleLocalProfileUpdate);
+//     return () => window.removeEventListener('df_user_profile_updated', handleLocalProfileUpdate);
+//   }, []);
+
+//   // Persistent User ID for readBy Tracking
+//   const currentUserId = user?._id || user?.id || (() => {
+//     try {
+//       let saved = localStorage.getItem('df_guest_id');
+//       if (!saved) {
+//         saved = 'guest_' + Math.random().toString(36).substring(2, 9);
+//         localStorage.setItem('df_guest_id', saved);
+//       }
+//       return saved;
+//     } catch (e) {
+//       return 'guest_user_1';
+//     }
+//   })();
+
+//   const unreadNotificationCount = notifications.filter(
+//     (n) => !readNotificationIds.includes(n._id) && (!Array.isArray(n.readBy) || !n.readBy.includes(currentUserId))
+//   ).length;
+
+//   const handleOpenNotifications = () => {
+//     setIsNotificationsOpen(true);
+//     setShowNotificationBubble(false);
+//     const allIds = notifications.map(n => n._id);
+//     const updatedRead = Array.from(new Set([...readNotificationIds, ...allIds]));
+//     setReadNotificationIds(updatedRead);
+//     try {
+//       localStorage.setItem('df_read_notifications', JSON.stringify(updatedRead));
+//     } catch (e) {}
+//   };
+
+//   const handleMarkAllAsRead = async () => {
+//     const allIds = notifications.map(n => n._id);
+//     setReadNotificationIds(allIds);
+//     setShowNotificationBubble(false);
+//     try {
+//       localStorage.setItem('df_read_notifications', JSON.stringify(allIds));
+//     } catch (e) {}
+
+//     notifications.forEach(async (n) => {
+//       try {
+//         await apiFetch(`/api/notifications/${n._id}/read`, {
+//           method: 'POST',
+//           headers: { 'Content-Type': 'application/json' },
+//           body: JSON.stringify({ userId: currentUserId })
+//         });
+//       } catch (e) {}
+//     });
+//   };
+
+//   const handleMarkSingleAsRead = async (id) => {
+//     if (!readNotificationIds.includes(id)) {
+//       const updated = [...readNotificationIds, id];
+//       setReadNotificationIds(updated);
+//       try {
+//         localStorage.setItem('df_read_notifications', JSON.stringify(updated));
+//       } catch (e) {}
+//     }
+
+//     try {
+//       await apiFetch(`/api/notifications/${id}/read`, {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/json' },
+//         body: JSON.stringify({ userId: currentUserId })
+//       });
+//     } catch (e) {}
+//   };
+
+//   // ============================================================
+//   // FAST PRODUCT LOADING & INSTANT STATE WITH PRE-FETCHING
+//   // ============================================================
+//   const [categories, setCategories] = useState([]);
+//   const [selectedCategory, setSelectedCategory] = useState('All');
+//   const [searchTerm, setSearchTerm] = useState('');
+
+//   // 1. Instant Cache Hydration to eliminate initial blank screen
+//   const [products, setProducts] = useState(() => {
+//     try {
+//       const cached = localStorage.getItem('df_storefront_products');
+//       return cached ? JSON.parse(cached) : [];
+//     } catch (e) {
+//       return [];
+//     }
+//   });
+
+//   // Only show loading spinner/skeleton if we have 0 products in initial cache
+//   const [loading, setLoading] = useState(() => products.length === 0);
+//   const [page, setPage] = useState(1);
+//   const [totalPages, setTotalPages] = useState(1);
+//   const [totalProductsCount, setTotalProductsCount] = useState(() => products.length);
+//   const [apiError, setApiError] = useState(null);
+
+//   const catalogRef = useRef(null);
+//   const isFetchingRef = useRef(false);
+
+//   const fetchCategories = async () => {
+//     try {
+//       const { data } = await fetchWithCache('categories', async () => {
+//         const res = await fetch(`${API_URL}/api/categories`);
+//         return await res.json();
+//       });
+//       if (data) setCategories(data);
+//     } catch (e) {
+//       console.error('Error loading categories:', e);
+//     }
+//   };
+
+//   const fetchProducts = async (pageNum = 1, forceRefresh = false) => {
+//     if (isFetchingRef.current && !forceRefresh) return;
+//     isFetchingRef.current = true;
+
+//     const sanitizedCat = (!selectedCategory || selectedCategory === 'All') ? '' : selectedCategory.trim();
+//     const cacheKey = `products_cat_${sanitizedCat || 'all'}_search_${searchTerm.trim()}_p${pageNum}`;
+
+//     try {
+//       if (products.length === 0) setLoading(true);
+//       setApiError(null);
+
+//       const params = new URLSearchParams();
+//       if (sanitizedCat) params.append('category', sanitizedCat);
+//       if (searchTerm.trim()) params.append('search', searchTerm.trim());
+//       params.append('page', pageNum);
+//       params.append('limit', 20);
+
+//       const { data: rawResponse } = await fetchWithCache(
+//         cacheKey,
+//         async () => {
+//           const res = await fetch(`${API_URL}/api/products?${params.toString()}`);
+//           if (!res.ok) throw new Error(`Server status ${res.status}`);
+//           return await res.json();
+//         },
+//         { forceRefresh }
+//       );
+
+//       let fetchedProducts = [];
+//       let totalPagesVal = 1;
+//       let totalProductsVal = 0;
+
+//       if (rawResponse && typeof rawResponse === 'object' && !Array.isArray(rawResponse)) {
+//         fetchedProducts = rawResponse.products || [];
+//         totalPagesVal = rawResponse.totalPages || 1;
+//         totalProductsVal = rawResponse.totalProducts !== undefined ? rawResponse.totalProducts : fetchedProducts.length;
+//       } else if (Array.isArray(rawResponse)) {
+//         fetchedProducts = rawResponse;
+//         totalPagesVal = Math.ceil(fetchedProducts.length / 20) || 1;
+//         totalProductsVal = fetchedProducts.length;
+//       }
+
+//       setProducts(fetchedProducts);
+//       setTotalPages(totalPagesVal);
+//       setTotalProductsCount(totalProductsVal);
+//       setPage(pageNum);
+
+//       // Cache the first page locally for instant initial renders on future visits
+//       if (pageNum === 1 && !sanitizedCat && !searchTerm.trim()) {
+//         try {
+//           localStorage.setItem('df_storefront_products', JSON.stringify(fetchedProducts));
+//         } catch (e) {}
+//       }
+
+//       // PRE-FETCH NEXT PAGE IN BACKGROUND (0ms Instant Transition on Next click)
+//       if (pageNum < totalPagesVal) {
+//         const nextParams = new URLSearchParams();
+//         if (sanitizedCat) nextParams.append('category', sanitizedCat);
+//         if (searchTerm.trim()) nextParams.append('search', searchTerm.trim());
+//         nextParams.append('page', pageNum + 1);
+//         nextParams.append('limit', 20);
+
+//         fetchWithCache(
+//           `products_cat_${sanitizedCat || 'all'}_search_${searchTerm.trim()}_p${pageNum + 1}`,
+//           async () => {
+//             const res = await fetch(`${API_URL}/api/products?${nextParams.toString()}`);
+//             return await res.json();
+//           }
+//         ).catch(() => {});
+//       }
+//     } catch (e) {
+//       console.error('Error fetching products:', e);
+//       if (products.length === 0) {
+//         setApiError('Unable to load products. Please check your connection or try again.');
+//       }
+//     } finally {
+//       setLoading(false);
+//       isFetchingRef.current = false;
+//     }
+//   };
+
+//   // Click Next/Previous -> Switch page & smoothly scroll to the ABSOLUTE TOP of the webpage
+//   const handlePageChange = (newPage) => {
+//     if (newPage === page || newPage < 1 || newPage > totalPages) return;
+    
+//     setPage(newPage);
+//     fetchProducts(newPage);
+
+//     // 1. Instantly scroll to the absolute top (Navbar & Banner included)
+//     window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+
+//     // 2. Safeguard scroll after state re-render
+//     setTimeout(() => {
+//       window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+//     }, 100);
+//   };
+
+//   // Product Filters
+//   const DEFAULT_FILTERS = {
+//     category: 'All',
+//     presetPrice: 'all',
+//     minPrice: '',
+//     maxPrice: '',
+//     minDiscount: 0,
+//     minRating: 0,
+//     inStockOnly: false
+//   };
+
+//   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
+//   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+
+//   const activeFilterCount = useMemo(() => {
+//     let count = 0;
+//     if (appliedFilters.category && appliedFilters.category !== 'All') count++;
+//     if (appliedFilters.presetPrice && appliedFilters.presetPrice !== 'all') count++;
+//     if (appliedFilters.minPrice || appliedFilters.maxPrice) count++;
+//     if (appliedFilters.minDiscount > 0) count++;
+//     if (appliedFilters.minRating > 0) count++;
+//     if (appliedFilters.inStockOnly) count++;
+//     return count;
+//   }, [appliedFilters]);
+
+//   const displayedProducts = useMemo(() => {
+//     let list = Array.isArray(products) ? products : [];
+
+//     // Category Filter
+//     if (selectedCategory && selectedCategory !== 'All') {
+//       list = list.filter((p) => p.category?.toLowerCase() === selectedCategory.toLowerCase());
+//     } else if (appliedFilters.category && appliedFilters.category !== 'All') {
+//       list = list.filter((p) => p.category?.toLowerCase() === appliedFilters.category.toLowerCase());
+//     }
+
+//     // Search Filter
+//     if (searchTerm.trim()) {
+//       const q = searchTerm.trim().toLowerCase();
+//       list = list.filter(
+//         (p) =>
+//           p.name?.toLowerCase().includes(q) ||
+//           p.category?.toLowerCase().includes(q) ||
+//           p.description?.toLowerCase().includes(q)
+//       );
+//     }
+
+//     // Custom Price Filter
+//     if (appliedFilters.minPrice !== '' && !isNaN(appliedFilters.minPrice)) {
+//       list = list.filter((p) => Number(p.price) >= Number(appliedFilters.minPrice));
+//     }
+//     if (appliedFilters.maxPrice !== '' && !isNaN(appliedFilters.maxPrice)) {
+//       list = list.filter((p) => Number(p.price) <= Number(appliedFilters.maxPrice));
+//     }
+
+//     // Preset Price Range
+//     if (appliedFilters.presetPrice === 'under500') {
+//       list = list.filter((p) => Number(p.price) < 500);
+//     } else if (appliedFilters.presetPrice === '500-1000') {
+//       list = list.filter((p) => Number(p.price) >= 500 && Number(p.price) <= 1000);
+//     } else if (appliedFilters.presetPrice === '1000-2000') {
+//       list = list.filter((p) => Number(p.price) >= 1000 && Number(p.price) <= 2000);
+//     } else if (appliedFilters.presetPrice === 'above2000') {
+//       list = list.filter((p) => Number(p.price) > 2000);
+//     }
+
+//     // Minimum Discount %
+//     if (appliedFilters.minDiscount > 0) {
+//       list = list.filter((p) => {
+//         if (!p.mrp || p.mrp <= p.price) return false;
+//         const disc = Math.round(((p.mrp - p.price) / p.mrp) * 100);
+//         return disc >= appliedFilters.minDiscount;
+//       });
+//     }
+
+//     // Minimum Rating
+//     if (appliedFilters.minRating > 0) {
+//       list = list.filter((p) => (p.rating || 4.5) >= appliedFilters.minRating);
+//     }
+
+//     // In Stock Only
+//     if (appliedFilters.inStockOnly) {
+//       list = list.filter((p) => (p.quantity !== undefined ? p.quantity > 0 : true));
+//     }
+
+//     return list;
+//   }, [products, selectedCategory, searchTerm, appliedFilters]);
+
+//   // Modal States
+//   const [selectedProduct, setSelectedProduct] = useState(null);
+//   const [isDetailOpen, setIsDetailOpen] = useState(false);
+//   const [productHistory, setProductHistory] = useState([]);
+//   const productHistoryRef = useRef([]);
+
+//   const updateProductHistory = (newHistory) => {
+//     productHistoryRef.current = newHistory;
+//     setProductHistory(newHistory);
+//   };
+//   const [lightboxProduct, setLightboxProduct] = useState(null);
+//   const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+
+//   // Cart & Coupon State
+//   const [cartItems, setCartItems] = useState(() => {
+//     try {
+//       const savedCart = localStorage.getItem('df_cart');
+//       return savedCart ? JSON.parse(savedCart) : [];
+//     } catch (e) {
+//       return [];
+//     }
+//   });
+
+//   const [appliedCoupon, setAppliedCoupon] = useState(null);
+
+//   useEffect(() => {
+//     try {
+//       localStorage.setItem('df_cart', JSON.stringify(cartItems));
+//     } catch (e) {
+//       console.error('Failed to persist cart items:', e);
+//     }
+//   }, [cartItems]);
+
+//   const [isAuthOpen, setIsAuthOpen] = useState(false);
+//   const [isProfileOpen, setIsProfileOpen] = useState(false);
+//   const [isCartOpen, setIsCartOpen] = useState(false);
+//   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+//   const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+//   const [deliveryAddress, setDeliveryAddress] = useState(null);
+
+//   // Customer Wishlist State
+//   const [wishlist, setWishlist] = useState(() => {
+//     try {
+//       const saved = localStorage.getItem('df_wishlist');
+//       if (!saved) return [];
+//       const parsed = JSON.parse(saved);
+//       if (Array.isArray(parsed)) return parsed;
+//       return [];
+//     } catch (e) {
+//       return [];
+//     }
+//   });
+
+//   useEffect(() => {
+//     const fetchUserWishlist = async () => {
+//       const token = localStorage.getItem('df_token');
+//       const userEmail = user?.email;
+//       if (!token && !userEmail) return;
+
+//       try {
+//         let url = `${API_URL}/api/user/wishlist`;
+//         if (userEmail) url += `?email=${encodeURIComponent(userEmail)}`;
+//         const res = await apiFetch(url, {
+//           headers: token ? { Authorization: `Bearer ${token}` } : {}
+//         });
+//         const data = await parseResponseSafely(res);
+//         if (data && data.success && Array.isArray(data.wishlist) && data.wishlist.length > 0) {
+//           setWishlist(data.wishlist);
+//         }
+//       } catch (err) {
+//         console.warn('Failed to hydrate wishlist:', err);
+//       }
+//     };
+//     fetchUserWishlist();
+//   }, [user]);
+
+//   useEffect(() => {
+//     try {
+//       const wishlistIds = (wishlist || []).map((item) =>
+//         typeof item === 'string' ? item : item?._id || item?.id
+//       ).filter(Boolean);
+
+//       localStorage.setItem('df_wishlist', JSON.stringify(wishlistIds));
+
+//       const token = localStorage.getItem('df_token');
+//       const userEmail = user?.email;
+//       if (token || userEmail) {
+//         apiFetch('/api/user/wishlist', {
+//           method: 'POST',
+//           headers: {
+//             'Content-Type': 'application/json',
+//             ...(token ? { Authorization: `Bearer ${token}` } : {})
+//           },
+//           body: JSON.stringify({ wishlistIds, email: userEmail })
+//         }).catch(() => {});
+//       }
+//     } catch (e) {}
+//   }, [wishlist, user]);
+
+//   const handleToggleWishlist = (prod) => {
+//     if (!prod) return;
+//     const prodId = typeof prod === 'string' ? prod : prod._id || prod.id;
+    
+//     setWishlist((prev) => {
+//       const prevList = Array.isArray(prev) ? prev : [];
+//       const exists = prevList.some((item) => {
+//         const id = typeof item === 'string' ? item : item?._id || item?.id;
+//         return id === prodId;
+//       });
+
+//       if (exists) {
+//         return prevList.filter((item) => {
+//           const id = typeof item === 'string' ? item : item?._id || item?.id;
+//           return id !== prodId;
+//         });
+//       } else {
+//         return [...prevList, prod];
+//       }
+//     });
+//   };
+
+//   useEffect(() => {
+//     fetchCategories();
+//   }, []);
+
+//   useEffect(() => {
+//     setPage(1);
+//     fetchProducts(1, false);
+//   }, [selectedCategory, searchTerm]);
+
+//   // Restore opened Product Detail Page on refresh
+//   useEffect(() => {
+//     const hash = window.location.hash;
+//     const match = hash.match(/#product=([^&]+)/);
+//     const savedProdId = match ? match[1] : sessionStorage.getItem('df_opened_product_id');
+
+//     if (savedProdId && products.length > 0) {
+//       const found = products.find((p) => String(p._id || p.id) === String(savedProdId));
+//       if (found) {
+//         setSelectedProduct(found);
+//         updateProductHistory([found]);
+//         setIsDetailOpen(true);
+//       }
+//     }
+//   }, [products]);
+
+//   const handleOpenProductDetail = (product) => {
+//     if (!product) return;
+//     const prodId = product._id || product.id;
+//     setSelectedProduct(product);
+//     updateProductHistory([product]);
+//     setIsDetailOpen(true);
+//     sessionStorage.setItem('df_opened_product_id', prodId);
+//     try {
+//       window.history.replaceState(null, '', `#product=${prodId}`);
+//     } catch (e) {}
+//   };
+
+//   const handleSelectRelatedProduct = (product) => {
+//     if (!product) return;
+//     const prodId = product._id || product.id;
+//     setSelectedProduct(product);
+//     updateProductHistory([...productHistoryRef.current, product]);
+//     setIsDetailOpen(true);
+//     sessionStorage.setItem('df_opened_product_id', prodId);
+//     try {
+//       window.history.replaceState(null, '', `#product=${prodId}`);
+//     } catch (e) {}
+//   };
+
+//   const handleProductDetailBack = () => {
+//     if (productHistoryRef.current.length > 1) {
+//       const nextHistory = [...productHistoryRef.current];
+//       nextHistory.pop();
+//       const prevProduct = nextHistory[nextHistory.length - 1];
+//       const prodId = prevProduct._id || prevProduct.id;
+//       updateProductHistory(nextHistory);
+//       setSelectedProduct(prevProduct);
+//       sessionStorage.setItem('df_opened_product_id', prodId);
+//       try {
+//         window.history.replaceState(null, '', `#product=${prodId}`);
+//       } catch (e) {}
+//     } else {
+//       updateProductHistory([]);
+//       setIsDetailOpen(false);
+//       sessionStorage.removeItem('df_opened_product_id');
+//       try {
+//         window.history.replaceState(null, '', window.location.pathname.replace(/#.*$/, ''));
+//       } catch (e) {}
+//     }
+//   };
+
+//   const handleCloseProductDetail = () => {
+//     updateProductHistory([]);
+//     setIsDetailOpen(false);
+//     sessionStorage.removeItem('df_opened_product_id');
+//     try {
+//       window.history.replaceState(null, '', window.location.pathname.replace(/#.*$/, ''));
+//     } catch (e) {}
+//   };
+
+//   // Cart Actions
+//   const handleAddToCart = (product) => {
+//     const remStock = product.remainingStock !== undefined && product.remainingStock !== null ? product.remainingStock : (product.quantity !== undefined ? product.quantity : 10);
+//     if (remStock <= 0) {
+//       alert('Out of Stock - Cannot add to cart!');
+//       return;
+//     }
+
+//     const sizesList = (product?.availableSizes && product.availableSizes.length > 0)
+//       ? product.availableSizes
+//       : (product?.category === 'Saree' ? ['Free Size'] : ['S', 'M', 'L', 'XL', 'XXL']);
+
+//     if (product.selectedSize) {
+//       setCartItems((prevItems) => {
+//         const existing = prevItems.find((item) => item._id === product._id && item.selectedSize === product.selectedSize);
+//         if (existing) {
+//           return prevItems.map((item) =>
+//             (item._id === product._id && item.selectedSize === product.selectedSize)
+//               ? { ...item, quantity: item.quantity + 1 }
+//               : item
+//           );
+//         }
+//         return [...prevItems, { ...product, quantity: 1 }];
+//       });
+//       setIsCartOpen(true);
+//       return;
+//     }
+
+//     if (sizesList.length > 1) {
+//       setSelectedProduct(product);
+//       setIsDetailOpen(true);
+//       return;
+//     }
+
+//     const autoSize = sizesList[0] || 'Standard';
+//     setCartItems((prevItems) => {
+//       const existing = prevItems.find((item) => item._id === product._id && item.selectedSize === autoSize);
+//       if (existing) {
+//         if (existing.quantity >= remStock) {
+//           alert(`Only ${remStock} item(s) available in stock! Cannot add more.`);
+//           return prevItems;
+//         }
+//         return prevItems.map((item) =>
+//           (item._id === product._id && item.selectedSize === autoSize)
+//             ? { ...item, quantity: item.quantity + 1 }
+//             : item
+//         );
+//       }
+//       return [...prevItems, { ...product, quantity: 1, selectedSize: autoSize }];
+//     });
+//     setIsCartOpen(true);
+//   };
+
+//   const handleUpdateQuantity = (productId, newQty) => {
+//     if (newQty <= 0) {
+//       handleRemoveFromCart(productId);
+//       return;
+//     }
+//     const cartItem = cartItems.find((item) => item._id === productId);
+//     if (cartItem) {
+//       const remStock = cartItem.remainingStock !== undefined && cartItem.remainingStock !== null ? cartItem.remainingStock : (cartItem.quantity !== undefined ? cartItem.quantity : 10);
+//       if (newQty > remStock) {
+//         alert(`Only ${remStock} item(s) available in stock!`);
+//         return;
+//       }
+//     }
+//     setCartItems((prevItems) =>
+//       prevItems.map((item) => (item._id === productId ? { ...item, quantity: newQty } : item))
+//     );
+//   };
+
+//   const handleRemoveFromCart = (productId) => {
+//     setCartItems((prevItems) => prevItems.filter((item) => item._id !== productId));
+//   };
+
+//   const handleLogout = () => {
+//     localStorage.removeItem('df_token');
+//     localStorage.removeItem('df_user');
+//     setUser(null);
+//   };
+
+//   const handleProceedToCheckout = () => {
+//     setIsCartOpen(false);
+//     setIsCheckoutOpen(true);
+//   };
+
+//   const handleProceedToPayment = (address) => {
+//     setDeliveryAddress(address);
+//     setIsCheckoutOpen(false);
+//     setIsPaymentOpen(true);
+//   };
+
+//   const handleBackToCheckout = () => {
+//     setIsPaymentOpen(false);
+//     setIsCheckoutOpen(true);
+//   };
+
+//   const handleBackToCart = () => {
+//     setIsCheckoutOpen(false);
+//     setIsCartOpen(true);
+//   };
+
+//   const handleOrderSuccess = () => {
+//     setCartItems([]);
+//     setAppliedCoupon(null);
+//     setIsCartOpen(false);
+//     setIsCheckoutOpen(false);
+//     try {
+//       localStorage.removeItem('df_cart');
+//     } catch (e) {}
+//   };
+
+//   const closeAllModals = () => {
+//     setIsCartOpen(false);
+//     setIsCheckoutOpen(false);
+//     setIsPaymentOpen(false);
+//     setIsProfileOpen(false);
+//     setIsAuthOpen(false);
+//     setIsDetailOpen(false);
+//     setIsNotificationsOpen(false);
+//     setIsLightboxOpen(false);
+//   };
+
+//   const handleMobileHomeClick = () => {
+//     closeAllModals();
+//     setSelectedCategory('All');
+//     window.scrollTo({ top: 0, behavior: 'smooth' });
+//   };
+
+//   const handleMobileAccountClick = () => {
+//     closeAllModals();
+//     if (user) {
+//       setIsProfileOpen(true);
+//     } else {
+//       setIsAuthOpen(true);
+//     }
+//   };
+
+//   const handleMobileCartClick = () => {
+//     closeAllModals();
+//     setIsCartOpen(true);
+//   };
+
+//   // Keyboard Escape & PopState Handler
+//   useEffect(() => {
+//     const handlePopState = () => {
+//       if (isPaymentOpen) {
+//         setIsPaymentOpen(false);
+//         setIsCheckoutOpen(true);
+//       } else if (isCheckoutOpen) {
+//         setIsCheckoutOpen(false);
+//         setIsCartOpen(true);
+//       } else if (isCartOpen) {
+//         setIsCartOpen(false);
+//       } else if (isProfileOpen) {
+//         setIsProfileOpen(false);
+//       } else if (isDetailOpen) {
+//         handleProductDetailBack();
+//       } else if (isLightboxOpen) {
+//         setIsLightboxOpen(false);
+//       } else if (isAuthOpen) {
+//         setIsAuthOpen(false);
+//       }
+//     };
+
+//     const handleKeyDown = (e) => {
+//       if (e.key === 'Escape') {
+//         if (isPaymentOpen) setIsPaymentOpen(false);
+//         else if (isCheckoutOpen) setIsCheckoutOpen(false);
+//         else if (isCartOpen) setIsCartOpen(false);
+//         else if (isProfileOpen) setIsProfileOpen(false);
+//         else if (isDetailOpen) handleProductDetailBack();
+//         else if (isLightboxOpen) setIsLightboxOpen(false);
+//         else if (isAuthOpen) setIsAuthOpen(false);
+//       }
+//     };
+
+//     window.addEventListener('popstate', handlePopState);
+//     window.addEventListener('keydown', handleKeyDown);
+
+//     return () => {
+//       window.removeEventListener('popstate', handlePopState);
+//       window.removeEventListener('keydown', handleKeyDown);
+//     };
+//   }, [isPaymentOpen, isCheckoutOpen, isCartOpen, isProfileOpen, isDetailOpen, isLightboxOpen, isAuthOpen, productHistory.length]);
+
+//   return (
+//     <div className="app-container">
+//       {/* Sticky Live Sale Banner */}
+//       {currentView === 'shop' && (
+//         <LiveSaleBanner onSelectCategory={(cat) => setSelectedCategory(cat)} />
+//       )}
+
+//       {/* Header / Navbar */}
+//       <Navbar
+//         searchTerm={searchTerm}
+//         setSearchTerm={setSearchTerm}
+//         cartItemsCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
+//         onOpenCart={() => setIsCartOpen(true)}
+//         user={currentView === 'admin' ? null : user}
+//         onOpenAuth={() => setIsAuthOpen(true)}
+//         onOpenProfile={() => setIsProfileOpen(true)}
+//         onLogout={handleLogout}
+//         currentView={currentView}
+//         setCurrentView={setView}
+//         categories={categories}
+//         allProducts={products}
+//         onSelectProduct={handleOpenProductDetail}
+//         unreadNotificationCount={unreadNotificationCount}
+//         showNotificationBubble={showNotificationBubble}
+//         latestNotificationTitle={latestNotificationTitle}
+//         onOpenNotifications={handleOpenNotifications}
+//         activeFilterCount={activeFilterCount}
+//         onOpenFilterModal={() => setIsFilterModalOpen(true)}
+//       />
+
+//       {/* Main View Switch */}
+//       {currentView === 'admin' ? (
+//         <AdminPanel onExitAdmin={() => setView('shop')} />
+//       ) : (
+//         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', width: '100%' }}>
+//           <div className="main-layout" style={{ flex: '1 0 auto' }}>
+//             {/* Category Sidebar */}
+//             <CategorySidebar
+//               categories={categories}
+//               selectedCategory={selectedCategory}
+//               onSelectCategory={(catName) => setSelectedCategory(catName)}
+//             />
+
+//             {/* Products Grid */}
+//             <main ref={catalogRef} className="products-section">
+//               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
+//                 <h2>
+//                   <span>{selectedCategory === 'All' ? 'All Collections' : selectedCategory}</span>
+//                   <span style={{ fontSize: '0.9rem', color: '#64748b', fontWeight: 'normal', marginLeft: '8px' }}>
+//                     ({displayedProducts.length} products)
+//                   </span>
+//                 </h2>
+
+//                 <button
+//                   type="button"
+//                   onClick={() => setIsFilterModalOpen(true)}
+//                   style={{
+//                     display: 'inline-flex',
+//                     alignItems: 'center',
+//                     gap: '6px',
+//                     background: activeFilterCount > 0 ? '#fdf4ff' : '#ffffff',
+//                     border: activeFilterCount > 0 ? '1.5px solid #c026d3' : '1px solid #cbd5e1',
+//                     color: activeFilterCount > 0 ? '#c026d3' : '#334155',
+//                     padding: '0.45rem 0.85rem',
+//                     borderRadius: '10px',
+//                     fontWeight: '700',
+//                     fontSize: '0.82rem',
+//                     cursor: 'pointer',
+//                     boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
+//                   }}
+//                 >
+//                   <SlidersHorizontal size={15} color={activeFilterCount > 0 ? '#c026d3' : '#475569'} />
+//                   <span>Filters {activeFilterCount > 0 ? `(${activeFilterCount})` : ''}</span>
+//                 </button>
+//               </div>
+
+//               {/* Active Filter Strip */}
+//               {activeFilterCount > 0 && (
+//                 <div
+//                   style={{
+//                     display: 'flex',
+//                     alignItems: 'center',
+//                     gap: '0.5rem',
+//                     flexWrap: 'wrap',
+//                     background: '#fdf4ff',
+//                     border: '1.5px solid #f0abfc',
+//                     padding: '0.65rem 0.85rem',
+//                     borderRadius: '12px',
+//                     marginBottom: '1.25rem'
+//                   }}
+//                 >
+//                   <span style={{ fontSize: '0.78rem', fontWeight: '800', color: '#86198f', display: 'flex', alignItems: 'center', gap: '4px' }}>
+//                     <Filter size={14} /> Active Filters:
+//                   </span>
+
+//                   {appliedFilters.category && appliedFilters.category !== 'All' && (
+//                     <span style={{ background: '#ffffff', border: '1px solid #d8b4fe', color: '#7e22ce', padding: '2px 8px', borderRadius: '14px', fontSize: '0.75rem', fontWeight: '800' }}>
+//                       Category: {appliedFilters.category}
+//                     </span>
+//                   )}
+
+//                   {appliedFilters.presetPrice && appliedFilters.presetPrice !== 'all' && (
+//                     <span style={{ background: '#ffffff', border: '1px solid #d8b4fe', color: '#7e22ce', padding: '2px 8px', borderRadius: '14px', fontSize: '0.75rem', fontWeight: '800' }}>
+//                       Price: {appliedFilters.presetPrice}
+//                     </span>
+//                   )}
+
+//                   {(appliedFilters.minPrice || appliedFilters.maxPrice) && (
+//                     <span style={{ background: '#ffffff', border: '1px solid #d8b4fe', color: '#7e22ce', padding: '2px 8px', borderRadius: '14px', fontSize: '0.75rem', fontWeight: '800' }}>
+//                       ₹{appliedFilters.minPrice || 0} - ₹{appliedFilters.maxPrice || '∞'}
+//                     </span>
+//                   )}
+
+//                   {appliedFilters.minDiscount > 0 && (
+//                     <span style={{ background: '#ffffff', border: '1px solid #d8b4fe', color: '#7e22ce', padding: '2px 8px', borderRadius: '14px', fontSize: '0.75rem', fontWeight: '800' }}>
+//                       {appliedFilters.minDiscount}%+ Off
+//                     </span>
+//                   )}
+
+//                   {appliedFilters.minRating > 0 && (
+//                     <span style={{ background: '#ffffff', border: '1px solid #d8b4fe', color: '#7e22ce', padding: '2px 8px', borderRadius: '14px', fontSize: '0.75rem', fontWeight: '800' }}>
+//                       {appliedFilters.minRating}★ & above
+//                     </span>
+//                   )}
+
+//                   {appliedFilters.inStockOnly && (
+//                     <span style={{ background: '#ffffff', border: '1px solid #bbf7d0', color: '#15803d', padding: '2px 8px', borderRadius: '14px', fontSize: '0.75rem', fontWeight: '800' }}>
+//                       In Stock Only
+//                     </span>
+//                   )}
+
+//                   <button
+//                     type="button"
+//                     onClick={() => setAppliedFilters(DEFAULT_FILTERS)}
+//                     style={{
+//                       background: '#fef2f2',
+//                       border: '1px solid #fca5a5',
+//                       color: '#dc2626',
+//                       padding: '2px 8px',
+//                       borderRadius: '14px',
+//                       fontSize: '0.75rem',
+//                       fontWeight: '800',
+//                       cursor: 'pointer',
+//                       display: 'inline-flex',
+//                       alignItems: 'center',
+//                       gap: '3px',
+//                       marginLeft: 'auto'
+//                     }}
+//                   >
+//                     <RotateCcw size={12} /> Clear All
+//                   </button>
+//                 </div>
+//               )}
+
+//               {/* Product Grid Render: Instant or Skeleton */}
+//               {apiError ? (
+//                 <div style={{ background: 'white', padding: '3rem', textAlign: 'center', borderRadius: '12px', border: '1px solid #fee2e2' }}>
+//                   <h3 style={{ color: '#dc2626' }}>Failed to Load Products</h3>
+//                   <p style={{ color: '#64748b', marginTop: '0.5rem' }}>{apiError}</p>
+//                   <button
+//                     type="button"
+//                     onClick={() => fetchProducts(1, true)}
+//                     style={{ marginTop: '1rem', background: '#c026d3', color: 'white', border: 'none', padding: '0.65rem 1.2rem', borderRadius: '10px', fontWeight: '800', cursor: 'pointer' }}
+//                   >
+//                     Retry Loading
+//                   </button>
+//                 </div>
+//               ) : loading && products.length === 0 ? (
+//                 <ProductGridSkeleton count={8} />
+//               ) : displayedProducts.length === 0 ? (
+//                 <div style={{ background: 'white', padding: '3rem', textAlign: 'center', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+//                   <h3>No matching products found</h3>
+//                   <p style={{ color: '#64748b', marginTop: '0.5rem' }}>
+//                     Try resetting your filters or selecting another category.
+//                   </p>
+//                   <button
+//                     type="button"
+//                     onClick={() => {
+//                       setAppliedFilters(DEFAULT_FILTERS);
+//                       setSelectedCategory('All');
+//                       setSearchTerm('');
+//                     }}
+//                     style={{ marginTop: '1rem', background: '#c026d3', color: 'white', border: 'none', padding: '0.65rem 1.2rem', borderRadius: '10px', fontWeight: '800', cursor: 'pointer' }}
+//                   >
+//                     Clear All Filters & Search
+//                   </button>
+//                 </div>
+//               ) : (
+//                 <>
+//                   <div className="product-grid">
+//                     {displayedProducts.map((product) => {
+//                       const isWishlisted = wishlist.some(w => (w._id || w.id) === (product._id || product.id));
+//                       return (
+//                         <ProductCard
+//                           key={product._id || product.id}
+//                           product={product}
+//                           onAddToCart={handleAddToCart}
+//                           onClickProductTitle={handleOpenProductDetail}
+//                           onClickProductImage={handleOpenProductDetail}
+//                           isWishlisted={isWishlisted}
+//                           onToggleWishlist={handleToggleWishlist}
+//                           cartItems={cartItems}
+//                           onOpenCart={() => setIsCartOpen(true)}
+//                         />
+//                       );
+//                     })}
+//                   </div>
+
+//                   {/* SCREENSHOT-STYLE EXACT MATCH PREVIOUS / NEXT BUTTONS */}
+//                   {totalPages > 1 && (
+//                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: '3.5rem 0 2.5rem 0', width: '100%', gap: '0.85rem' }}>
+//                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+//                         {/* Previous Button */}
+//                         <button
+//                           type="button"
+//                           disabled={page <= 1 || loading}
+//                           onClick={() => handlePageChange(page - 1)}
+//                           style={{
+//                             display: 'inline-flex',
+//                             alignItems: 'center',
+//                             justifyContent: 'center',
+//                             padding: '10px 22px',
+//                             fontSize: '1rem',
+//                             fontWeight: '600',
+//                             cursor: page <= 1 || loading ? 'not-allowed' : 'pointer',
+//                             background: page <= 1 || loading ? '#f1f5f9' : '#f4f4f5',
+//                             color: page <= 1 || loading ? '#94a3b8' : '#18181b',
+//                             border: '1px solid #e4e4e7',
+//                             borderRadius: '4px',
+//                             transition: 'all 0.15s ease',
+//                             outline: 'none'
+//                           }}
+//                         >
+//                           « Previous
+//                         </button>
+
+//                         {/* Next Button */}
+//                         <button
+//                           type="button"
+//                           disabled={page >= totalPages || loading}
+//                           onClick={() => handlePageChange(page + 1)}
+//                           style={{
+//                             display: 'inline-flex',
+//                             alignItems: 'center',
+//                             justifyContent: 'center',
+//                             padding: '10px 24px',
+//                             fontSize: '1rem',
+//                             fontWeight: '600',
+//                             cursor: page >= totalPages || loading ? 'not-allowed' : 'pointer',
+//                             background: page >= totalPages || loading ? '#94a3b8' : '#c026d3',
+//                             color: '#ffffff',
+//                             border: 'none',
+//                             borderRadius: '4px',
+//                             transition: 'all 0.15s ease',
+//                             outline: 'none',
+//                             boxShadow: page >= totalPages || loading ? 'none' : '0 2px 8px rgba(192, 38, 211, 0.25)'
+//                           }}
+//                         >
+//                           Next »
+//                         </button>
+//                       </div>
+
+//                       {/* Summary Caption */}
+//                       <p style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: '600', margin: 0 }}>
+//                         Page <span style={{ color: '#c026d3', fontWeight: '800' }}>{page}</span> of{' '}
+//                         <span style={{ color: '#0f172a', fontWeight: '800' }}>{totalPages}</span> ({totalProductsCount} total items)
+//                       </p>
+//                     </div>
+//                   )}
+//                 </>
+//               )}
+//             </main>
+//           </div>
+
+//           <Footer
+//             onOpenAboutUs={() => setIsAboutUsOpen(true)}
+//             onOpenTermsPrivacy={(tab) => {
+//               setTermsTab(tab);
+//               setIsTermsOpen(true);
+//             }}
+//           />
+//         </div>
+//       )}
+
+//       {/* Modals & Drawers */}
+//       <ProductDetailModal
+//         product={selectedProduct}
+//         isOpen={isDetailOpen}
+//         onClose={handleCloseProductDetail}
+//         onAddToCart={handleAddToCart}
+//         allProducts={products}
+//         onSelectProduct={handleSelectRelatedProduct}
+//         isWishlisted={wishlist.some(w => (w._id || w.id) === (selectedProduct?._id || selectedProduct?.id))}
+//         onToggleWishlist={handleToggleWishlist}
+//         wishlist={wishlist}
+//         historyLength={productHistory.length}
+//         onGoBack={handleProductDetailBack}
+//         searchTerm={searchTerm}
+//         setSearchTerm={setSearchTerm}
+//         cartItems={cartItems}
+//         onOpenCart={() => setIsCartOpen(true)}
+//       />
+
+//       <ImageLightboxModal
+//         product={lightboxProduct}
+//         isOpen={isLightboxOpen}
+//         onClose={() => setIsLightboxOpen(false)}
+//       />
+
+//       <AuthModal
+//         isOpen={isAuthOpen}
+//         onClose={() => setIsAuthOpen(false)}
+//         onAuthSuccess={(userData) => setUser(userData)}
+//       />
+
+//       <UserProfileModal
+//         isOpen={isProfileOpen}
+//         onClose={() => setIsProfileOpen(false)}
+//         user={user}
+//         onLogout={handleLogout}
+//         onUpdateUser={(updatedUser) => {
+//           const merged = { ...user, ...updatedUser };
+//           setUser(merged);
+//           try {
+//             const clone = { ...merged };
+//             if (clone.avatar && clone.avatar.startsWith('data:')) clone.avatar = '';
+//             if (clone.profilePicture && clone.profilePicture.startsWith('data:')) clone.profilePicture = '';
+//             localStorage.setItem('df_user', JSON.stringify(clone));
+//           } catch (e) {}
+//         }}
+//         wishlist={wishlist}
+//         onToggleWishlist={handleToggleWishlist}
+//         onSelectProduct={(p) => {
+//           setSelectedProduct(p);
+//           setIsDetailOpen(true);
+//         }}
+//         onAddToCart={handleAddToCart}
+//         cartItems={cartItems}
+//         onOpenCart={() => setIsCartOpen(true)}
+//       />
+
+//       <CartDrawer
+//         isOpen={isCartOpen}
+//         onClose={() => setIsCartOpen(false)}
+//         cartItems={cartItems}
+//         onUpdateQuantity={handleUpdateQuantity}
+//         onRemoveItem={handleRemoveFromCart}
+//         onProceedToCheckout={handleProceedToCheckout}
+//         user={user}
+//         onOpenAuth={() => setIsAuthOpen(true)}
+//         appliedCoupon={appliedCoupon}
+//         setAppliedCoupon={setAppliedCoupon}
+//       />
+
+//       <CheckoutModal
+//         isOpen={isCheckoutOpen}
+//         onClose={() => setIsCheckoutOpen(false)}
+//         onBackToCart={handleBackToCart}
+//         user={user}
+//         onProceedToPayment={handleProceedToPayment}
+//       />
+
+//       <PaymentModal
+//         isOpen={isPaymentOpen}
+//         onClose={() => setIsPaymentOpen(false)}
+//         onBackToCheckout={handleBackToCheckout}
+//         user={user}
+//         cartItems={cartItems}
+//         deliveryAddress={deliveryAddress}
+//         appliedCoupon={appliedCoupon}
+//         onOrderSuccess={handleOrderSuccess}
+//       />
+
+//       <NotificationModal
+//         isOpen={isNotificationsOpen}
+//         onClose={() => setIsNotificationsOpen(false)}
+//         notifications={notifications}
+//         readNotificationIds={readNotificationIds}
+//         currentUserId={currentUserId}
+//         onMarkAllAsRead={handleMarkAllAsRead}
+//         onMarkSingleAsRead={handleMarkSingleAsRead}
+//         onNavigateToShop={() => setView('shop')}
+//       />
+
+//       {currentView === 'shop' && (
+//         <MobileBottomNav
+//           activeTab={
+//             (isCartOpen || isCheckoutOpen || isPaymentOpen)
+//               ? 'cart'
+//               : (isProfileOpen || isAuthOpen)
+//               ? 'account'
+//               : 'home'
+//           }
+//           onHomeClick={handleMobileHomeClick}
+//           onAccountClick={handleMobileAccountClick}
+//           onCartClick={handleMobileCartClick}
+//           cartCount={cartItems.reduce((acc, item) => acc + item.quantity, 0)}
+//           isLoggedIn={Boolean(user)}
+//         />
+//       )}
+
+//       <ProductFilterModal
+//         isOpen={isFilterModalOpen}
+//         onClose={() => setIsFilterModalOpen(false)}
+//         categories={categories}
+//         allProducts={products}
+//         currentFilters={appliedFilters}
+//         onApplyFilters={(newFilters) => setAppliedFilters(newFilters)}
+//         onResetFilters={() => setAppliedFilters(DEFAULT_FILTERS)}
+//       />
+
+//       <AboutUsModal
+//         isOpen={isAboutUsOpen}
+//         onClose={() => setIsAboutUsOpen(false)}
+//       />
+
+//       <TermsPrivacyModal
+//         isOpen={isTermsOpen}
+//         onClose={() => setIsTermsOpen(false)}
+//         initialTab={termsTab}
+//       />
+//     </div>
+//   );
+// }
+
+// export default App;
+
+
+
+
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import Navbar from './components/Navbar';
 import CategorySidebar from './components/CategorySidebar';
@@ -1538,9 +2868,9 @@ function App() {
   const setView = (view) => {
     setCurrentView(view);
     if (view === 'admin') {
-      window.history.pushState(null, '', '/admin');
+      window.history.pushState({ view: 'admin' }, '', '/admin');
     } else {
-      window.history.pushState(null, '', '/');
+      window.history.pushState({ view: 'shop' }, '', '/');
     }
   };
 
@@ -1554,7 +2884,7 @@ function App() {
     }
   });
 
-  // Store Notifications & Real-Time Listeners
+  // Store Notifications & Modals State
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isAboutUsOpen, setIsAboutUsOpen] = useState(false);
   const [isTermsOpen, setIsTermsOpen] = useState(false);
@@ -1571,6 +2901,172 @@ function App() {
   const [showNotificationBubble, setShowNotificationBubble] = useState(false);
   const [latestNotificationTitle, setLatestNotificationTitle] = useState('');
 
+  // Modals / Drawers State
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [productHistory, setProductHistory] = useState([]);
+  const productHistoryRef = useRef([]);
+
+  const updateProductHistory = (newHistory) => {
+    productHistoryRef.current = newHistory;
+    setProductHistory(newHistory);
+  };
+  const [lightboxProduct, setLightboxProduct] = useState(null);
+  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
+
+  const [cartItems, setCartItems] = useState(() => {
+    try {
+      const savedCart = localStorage.getItem('df_cart');
+      return savedCart ? JSON.parse(savedCart) : [];
+    } catch (e) {
+      return [];
+    }
+  });
+
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isCartOpen, setIsCartOpen] = useState(false);
+  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [deliveryAddress, setDeliveryAddress] = useState(null);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+
+  // Sync state refs for popstate listener without stale closures
+  const modalStatesRef = useRef({});
+  modalStatesRef.current = {
+    isPaymentOpen,
+    isCheckoutOpen,
+    isCartOpen,
+    isProfileOpen,
+    isDetailOpen,
+    isLightboxOpen,
+    isAuthOpen,
+    isNotificationsOpen,
+    isAboutUsOpen,
+    isTermsOpen,
+    isFilterModalOpen,
+    productHistoryLength: productHistory.length,
+    currentView
+  };
+
+  // Helper to open modal and push history state
+  const pushModalHistory = (name) => {
+    try {
+      window.history.pushState({ modal: name }, '', window.location.href);
+    } catch (e) {}
+  };
+
+  const openCartModal = () => {
+    pushModalHistory('cart');
+    setIsCartOpen(true);
+  };
+
+  const openProfileModal = () => {
+    pushModalHistory('profile');
+    setIsProfileOpen(true);
+  };
+
+  const openAuthModal = () => {
+    pushModalHistory('auth');
+    setIsAuthOpen(true);
+  };
+
+  const openFilterModal = () => {
+    pushModalHistory('filter');
+    setIsFilterModalOpen(true);
+  };
+
+  const openAboutUsModal = () => {
+    pushModalHistory('about');
+    setIsAboutUsOpen(true);
+  };
+
+  const openTermsModal = (tab = 'privacy') => {
+    setTermsTab(tab);
+    pushModalHistory('terms');
+    setIsTermsOpen(true);
+  };
+
+  const openNotificationsModal = () => {
+    pushModalHistory('notifications');
+    setIsNotificationsOpen(true);
+    setShowNotificationBubble(false);
+    const allIds = notifications.map(n => n._id);
+    const updatedRead = Array.from(new Set([...readNotificationIds, ...allIds]));
+    setReadNotificationIds(updatedRead);
+    try {
+      localStorage.setItem('df_read_notifications', JSON.stringify(updatedRead));
+    } catch (e) {}
+  };
+
+  // ============================================================
+  // SYSTEM & BROWSER BACK BUTTON (POPSTATE) STEP-BY-STEP HANDLER
+  // ============================================================
+  useEffect(() => {
+    const handlePopState = (e) => {
+      const state = modalStatesRef.current;
+
+      if (state.isLightboxOpen) {
+        setIsLightboxOpen(false);
+      } else if (state.isPaymentOpen) {
+        setIsPaymentOpen(false);
+        setIsCheckoutOpen(true);
+      } else if (state.isCheckoutOpen) {
+        setIsCheckoutOpen(false);
+        setIsCartOpen(true);
+      } else if (state.isCartOpen) {
+        setIsCartOpen(false);
+      } else if (state.isFilterModalOpen) {
+        setIsFilterModalOpen(false);
+      } else if (state.isNotificationsOpen) {
+        setIsNotificationsOpen(false);
+      } else if (state.isAboutUsOpen) {
+        setIsAboutUsOpen(false);
+      } else if (state.isTermsOpen) {
+        setIsTermsOpen(false);
+      } else if (state.isProfileOpen) {
+        setIsProfileOpen(false);
+      } else if (state.isAuthOpen) {
+        setIsAuthOpen(false);
+      } else if (state.isDetailOpen) {
+        if (productHistoryRef.current.length > 1) {
+          const nextHistory = [...productHistoryRef.current];
+          nextHistory.pop();
+          const prevProduct = nextHistory[nextHistory.length - 1];
+          const prodId = prevProduct._id || prevProduct.id;
+          updateProductHistory(nextHistory);
+          setSelectedProduct(prevProduct);
+          sessionStorage.setItem('df_opened_product_id', prodId);
+        } else {
+          updateProductHistory([]);
+          setIsDetailOpen(false);
+          sessionStorage.removeItem('df_opened_product_id');
+        }
+      } else if (state.currentView === 'admin') {
+        setCurrentView('shop');
+      }
+    };
+
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        const state = modalStatesRef.current;
+        if (state.isLightboxOpen || state.isPaymentOpen || state.isCheckoutOpen || state.isCartOpen || state.isFilterModalOpen || state.isNotificationsOpen || state.isAboutUsOpen || state.isTermsOpen || state.isProfileOpen || state.isAuthOpen || state.isDetailOpen) {
+          window.history.back();
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handlePopState);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('popstate', handlePopState);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
+  // Notifications fetch logic
   useEffect(() => {
     fetchNotifications();
     const interval = setInterval(fetchNotifications, 15000);
@@ -1598,9 +3094,7 @@ function App() {
     }
   };
 
-  // ============================================================
-  // REAL-TIME SOCKET.IO LISTENERS
-  // ============================================================
+  // Socket.io Real-time Listeners
   const { socket } = useSocket();
 
   useEffect(() => {
@@ -1622,31 +3116,10 @@ function App() {
 
     const onNewOrderPlaced = (order) => {
       window.dispatchEvent(new CustomEvent('df_new_order_placed', { detail: order }));
-      try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-        const osc = audioCtx.createOscillator();
-        const gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(659.25, audioCtx.currentTime);
-        osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.15);
-        gain.gain.setValueAtTime(0.12, audioCtx.currentTime);
-        osc.connect(gain);
-        gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.35);
-      } catch (e) {}
     };
 
     const onOrderStatusUpdated = (updatedOrder) => {
       window.dispatchEvent(new CustomEvent('df_order_status_updated', { detail: updatedOrder }));
-    };
-
-    const sanitizeUserForStorage = (u) => {
-      if (!u) return u;
-      const clone = { ...u };
-      if (clone.avatar && clone.avatar.startsWith('data:')) clone.avatar = '';
-      if (clone.profilePicture && clone.profilePicture.startsWith('data:')) clone.profilePicture = '';
-      return clone;
     };
 
     const onUserProfileUpdated = (updatedUser) => {
@@ -1656,7 +3129,7 @@ function App() {
         const updId = updatedUser._id || updatedUser.id;
         if (prevId && updId && String(prevId) === String(updId)) {
           const merged = { ...prev, ...updatedUser };
-          try { localStorage.setItem('df_user', JSON.stringify(sanitizeUserForStorage(merged))); } catch (e) {}
+          try { localStorage.setItem('df_user', JSON.stringify(merged)); } catch (e) {}
           return merged;
         }
         return prev;
@@ -1680,41 +3153,6 @@ function App() {
     };
   }, [socket]);
 
-  // LOCAL ANNOUNCEMENT EVENT LISTENER
-  useEffect(() => {
-    const handleLocalNotif = (e) => {
-      if (e.detail) {
-        const newNotif = e.detail;
-        setNotifications((prev) => [newNotif, ...prev.filter(n => n._id !== newNotif._id)]);
-        setLatestNotificationTitle(newNotif.title);
-        setShowNotificationBubble(true);
-      }
-    };
-    window.addEventListener('df_new_notification', handleLocalNotif);
-    return () => window.removeEventListener('df_new_notification', handleLocalNotif);
-  }, []);
-
-  // LOCAL USER PROFILE UPDATE EVENT LISTENER
-  useEffect(() => {
-    const handleLocalProfileUpdate = (e) => {
-      if (e.detail) {
-        const updatedUser = e.detail;
-        setUser((prev) => {
-          const merged = { ...prev, ...updatedUser };
-          try {
-            const clone = { ...merged };
-            if (clone.avatar && clone.avatar.startsWith('data:')) clone.avatar = '';
-            if (clone.profilePicture && clone.profilePicture.startsWith('data:')) clone.profilePicture = '';
-            localStorage.setItem('df_user', JSON.stringify(clone));
-          } catch (err) {}
-          return merged;
-        });
-      }
-    };
-    window.addEventListener('df_user_profile_updated', handleLocalProfileUpdate);
-    return () => window.removeEventListener('df_user_profile_updated', handleLocalProfileUpdate);
-  }, []);
-
   // Persistent User ID for readBy Tracking
   const currentUserId = user?._id || user?.id || (() => {
     try {
@@ -1732,17 +3170,6 @@ function App() {
   const unreadNotificationCount = notifications.filter(
     (n) => !readNotificationIds.includes(n._id) && (!Array.isArray(n.readBy) || !n.readBy.includes(currentUserId))
   ).length;
-
-  const handleOpenNotifications = () => {
-    setIsNotificationsOpen(true);
-    setShowNotificationBubble(false);
-    const allIds = notifications.map(n => n._id);
-    const updatedRead = Array.from(new Set([...readNotificationIds, ...allIds]));
-    setReadNotificationIds(updatedRead);
-    try {
-      localStorage.setItem('df_read_notifications', JSON.stringify(updatedRead));
-    } catch (e) {}
-  };
 
   const handleMarkAllAsRead = async () => {
     const allIds = notifications.map(n => n._id);
@@ -1781,14 +3208,11 @@ function App() {
     } catch (e) {}
   };
 
-  // ============================================================
-  // FAST PRODUCT LOADING & INSTANT STATE WITH PRE-FETCHING
-  // ============================================================
+  // Products Loading & Fetching
   const [categories, setCategories] = useState([]);
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchTerm, setSearchTerm] = useState('');
 
-  // 1. Instant Cache Hydration to eliminate initial blank screen
   const [products, setProducts] = useState(() => {
     try {
       const cached = localStorage.getItem('df_storefront_products');
@@ -1798,7 +3222,6 @@ function App() {
     }
   });
 
-  // Only show loading spinner/skeleton if we have 0 products in initial cache
   const [loading, setLoading] = useState(() => products.length === 0);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -1866,33 +3289,15 @@ function App() {
       setTotalProductsCount(totalProductsVal);
       setPage(pageNum);
 
-      // Cache the first page locally for instant initial renders on future visits
       if (pageNum === 1 && !sanitizedCat && !searchTerm.trim()) {
         try {
           localStorage.setItem('df_storefront_products', JSON.stringify(fetchedProducts));
         } catch (e) {}
       }
-
-      // PRE-FETCH NEXT PAGE IN BACKGROUND (0ms Instant Transition on Next click)
-      if (pageNum < totalPagesVal) {
-        const nextParams = new URLSearchParams();
-        if (sanitizedCat) nextParams.append('category', sanitizedCat);
-        if (searchTerm.trim()) nextParams.append('search', searchTerm.trim());
-        nextParams.append('page', pageNum + 1);
-        nextParams.append('limit', 20);
-
-        fetchWithCache(
-          `products_cat_${sanitizedCat || 'all'}_search_${searchTerm.trim()}_p${pageNum + 1}`,
-          async () => {
-            const res = await fetch(`${API_URL}/api/products?${nextParams.toString()}`);
-            return await res.json();
-          }
-        ).catch(() => {});
-      }
     } catch (e) {
       console.error('Error fetching products:', e);
       if (products.length === 0) {
-        setApiError('Unable to load products. Please check your connection or try again.');
+        setApiError('Unable to load products. Please check your connection.');
       }
     } finally {
       setLoading(false);
@@ -1900,20 +3305,11 @@ function App() {
     }
   };
 
-  // Click Next/Previous -> Switch page & smoothly scroll to the ABSOLUTE TOP of the webpage
   const handlePageChange = (newPage) => {
     if (newPage === page || newPage < 1 || newPage > totalPages) return;
-    
     setPage(newPage);
     fetchProducts(newPage);
-
-    // 1. Instantly scroll to the absolute top (Navbar & Banner included)
     window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-
-    // 2. Safeguard scroll after state re-render
-    setTimeout(() => {
-      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-    }, 100);
   };
 
   // Product Filters
@@ -1928,7 +3324,6 @@ function App() {
   };
 
   const [appliedFilters, setAppliedFilters] = useState(DEFAULT_FILTERS);
-  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
 
   const activeFilterCount = useMemo(() => {
     let count = 0;
@@ -1944,14 +3339,12 @@ function App() {
   const displayedProducts = useMemo(() => {
     let list = Array.isArray(products) ? products : [];
 
-    // Category Filter
     if (selectedCategory && selectedCategory !== 'All') {
       list = list.filter((p) => p.category?.toLowerCase() === selectedCategory.toLowerCase());
     } else if (appliedFilters.category && appliedFilters.category !== 'All') {
       list = list.filter((p) => p.category?.toLowerCase() === appliedFilters.category.toLowerCase());
     }
 
-    // Search Filter
     if (searchTerm.trim()) {
       const q = searchTerm.trim().toLowerCase();
       list = list.filter(
@@ -1962,7 +3355,6 @@ function App() {
       );
     }
 
-    // Custom Price Filter
     if (appliedFilters.minPrice !== '' && !isNaN(appliedFilters.minPrice)) {
       list = list.filter((p) => Number(p.price) >= Number(appliedFilters.minPrice));
     }
@@ -1970,7 +3362,6 @@ function App() {
       list = list.filter((p) => Number(p.price) <= Number(appliedFilters.maxPrice));
     }
 
-    // Preset Price Range
     if (appliedFilters.presetPrice === 'under500') {
       list = list.filter((p) => Number(p.price) < 500);
     } else if (appliedFilters.presetPrice === '500-1000') {
@@ -1981,7 +3372,6 @@ function App() {
       list = list.filter((p) => Number(p.price) > 2000);
     }
 
-    // Minimum Discount %
     if (appliedFilters.minDiscount > 0) {
       list = list.filter((p) => {
         if (!p.mrp || p.mrp <= p.price) return false;
@@ -1990,12 +3380,10 @@ function App() {
       });
     }
 
-    // Minimum Rating
     if (appliedFilters.minRating > 0) {
       list = list.filter((p) => (p.rating || 4.5) >= appliedFilters.minRating);
     }
 
-    // In Stock Only
     if (appliedFilters.inStockOnly) {
       list = list.filter((p) => (p.quantity !== undefined ? p.quantity > 0 : true));
     }
@@ -2003,104 +3391,190 @@ function App() {
     return list;
   }, [products, selectedCategory, searchTerm, appliedFilters]);
 
-  // Modal States
-  const [selectedProduct, setSelectedProduct] = useState(null);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [productHistory, setProductHistory] = useState([]);
-  const productHistoryRef = useRef([]);
-
-  const updateProductHistory = (newHistory) => {
-    productHistoryRef.current = newHistory;
-    setProductHistory(newHistory);
+  // Product Detail Chaining with History State
+  const handleOpenProductDetail = (product) => {
+    if (!product) return;
+    const prodId = product._id || product.id;
+    pushModalHistory(`product_${prodId}`);
+    setSelectedProduct(product);
+    updateProductHistory([product]);
+    setIsDetailOpen(true);
+    sessionStorage.setItem('df_opened_product_id', prodId);
   };
-  const [lightboxProduct, setLightboxProduct] = useState(null);
-  const [isLightboxOpen, setIsLightboxOpen] = useState(false);
 
-  // Cart & Coupon State
-  const [cartItems, setCartItems] = useState(() => {
-    try {
-      const savedCart = localStorage.getItem('df_cart');
-      return savedCart ? JSON.parse(savedCart) : [];
-    } catch (e) {
-      return [];
+  const handleSelectRelatedProduct = (product) => {
+    if (!product) return;
+    const prodId = product._id || product.id;
+    pushModalHistory(`product_${prodId}`);
+    setSelectedProduct(product);
+    updateProductHistory([...productHistoryRef.current, product]);
+    setIsDetailOpen(true);
+    sessionStorage.setItem('df_opened_product_id', prodId);
+  };
+
+  const handleProductDetailBack = () => {
+    window.history.back();
+  };
+
+  const handleCloseProductDetail = () => {
+    window.history.back();
+  };
+
+  // Cart Handlers
+  const handleAddToCart = (product) => {
+    const remStock = product.remainingStock !== undefined && product.remainingStock !== null ? product.remainingStock : (product.quantity !== undefined ? product.quantity : 10);
+    if (remStock <= 0) {
+      alert('Out of Stock - Cannot add to cart!');
+      return;
     }
-  });
 
-  const [appliedCoupon, setAppliedCoupon] = useState(null);
+    const sizesList = (product?.availableSizes && product.availableSizes.length > 0)
+      ? product.availableSizes
+      : (product?.category === 'Saree' ? ['Free Size'] : ['S', 'M', 'L', 'XL', 'XXL']);
 
-  useEffect(() => {
-    try {
-      localStorage.setItem('df_cart', JSON.stringify(cartItems));
-    } catch (e) {
-      console.error('Failed to persist cart items:', e);
+    if (product.selectedSize) {
+      setCartItems((prevItems) => {
+        const existing = prevItems.find((item) => item._id === product._id && item.selectedSize === product.selectedSize);
+        if (existing) {
+          return prevItems.map((item) =>
+            (item._id === product._id && item.selectedSize === product.selectedSize)
+              ? { ...item, quantity: item.quantity + 1 }
+              : item
+          );
+        }
+        return [...prevItems, { ...product, quantity: 1 }];
+      });
+      openCartModal();
+      return;
     }
-  }, [cartItems]);
 
-  const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [isProfileOpen, setIsProfileOpen] = useState(false);
-  const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
-  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
-  const [deliveryAddress, setDeliveryAddress] = useState(null);
+    if (sizesList.length > 1) {
+      handleOpenProductDetail(product);
+      return;
+    }
 
-  // Customer Wishlist State
+    const autoSize = sizesList[0] || 'Standard';
+    setCartItems((prevItems) => {
+      const existing = prevItems.find((item) => item._id === product._id && item.selectedSize === autoSize);
+      if (existing) {
+        if (existing.quantity >= remStock) {
+          alert(`Only ${remStock} item(s) available in stock! Cannot add more.`);
+          return prevItems;
+        }
+        return prevItems.map((item) =>
+          (item._id === product._id && item.selectedSize === autoSize)
+            ? { ...item, quantity: item.quantity + 1 }
+            : item
+        );
+      }
+      return [...prevItems, { ...product, quantity: 1, selectedSize: autoSize }];
+    });
+    openCartModal();
+  };
+
+  const handleUpdateQuantity = (productId, newQty) => {
+    if (newQty <= 0) {
+      handleRemoveFromCart(productId);
+      return;
+    }
+    const cartItem = cartItems.find((item) => item._id === productId);
+    if (cartItem) {
+      const remStock = cartItem.remainingStock !== undefined && cartItem.remainingStock !== null ? cartItem.remainingStock : (cartItem.quantity !== undefined ? cartItem.quantity : 10);
+      if (newQty > remStock) {
+        alert(`Only ${remStock} item(s) available in stock!`);
+        return;
+      }
+    }
+    setCartItems((prevItems) =>
+      prevItems.map((item) => (item._id === productId ? { ...item, quantity: newQty } : item))
+    );
+  };
+
+  const handleRemoveFromCart = (productId) => {
+    setCartItems((prevItems) => prevItems.filter((item) => item._id !== productId));
+  };
+
+  const handleLogout = () => {
+    localStorage.removeItem('df_token');
+    localStorage.removeItem('df_user');
+    setUser(null);
+  };
+
+  const handleProceedToCheckout = () => {
+    pushModalHistory('checkout');
+    setIsCartOpen(false);
+    setIsCheckoutOpen(true);
+  };
+
+  const handleProceedToPayment = (address) => {
+    setDeliveryAddress(address);
+    pushModalHistory('payment');
+    setIsCheckoutOpen(false);
+    setIsPaymentOpen(true);
+  };
+
+  const handleBackToCheckout = () => {
+    window.history.back();
+  };
+
+  const handleBackToCart = () => {
+    window.history.back();
+  };
+
+  const handleOrderSuccess = () => {
+    setCartItems([]);
+    setAppliedCoupon(null);
+    setIsCartOpen(false);
+    setIsCheckoutOpen(false);
+    setIsPaymentOpen(false);
+    try {
+      localStorage.removeItem('df_cart');
+    } catch (e) {}
+  };
+
+  const closeAllModals = () => {
+    setIsCartOpen(false);
+    setIsCheckoutOpen(false);
+    setIsPaymentOpen(false);
+    setIsProfileOpen(false);
+    setIsAuthOpen(false);
+    setIsDetailOpen(false);
+    setIsNotificationsOpen(false);
+    setIsLightboxOpen(false);
+    setIsAboutUsOpen(false);
+    setIsTermsOpen(false);
+    setIsFilterModalOpen(false);
+  };
+
+  const handleMobileHomeClick = () => {
+    closeAllModals();
+    setSelectedCategory('All');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleMobileAccountClick = () => {
+    closeAllModals();
+    if (user) {
+      openProfileModal();
+    } else {
+      openAuthModal();
+    }
+  };
+
+  const handleMobileCartClick = () => {
+    closeAllModals();
+    openCartModal();
+  };
+
+  // Wishlist State
   const [wishlist, setWishlist] = useState(() => {
     try {
       const saved = localStorage.getItem('df_wishlist');
-      if (!saved) return [];
-      const parsed = JSON.parse(saved);
-      if (Array.isArray(parsed)) return parsed;
-      return [];
+      return saved ? JSON.parse(saved) : [];
     } catch (e) {
       return [];
     }
   });
-
-  useEffect(() => {
-    const fetchUserWishlist = async () => {
-      const token = localStorage.getItem('df_token');
-      const userEmail = user?.email;
-      if (!token && !userEmail) return;
-
-      try {
-        let url = `${API_URL}/api/user/wishlist`;
-        if (userEmail) url += `?email=${encodeURIComponent(userEmail)}`;
-        const res = await apiFetch(url, {
-          headers: token ? { Authorization: `Bearer ${token}` } : {}
-        });
-        const data = await parseResponseSafely(res);
-        if (data && data.success && Array.isArray(data.wishlist) && data.wishlist.length > 0) {
-          setWishlist(data.wishlist);
-        }
-      } catch (err) {
-        console.warn('Failed to hydrate wishlist:', err);
-      }
-    };
-    fetchUserWishlist();
-  }, [user]);
-
-  useEffect(() => {
-    try {
-      const wishlistIds = (wishlist || []).map((item) =>
-        typeof item === 'string' ? item : item?._id || item?.id
-      ).filter(Boolean);
-
-      localStorage.setItem('df_wishlist', JSON.stringify(wishlistIds));
-
-      const token = localStorage.getItem('df_token');
-      const userEmail = user?.email;
-      if (token || userEmail) {
-        apiFetch('/api/user/wishlist', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {})
-          },
-          body: JSON.stringify({ wishlistIds, email: userEmail })
-        }).catch(() => {});
-      }
-    } catch (e) {}
-  }, [wishlist, user]);
 
   const handleToggleWishlist = (prod) => {
     if (!prod) return;
@@ -2133,263 +3607,6 @@ function App() {
     fetchProducts(1, false);
   }, [selectedCategory, searchTerm]);
 
-  // Restore opened Product Detail Page on refresh
-  useEffect(() => {
-    const hash = window.location.hash;
-    const match = hash.match(/#product=([^&]+)/);
-    const savedProdId = match ? match[1] : sessionStorage.getItem('df_opened_product_id');
-
-    if (savedProdId && products.length > 0) {
-      const found = products.find((p) => String(p._id || p.id) === String(savedProdId));
-      if (found) {
-        setSelectedProduct(found);
-        updateProductHistory([found]);
-        setIsDetailOpen(true);
-      }
-    }
-  }, [products]);
-
-  const handleOpenProductDetail = (product) => {
-    if (!product) return;
-    const prodId = product._id || product.id;
-    setSelectedProduct(product);
-    updateProductHistory([product]);
-    setIsDetailOpen(true);
-    sessionStorage.setItem('df_opened_product_id', prodId);
-    try {
-      window.history.replaceState(null, '', `#product=${prodId}`);
-    } catch (e) {}
-  };
-
-  const handleSelectRelatedProduct = (product) => {
-    if (!product) return;
-    const prodId = product._id || product.id;
-    setSelectedProduct(product);
-    updateProductHistory([...productHistoryRef.current, product]);
-    setIsDetailOpen(true);
-    sessionStorage.setItem('df_opened_product_id', prodId);
-    try {
-      window.history.replaceState(null, '', `#product=${prodId}`);
-    } catch (e) {}
-  };
-
-  const handleProductDetailBack = () => {
-    if (productHistoryRef.current.length > 1) {
-      const nextHistory = [...productHistoryRef.current];
-      nextHistory.pop();
-      const prevProduct = nextHistory[nextHistory.length - 1];
-      const prodId = prevProduct._id || prevProduct.id;
-      updateProductHistory(nextHistory);
-      setSelectedProduct(prevProduct);
-      sessionStorage.setItem('df_opened_product_id', prodId);
-      try {
-        window.history.replaceState(null, '', `#product=${prodId}`);
-      } catch (e) {}
-    } else {
-      updateProductHistory([]);
-      setIsDetailOpen(false);
-      sessionStorage.removeItem('df_opened_product_id');
-      try {
-        window.history.replaceState(null, '', window.location.pathname.replace(/#.*$/, ''));
-      } catch (e) {}
-    }
-  };
-
-  const handleCloseProductDetail = () => {
-    updateProductHistory([]);
-    setIsDetailOpen(false);
-    sessionStorage.removeItem('df_opened_product_id');
-    try {
-      window.history.replaceState(null, '', window.location.pathname.replace(/#.*$/, ''));
-    } catch (e) {}
-  };
-
-  // Cart Actions
-  const handleAddToCart = (product) => {
-    const remStock = product.remainingStock !== undefined && product.remainingStock !== null ? product.remainingStock : (product.quantity !== undefined ? product.quantity : 10);
-    if (remStock <= 0) {
-      alert('Out of Stock - Cannot add to cart!');
-      return;
-    }
-
-    const sizesList = (product?.availableSizes && product.availableSizes.length > 0)
-      ? product.availableSizes
-      : (product?.category === 'Saree' ? ['Free Size'] : ['S', 'M', 'L', 'XL', 'XXL']);
-
-    if (product.selectedSize) {
-      setCartItems((prevItems) => {
-        const existing = prevItems.find((item) => item._id === product._id && item.selectedSize === product.selectedSize);
-        if (existing) {
-          return prevItems.map((item) =>
-            (item._id === product._id && item.selectedSize === product.selectedSize)
-              ? { ...item, quantity: item.quantity + 1 }
-              : item
-          );
-        }
-        return [...prevItems, { ...product, quantity: 1 }];
-      });
-      setIsCartOpen(true);
-      return;
-    }
-
-    if (sizesList.length > 1) {
-      setSelectedProduct(product);
-      setIsDetailOpen(true);
-      return;
-    }
-
-    const autoSize = sizesList[0] || 'Standard';
-    setCartItems((prevItems) => {
-      const existing = prevItems.find((item) => item._id === product._id && item.selectedSize === autoSize);
-      if (existing) {
-        if (existing.quantity >= remStock) {
-          alert(`Only ${remStock} item(s) available in stock! Cannot add more.`);
-          return prevItems;
-        }
-        return prevItems.map((item) =>
-          (item._id === product._id && item.selectedSize === autoSize)
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [...prevItems, { ...product, quantity: 1, selectedSize: autoSize }];
-    });
-    setIsCartOpen(true);
-  };
-
-  const handleUpdateQuantity = (productId, newQty) => {
-    if (newQty <= 0) {
-      handleRemoveFromCart(productId);
-      return;
-    }
-    const cartItem = cartItems.find((item) => item._id === productId);
-    if (cartItem) {
-      const remStock = cartItem.remainingStock !== undefined && cartItem.remainingStock !== null ? cartItem.remainingStock : (cartItem.quantity !== undefined ? cartItem.quantity : 10);
-      if (newQty > remStock) {
-        alert(`Only ${remStock} item(s) available in stock!`);
-        return;
-      }
-    }
-    setCartItems((prevItems) =>
-      prevItems.map((item) => (item._id === productId ? { ...item, quantity: newQty } : item))
-    );
-  };
-
-  const handleRemoveFromCart = (productId) => {
-    setCartItems((prevItems) => prevItems.filter((item) => item._id !== productId));
-  };
-
-  const handleLogout = () => {
-    localStorage.removeItem('df_token');
-    localStorage.removeItem('df_user');
-    setUser(null);
-  };
-
-  const handleProceedToCheckout = () => {
-    setIsCartOpen(false);
-    setIsCheckoutOpen(true);
-  };
-
-  const handleProceedToPayment = (address) => {
-    setDeliveryAddress(address);
-    setIsCheckoutOpen(false);
-    setIsPaymentOpen(true);
-  };
-
-  const handleBackToCheckout = () => {
-    setIsPaymentOpen(false);
-    setIsCheckoutOpen(true);
-  };
-
-  const handleBackToCart = () => {
-    setIsCheckoutOpen(false);
-    setIsCartOpen(true);
-  };
-
-  const handleOrderSuccess = () => {
-    setCartItems([]);
-    setAppliedCoupon(null);
-    setIsCartOpen(false);
-    setIsCheckoutOpen(false);
-    try {
-      localStorage.removeItem('df_cart');
-    } catch (e) {}
-  };
-
-  const closeAllModals = () => {
-    setIsCartOpen(false);
-    setIsCheckoutOpen(false);
-    setIsPaymentOpen(false);
-    setIsProfileOpen(false);
-    setIsAuthOpen(false);
-    setIsDetailOpen(false);
-    setIsNotificationsOpen(false);
-    setIsLightboxOpen(false);
-  };
-
-  const handleMobileHomeClick = () => {
-    closeAllModals();
-    setSelectedCategory('All');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  };
-
-  const handleMobileAccountClick = () => {
-    closeAllModals();
-    if (user) {
-      setIsProfileOpen(true);
-    } else {
-      setIsAuthOpen(true);
-    }
-  };
-
-  const handleMobileCartClick = () => {
-    closeAllModals();
-    setIsCartOpen(true);
-  };
-
-  // Keyboard Escape & PopState Handler
-  useEffect(() => {
-    const handlePopState = () => {
-      if (isPaymentOpen) {
-        setIsPaymentOpen(false);
-        setIsCheckoutOpen(true);
-      } else if (isCheckoutOpen) {
-        setIsCheckoutOpen(false);
-        setIsCartOpen(true);
-      } else if (isCartOpen) {
-        setIsCartOpen(false);
-      } else if (isProfileOpen) {
-        setIsProfileOpen(false);
-      } else if (isDetailOpen) {
-        handleProductDetailBack();
-      } else if (isLightboxOpen) {
-        setIsLightboxOpen(false);
-      } else if (isAuthOpen) {
-        setIsAuthOpen(false);
-      }
-    };
-
-    const handleKeyDown = (e) => {
-      if (e.key === 'Escape') {
-        if (isPaymentOpen) setIsPaymentOpen(false);
-        else if (isCheckoutOpen) setIsCheckoutOpen(false);
-        else if (isCartOpen) setIsCartOpen(false);
-        else if (isProfileOpen) setIsProfileOpen(false);
-        else if (isDetailOpen) handleProductDetailBack();
-        else if (isLightboxOpen) setIsLightboxOpen(false);
-        else if (isAuthOpen) setIsAuthOpen(false);
-      }
-    };
-
-    window.addEventListener('popstate', handlePopState);
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      window.removeEventListener('popstate', handlePopState);
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isPaymentOpen, isCheckoutOpen, isCartOpen, isProfileOpen, isDetailOpen, isLightboxOpen, isAuthOpen, productHistory.length]);
-
   return (
     <div className="app-container">
       {/* Sticky Live Sale Banner */}
@@ -2402,10 +3619,10 @@ function App() {
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
         cartItemsCount={cartItems.reduce((sum, item) => sum + item.quantity, 0)}
-        onOpenCart={() => setIsCartOpen(true)}
+        onOpenCart={openCartModal}
         user={currentView === 'admin' ? null : user}
-        onOpenAuth={() => setIsAuthOpen(true)}
-        onOpenProfile={() => setIsProfileOpen(true)}
+        onOpenAuth={openAuthModal}
+        onOpenProfile={openProfileModal}
         onLogout={handleLogout}
         currentView={currentView}
         setCurrentView={setView}
@@ -2415,9 +3632,9 @@ function App() {
         unreadNotificationCount={unreadNotificationCount}
         showNotificationBubble={showNotificationBubble}
         latestNotificationTitle={latestNotificationTitle}
-        onOpenNotifications={handleOpenNotifications}
+        onOpenNotifications={openNotificationsModal}
         activeFilterCount={activeFilterCount}
-        onOpenFilterModal={() => setIsFilterModalOpen(true)}
+        onOpenFilterModal={openFilterModal}
       />
 
       {/* Main View Switch */}
@@ -2433,7 +3650,7 @@ function App() {
               onSelectCategory={(catName) => setSelectedCategory(catName)}
             />
 
-            {/* Products Grid */}
+            {/* Products Section */}
             <main ref={catalogRef} className="products-section">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
                 <h2>
@@ -2445,7 +3662,7 @@ function App() {
 
                 <button
                   type="button"
-                  onClick={() => setIsFilterModalOpen(true)}
+                  onClick={openFilterModal}
                   style={{
                     display: 'inline-flex',
                     alignItems: 'center',
@@ -2544,7 +3761,7 @@ function App() {
                 </div>
               )}
 
-              {/* Product Grid Render: Instant or Skeleton */}
+              {/* Product Grid Render */}
               {apiError ? (
                 <div style={{ background: 'white', padding: '3rem', textAlign: 'center', borderRadius: '12px', border: '1px solid #fee2e2' }}>
                   <h3 style={{ color: '#dc2626' }}>Failed to Load Products</h3>
@@ -2592,17 +3809,16 @@ function App() {
                           isWishlisted={isWishlisted}
                           onToggleWishlist={handleToggleWishlist}
                           cartItems={cartItems}
-                          onOpenCart={() => setIsCartOpen(true)}
+                          onOpenCart={openCartModal}
                         />
                       );
                     })}
                   </div>
 
-                  {/* SCREENSHOT-STYLE EXACT MATCH PREVIOUS / NEXT BUTTONS */}
+                  {/* Previous / Next Pagination */}
                   {totalPages > 1 && (
                     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', margin: '3.5rem 0 2.5rem 0', width: '100%', gap: '0.85rem' }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
-                        {/* Previous Button */}
                         <button
                           type="button"
                           disabled={page <= 1 || loading}
@@ -2626,7 +3842,6 @@ function App() {
                           « Previous
                         </button>
 
-                        {/* Next Button */}
                         <button
                           type="button"
                           disabled={page >= totalPages || loading}
@@ -2652,7 +3867,6 @@ function App() {
                         </button>
                       </div>
 
-                      {/* Summary Caption */}
                       <p style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: '600', margin: 0 }}>
                         Page <span style={{ color: '#c026d3', fontWeight: '800' }}>{page}</span> of{' '}
                         <span style={{ color: '#0f172a', fontWeight: '800' }}>{totalPages}</span> ({totalProductsCount} total items)
@@ -2665,11 +3879,8 @@ function App() {
           </div>
 
           <Footer
-            onOpenAboutUs={() => setIsAboutUsOpen(true)}
-            onOpenTermsPrivacy={(tab) => {
-              setTermsTab(tab);
-              setIsTermsOpen(true);
-            }}
+            onOpenAboutUs={openAboutUsModal}
+            onOpenTermsPrivacy={openTermsModal}
           />
         </div>
       )}
@@ -2690,24 +3901,24 @@ function App() {
         searchTerm={searchTerm}
         setSearchTerm={setSearchTerm}
         cartItems={cartItems}
-        onOpenCart={() => setIsCartOpen(true)}
+        onOpenCart={openCartModal}
       />
 
       <ImageLightboxModal
         product={lightboxProduct}
         isOpen={isLightboxOpen}
-        onClose={() => setIsLightboxOpen(false)}
+        onClose={() => window.history.back()}
       />
 
       <AuthModal
         isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
+        onClose={() => window.history.back()}
         onAuthSuccess={(userData) => setUser(userData)}
       />
 
       <UserProfileModal
         isOpen={isProfileOpen}
-        onClose={() => setIsProfileOpen(false)}
+        onClose={() => window.history.back()}
         user={user}
         onLogout={handleLogout}
         onUpdateUser={(updatedUser) => {
@@ -2723,30 +3934,29 @@ function App() {
         wishlist={wishlist}
         onToggleWishlist={handleToggleWishlist}
         onSelectProduct={(p) => {
-          setSelectedProduct(p);
-          setIsDetailOpen(true);
+          handleOpenProductDetail(p);
         }}
         onAddToCart={handleAddToCart}
         cartItems={cartItems}
-        onOpenCart={() => setIsCartOpen(true)}
+        onOpenCart={openCartModal}
       />
 
       <CartDrawer
         isOpen={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
+        onClose={() => window.history.back()}
         cartItems={cartItems}
         onUpdateQuantity={handleUpdateQuantity}
         onRemoveItem={handleRemoveFromCart}
         onProceedToCheckout={handleProceedToCheckout}
         user={user}
-        onOpenAuth={() => setIsAuthOpen(true)}
+        onOpenAuth={openAuthModal}
         appliedCoupon={appliedCoupon}
         setAppliedCoupon={setAppliedCoupon}
       />
 
       <CheckoutModal
         isOpen={isCheckoutOpen}
-        onClose={() => setIsCheckoutOpen(false)}
+        onClose={() => window.history.back()}
         onBackToCart={handleBackToCart}
         user={user}
         onProceedToPayment={handleProceedToPayment}
@@ -2754,7 +3964,7 @@ function App() {
 
       <PaymentModal
         isOpen={isPaymentOpen}
-        onClose={() => setIsPaymentOpen(false)}
+        onClose={() => window.history.back()}
         onBackToCheckout={handleBackToCheckout}
         user={user}
         cartItems={cartItems}
@@ -2765,7 +3975,7 @@ function App() {
 
       <NotificationModal
         isOpen={isNotificationsOpen}
-        onClose={() => setIsNotificationsOpen(false)}
+        onClose={() => window.history.back()}
         notifications={notifications}
         readNotificationIds={readNotificationIds}
         currentUserId={currentUserId}
@@ -2793,7 +4003,7 @@ function App() {
 
       <ProductFilterModal
         isOpen={isFilterModalOpen}
-        onClose={() => setIsFilterModalOpen(false)}
+        onClose={() => window.history.back()}
         categories={categories}
         allProducts={products}
         currentFilters={appliedFilters}
@@ -2803,12 +4013,12 @@ function App() {
 
       <AboutUsModal
         isOpen={isAboutUsOpen}
-        onClose={() => setIsAboutUsOpen(false)}
+        onClose={() => window.history.back()}
       />
 
       <TermsPrivacyModal
         isOpen={isTermsOpen}
-        onClose={() => setIsTermsOpen(false)}
+        onClose={() => window.history.back()}
         initialTab={termsTab}
       />
     </div>

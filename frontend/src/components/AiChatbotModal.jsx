@@ -1,5 +1,9 @@
+
+
+
+
 // import React, { useState, useEffect, useRef } from 'react';
-// import { X, Send, Bot, User, Sparkles, Package, RotateCcw, Mail, HelpCircle } from 'lucide-react';
+// import { X, Send, Bot, User, Sparkles } from 'lucide-react';
 // import { API_URL } from '../api';
 
 // const QUICK_QUESTIONS = [
@@ -20,6 +24,7 @@
 //   const [typing, setTyping] = useState(false);
 //   const [orders, setOrders] = useState(userOrders);
 //   const chatEndRef = useRef(null);
+//   const messagesContainerRef = useRef(null);
 
 //   useEffect(() => {
 //     if (isOpen) {
@@ -48,7 +53,6 @@
 //       if (res.ok) {
 //         const data = await res.json();
 //         const ordersArray = Array.isArray(data) ? data : [];
-//         console.log("Fetched orders for user (chatbot):", ordersArray.length);
 //         setOrders(ordersArray);
 //       }
 //     } catch (e) {
@@ -56,11 +60,39 @@
 //     }
 //   };
 
-//   useEffect(() => {
+//   const scrollToBottom = () => {
 //     if (chatEndRef.current) {
-//       chatEndRef.current.scrollIntoView({ behavior: 'smooth' });
+//       chatEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 //     }
+//     if (messagesContainerRef.current) {
+//       messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
+//     }
+//   };
+
+//   useEffect(() => {
+//     scrollToBottom();
 //   }, [messages, typing]);
+
+//   // Adjust container height dynamically when mobile keyboard appears
+//   useEffect(() => {
+//     if (!isOpen) return;
+
+//     const handleResize = () => {
+//       scrollToBottom();
+//     };
+
+//     if (window.visualViewport) {
+//       window.visualViewport.addEventListener('resize', handleResize);
+//       window.visualViewport.addEventListener('scroll', handleResize);
+//     }
+
+//     return () => {
+//       if (window.visualViewport) {
+//         window.visualViewport.removeEventListener('resize', handleResize);
+//         window.visualViewport.removeEventListener('scroll', handleResize);
+//       }
+//     };
+//   }, [isOpen]);
 
 //   if (!isOpen) return null;
 
@@ -68,25 +100,23 @@
 //     const query = textToSend || inputMsg.trim();
 //     if (!query) return;
 
-//     // Add user message
 //     const newMsgs = [...messages, { sender: 'user', text: query }];
 //     setMessages(newMsgs);
 //     setInputMsg('');
 //     setTyping(true);
 
-//     // Simulate AI thinking and response
 //     setTimeout(() => {
 //       let botResponse = getAiResponse(query);
 //       setMessages((prev) => [...prev, { sender: 'bot', text: botResponse }]);
 //       setTyping(false);
-//     }, 700);
+//     }, 600);
 //   };
 
 //   const getAiResponse = (userQuery) => {
 //     const q = userQuery.trim();
 //     const qLower = q.toLowerCase();
 
-//     // 1. ORDER ID LOOKUP DETECTOR (e.g. DF-123456, DF123456, or 6+ alphanum string)
+//     // 1. ORDER ID LOOKUP DETECTOR
 //     const orderIdRegex = /(DF-?[A-Z0-9]{5,10})/i;
 //     const orderIdMatch = q.match(orderIdRegex);
 
@@ -113,14 +143,14 @@
 //         return `🔍 **Order Search Result**:
 // Could not find an active order with ID **"${orderIdMatch[0]}"** in your account.
 
-// Please verify your Order ID under **Profile $\rightarrow$ My Orders** or email support@diptofashion.com for manual lookup!`;
+// Please verify your Order ID under **Profile -> My Orders** or email support@diptofashion.com for manual lookup!`;
 //       }
 //     }
 
 //     // 2. LAST / LATEST ORDER DETAILS LOOKUP
 //     if (qLower.includes('last order') || qLower.includes('latest order') || qLower.includes('recent order') || qLower.includes('my order details')) {
 //       if (orders && orders.length > 0) {
-//         const last = orders[0]; // Most recent order
+//         const last = orders[0];
 //         const itemsListStr = last.items?.map((i) => `• ${i.name} (Qty: ${i.quantity}${i.selectedSize ? `, Size: ${i.selectedSize}` : ''})`).join('\n');
 //         const estDeliveryStr = new Date(new Date(last.createdAt).getTime() + 7 * 24 * 60 * 60 * 1000).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
@@ -141,7 +171,7 @@
 //     if (qLower.includes('return') || qLower.includes('refund') || qLower.includes('exchange') || qLower.includes('how to return')) {
 //       return `🔄 **Full Step-by-Step Product Return & Refund Guide**:
 
-// 1️⃣ **Open Your Profile**: Tap the profile icon at top right $\rightarrow$ click **My Orders**.
+// 1️⃣ **Open Your Profile**: Tap the profile icon at top right -> click **My Orders**.
 // 2️⃣ **Select Delivered Order**: Find your order (Returns are eligible within **7 Days** of delivery).
 // 3️⃣ **Click "Request Return"**: Select your return reason and enter your **Bank Details** or **UPI ID** for refund.
 // 4️⃣ **Pickup & Refund**: Our courier partner will pick up the product from your address within **3 Business Days**, and refund will be transferred directly to your bank account / UPI!`;
@@ -166,7 +196,7 @@
 // • **Punjabi Suits & Kurtas**: Standard S (36"), M (38"), L (40"), XL (42"), XXL (44") chest measurements. View size chart on product page for details.`;
 //     }
 
-//     // 7. UNKNOWN / GENERAL FALLBACK QUERY WITH SUPPORT CONTACT
+//     // 7. GENERAL FALLBACK
 //     return `🤖 Thank you for reaching out! For custom requests or queries outside order tracking and returns:
 
 // 📧 **Customer Support Email**: support@diptofashion.com
@@ -177,47 +207,123 @@
 //   };
 
 //   return (
-//     <div className="modal-overlay" style={{ zIndex: 400 }}>
+//     <div
+//       className="modal-overlay"
+//       style={{
+//         zIndex: 999,
+//         position: 'fixed',
+//         top: 0,
+//         left: 0,
+//         right: 0,
+//         bottom: 0,
+//         display: 'flex',
+//         alignItems: 'center',
+//         justifyContent: 'center',
+//         background: 'rgba(15, 23, 42, 0.65)',
+//         backdropFilter: 'blur(4px)'
+//       }}
+//       onClick={onClose}
+//     >
 //       <div
 //         className="modal-card"
 //         style={{
-//           maxWidth: '450px',
-//           width: '92%',
-//           height: '570px',
-//           borderRadius: '16px',
+//           maxWidth: '460px',
+//           width: '100%',
+//           height: '100dvh',
+//           maxHeight: 'min(640px, 100dvh)',
+//           borderRadius: window.innerWidth < 640 ? '0px' : '16px',
 //           display: 'flex',
 //           flexDirection: 'column',
 //           overflow: 'hidden',
-//           boxShadow: '0 20px 40px rgba(192,38,211,0.25)'
+//           background: '#ffffff',
+//           boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
+//           position: 'relative'
 //         }}
 //         onClick={(e) => e.stopPropagation()}
 //       >
 //         {/* Header */}
-//         <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)', padding: '0.95rem 1.25rem', color: 'white', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+//         <div
+//           style={{
+//             background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)',
+//             padding: '0.85rem 1.15rem',
+//             color: 'white',
+//             display: 'flex',
+//             alignItems: 'center',
+//             justifyContent: 'space-between',
+//             flexShrink: 0
+//           }}
+//         >
 //           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
-//             <div style={{ width: '36px', height: '36px', borderRadius: '50%', background: 'rgba(255,255,255,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+//             <div
+//               style={{
+//                 width: '36px',
+//                 height: '36px',
+//                 borderRadius: '50%',
+//                 background: 'rgba(255,255,255,0.2)',
+//                 display: 'flex',
+//                 alignItems: 'center',
+//                 justifyContent: 'center',
+//                 flexShrink: 0
+//               }}
+//             >
 //               <Bot size={22} color="#e879f9" />
 //             </div>
 //             <div>
-//               <h3 style={{ fontSize: '1.1rem', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
+//               <h3 style={{ fontSize: '1.05rem', fontWeight: '800', margin: 0, display: 'flex', alignItems: 'center', gap: '6px' }}>
 //                 Dipto AI Assistant <Sparkles size={14} color="#facc15" />
 //               </h3>
 //               <p style={{ fontSize: '0.72rem', opacity: 0.85, margin: 0 }}>Smart Order Tracking & Support</p>
 //             </div>
 //           </div>
-//           <button className="close-btn" onClick={onClose} style={{ color: 'white' }}>
-//             <X size={20} />
+//           <button
+//             onClick={onClose}
+//             style={{
+//               background: 'rgba(255,255,255,0.15)',
+//               border: 'none',
+//               borderRadius: '50%',
+//               width: '32px',
+//               height: '32px',
+//               display: 'flex',
+//               alignItems: 'center',
+//               justifyContent: 'center',
+//               color: 'white',
+//               cursor: 'pointer'
+//             }}
+//           >
+//             <X size={18} />
 //           </button>
 //         </div>
 
 //         {/* Quick Question Chips */}
-//         <div style={{ background: '#f8fafc', padding: '0.5rem 0.85rem', borderBottom: '1px solid #e2e8f0', display: 'flex', gap: '0.4rem', overflowX: 'auto', whiteSpace: 'nowrap' }}>
+//         <div
+//           style={{
+//             background: '#f8fafc',
+//             padding: '0.5rem 0.85rem',
+//             borderBottom: '1px solid #e2e8f0',
+//             display: 'flex',
+//             gap: '0.4rem',
+//             overflowX: 'auto',
+//             whiteSpace: 'nowrap',
+//             flexShrink: 0,
+//             WebkitOverflowScrolling: 'touch'
+//           }}
+//         >
 //           {QUICK_QUESTIONS.map((q, idx) => (
 //             <button
 //               key={idx}
 //               type="button"
 //               onClick={() => handleSend(q)}
-//               style={{ background: 'white', border: '1px solid #cbd5e1', borderRadius: '16px', padding: '3px 10px', fontSize: '0.73rem', fontWeight: '700', color: '#c026d3', cursor: 'pointer' }}
+//               style={{
+//                 background: 'white',
+//                 border: '1px solid #cbd5e1',
+//                 borderRadius: '16px',
+//                 padding: '4px 10px',
+//                 fontSize: '0.73rem',
+//                 fontWeight: '700',
+//                 color: '#c026d3',
+//                 cursor: 'pointer',
+//                 flexShrink: 0
+//               }}
 //             >
 //               {q}
 //             </button>
@@ -225,7 +331,19 @@
 //         </div>
 
 //         {/* Chat Messages */}
-//         <div style={{ flex: 1, padding: '1rem', overflowY: 'auto', background: '#ffffff', display: 'flex', flexDirection: 'column', gap: '0.85rem' }}>
+//         <div
+//           ref={messagesContainerRef}
+//           style={{
+//             flex: 1,
+//             padding: '1rem',
+//             overflowY: 'auto',
+//             background: '#ffffff',
+//             display: 'flex',
+//             flexDirection: 'column',
+//             gap: '0.85rem',
+//             WebkitOverflowScrolling: 'touch'
+//           }}
+//         >
 //           {messages.map((m, idx) => (
 //             <div
 //               key={idx}
@@ -248,7 +366,8 @@
 //                   justifyContent: 'center',
 //                   fontSize: '0.75rem',
 //                   fontWeight: '800',
-//                   border: m.sender === 'bot' ? '1px solid #bbf7d0' : 'none'
+//                   border: m.sender === 'bot' ? '1px solid #bbf7d0' : 'none',
+//                   flexShrink: 0
 //                 }}
 //               >
 //                 {m.sender === 'user' ? <User size={16} /> : <Bot size={16} />}
@@ -263,7 +382,8 @@
 //                   fontSize: '0.84rem',
 //                   lineHeight: '1.5',
 //                   border: m.sender === 'user' ? 'none' : '1px solid #e2e8f0',
-//                   whiteSpace: 'pre-line'
+//                   whiteSpace: 'pre-line',
+//                   wordBreak: 'break-word'
 //                 }}
 //               >
 //                 {m.text}
@@ -273,7 +393,19 @@
 
 //           {typing && (
 //             <div style={{ display: 'flex', gap: '0.6rem', alignItems: 'center' }}>
-//               <div style={{ width: '30px', height: '30px', borderRadius: '50%', background: '#f0fdf4', color: '#16a34a', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+//               <div
+//                 style={{
+//                   width: '30px',
+//                   height: '30px',
+//                   borderRadius: '50%',
+//                   background: '#f0fdf4',
+//                   color: '#16a34a',
+//                   display: 'flex',
+//                   alignItems: 'center',
+//                   justifyContent: 'center',
+//                   flexShrink: 0
+//                 }}
+//               >
 //                 <Bot size={16} />
 //               </div>
 //               <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.5rem 0.85rem', borderRadius: '14px', fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
@@ -281,31 +413,65 @@
 //               </div>
 //             </div>
 //           )}
-//           <div ref={chatEndRef} />
+//           <div ref={chatEndRef} style={{ height: '1px' }} />
 //         </div>
 
-//         {/* Input Bar */}
+//         {/* Input Bar (Stick to keyboard on mobile) */}
 //         <form
 //           onSubmit={(e) => {
 //             e.preventDefault();
 //             handleSend();
 //           }}
-//           style={{ padding: '0.75rem', background: '#f8fafc', borderTop: '1px solid #e2e8f0', display: 'flex', gap: '0.5rem' }}
+//           style={{
+//             padding: '0.65rem 0.75rem',
+//             paddingBottom: 'calc(0.65rem + env(safe-area-inset-bottom))',
+//             background: '#f8fafc',
+//             borderTop: '1.5px solid #e2e8f0',
+//             display: 'flex',
+//             gap: '0.5rem',
+//             alignItems: 'center',
+//             flexShrink: 0
+//           }}
 //         >
 //           <input
 //             type="text"
 //             placeholder="Enter Order ID, ask 'last order' or 'return'..."
 //             value={inputMsg}
+//             onFocus={() => {
+//               setTimeout(scrollToBottom, 250);
+//             }}
 //             onChange={(e) => setInputMsg(e.target.value)}
-//             style={{ flex: 1, padding: '0.65rem 1rem', border: '1.5px solid #cbd5e1', borderRadius: '20px', fontSize: '0.85rem', outline: 'none' }}
+//             style={{
+//               flex: 1,
+//               padding: '0.65rem 1rem',
+//               border: '1.5px solid #cbd5e1',
+//               borderRadius: '24px',
+//               fontSize: '0.9rem',
+//               outline: 'none',
+//               background: '#ffffff',
+//               color: '#0f172a'
+//             }}
 //           />
 //           <button
 //             type="submit"
 //             className="btn-primary"
-//             style={{ borderRadius: '50%', width: '40px', height: '40px', padding: 0, justifyContent: 'center' }}
+//             style={{
+//               borderRadius: '50%',
+//               width: '42px',
+//               height: '42px',
+//               minWidth: '42px',
+//               padding: 0,
+//               display: 'flex',
+//               alignItems: 'center',
+//               justifyContent: 'center',
+//               background: inputMsg.trim() ? '#c026d3' : '#cbd5e1',
+//               border: 'none',
+//               cursor: inputMsg.trim() ? 'pointer' : 'default',
+//               transition: 'background 0.2s ease'
+//             }}
 //             disabled={!inputMsg.trim()}
 //           >
-//             <Send size={18} />
+//             <Send size={18} color="white" />
 //           </button>
 //         </form>
 //       </div>
@@ -314,8 +480,6 @@
 // };
 
 // export default AiChatbotModal;
-
-
 
 
 
@@ -340,8 +504,13 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
   const [inputMsg, setInputMsg] = useState('');
   const [typing, setTyping] = useState(false);
   const [orders, setOrders] = useState(userOrders);
+  
+  // Dynamic mobile viewport height state
+  const [viewportHeight, setViewportHeight] = useState('100%');
+  
   const chatEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
+  const inputRef = useRef(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -377,36 +546,47 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
     }
   };
 
-  const scrollToBottom = () => {
-    if (chatEndRef.current) {
-      chatEndRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-    }
-    if (messagesContainerRef.current) {
-      messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight;
-    }
+  // Ultra-smooth robust auto-scroll
+  const scrollToBottom = (instant = false) => {
+    requestAnimationFrame(() => {
+      if (messagesContainerRef.current) {
+        messagesContainerRef.current.scrollTo({
+          top: messagesContainerRef.current.scrollHeight,
+          behavior: instant ? 'auto' : 'smooth'
+        });
+      }
+      if (chatEndRef.current) {
+        chatEndRef.current.scrollIntoView({ behavior: instant ? 'auto' : 'smooth', block: 'end' });
+      }
+    });
   };
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, typing]);
 
-  // Adjust container height dynamically when mobile keyboard appears
+  // Handle Virtual Keyboard appearance on iOS and Android
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleResize = () => {
-      scrollToBottom();
+    const handleViewportChange = () => {
+      if (window.visualViewport) {
+        const currentHeight = window.visualViewport.height;
+        setViewportHeight(`${currentHeight}px`);
+        scrollToBottom(true);
+      }
     };
 
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleResize);
-      window.visualViewport.addEventListener('scroll', handleResize);
+      window.visualViewport.addEventListener('resize', handleViewportChange);
+      window.visualViewport.addEventListener('scroll', handleViewportChange);
+      handleViewportChange();
     }
 
     return () => {
       if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleResize);
-        window.visualViewport.removeEventListener('scroll', handleResize);
+        window.visualViewport.removeEventListener('resize', handleViewportChange);
+        window.visualViewport.removeEventListener('scroll', handleViewportChange);
       }
     };
   }, [isOpen]);
@@ -533,6 +713,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
         left: 0,
         right: 0,
         bottom: 0,
+        height: viewportHeight,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
@@ -546,8 +727,8 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
         style={{
           maxWidth: '460px',
           width: '100%',
-          height: '100dvh',
-          maxHeight: 'min(640px, 100dvh)',
+          height: '100%',
+          maxHeight: '100%',
           borderRadius: window.innerWidth < 640 ? '0px' : '16px',
           display: 'flex',
           flexDirection: 'column',
@@ -647,7 +828,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           ))}
         </div>
 
-        {/* Chat Messages */}
+        {/* Chat Messages Container */}
         <div
           ref={messagesContainerRef}
           style={{
@@ -658,7 +839,8 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
             display: 'flex',
             flexDirection: 'column',
             gap: '0.85rem',
-            WebkitOverflowScrolling: 'touch'
+            WebkitOverflowScrolling: 'touch',
+            overscrollBehavior: 'contain'
           }}
         >
           {messages.map((m, idx) => (
@@ -730,10 +912,10 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
               </div>
             </div>
           )}
-          <div ref={chatEndRef} style={{ height: '1px' }} />
+          <div ref={chatEndRef} style={{ height: '2px', flexShrink: 0 }} />
         </div>
 
-        {/* Input Bar (Stick to keyboard on mobile) */}
+        {/* Input Bar (Locks directly on top of keyboard) */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -751,11 +933,14 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           }}
         >
           <input
+            ref={inputRef}
             type="text"
             placeholder="Enter Order ID, ask 'last order' or 'return'..."
             value={inputMsg}
             onFocus={() => {
-              setTimeout(scrollToBottom, 250);
+              setTimeout(() => {
+                scrollToBottom(true);
+              }, 300);
             }}
             onChange={(e) => setInputMsg(e.target.value)}
             style={{
