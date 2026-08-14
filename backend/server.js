@@ -1174,9 +1174,164 @@ const processProductImages = async (imagesList, files) => {
   ];
 };
 
+// app.post(['/api/products', '/products'], upload.array('images', 5), async (req, res) => {
+//   try {
+//     const { name, category, mrp, price, quantity, description, rating, reviewsCount } = req.body;
+//     let imagesInput = req.body.images;
+//     if (typeof imagesInput === 'string') {
+//       try { imagesInput = JSON.parse(imagesInput); } catch (e) { imagesInput = [imagesInput]; }
+//     }
+
+//     const processedImages = await processProductImages(imagesInput, req.files);
+
+//     if (!name || !category || !mrp || !price) {
+//       return res.status(400).json({ message: 'Product title, category, MRP, and offer price are required' });
+//     }
+
+//     clearProductCache();
+
+//     const enteredQty = Number(quantity) || 10;
+
+//     if (isMongoConnected()) {
+//       const prod = await Product.create({
+//         name,
+//         category,
+//         mrp: Number(mrp),
+//         price: Number(price),
+//         quantity: enteredQty,
+//         remainingStock: enteredQty,
+//         rating: Number(rating) || 4.5,
+//         reviewsCount: Number(reviewsCount) || 142,
+//         images: processedImages,
+//         image: processedImages[0],
+//         description: description || ''
+//       });
+//       try { io.emit('product_added', prod); } catch (e) {}
+//       return res.json(prod);
+//     } else {
+//       const prod = {
+//         _id: 'p_' + Date.now(),
+//         name,
+//         category,
+//         mrp: Number(mrp),
+//         price: Number(price),
+//         quantity: enteredQty,
+//         remainingStock: enteredQty,
+//         rating: Number(rating) || 4.5,
+//         reviewsCount: Number(reviewsCount) || 142,
+//         images: processedImages,
+//         image: processedImages[0],
+//         description: description || ''
+//       };
+//       memoryProducts.unshift(prod);
+//       try { io.emit('product_added', prod); } catch (e) {}
+//       return res.json(prod);
+//     }
+//   } catch (err) {
+//     res.status(500).json({ message: err.message });
+//   }
+// });
+
+// app.put(['/api/products/:id', '/products/:id'], upload.array('images', 5), async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     const { name, category, mrp, price, quantity, description, rating, reviewsCount } = req.body;
+//     let imagesInput = req.body.images;
+//     if (typeof imagesInput === 'string') {
+//       try { imagesInput = JSON.parse(imagesInput); } catch (e) { imagesInput = [imagesInput]; }
+//     }
+
+//     const processedImages = await processProductImages(imagesInput, req.files);
+
+//     if (!name || !category || !mrp || !price) {
+//       return res.status(400).json({ message: 'Product title, category, MRP, and offer price are required' });
+//     }
+
+//     clearProductCache();
+
+//     const enteredQty = Number(quantity) || 10;
+
+//     if (isMongoConnected()) {
+//       const existing = await Product.findById(id);
+//       let newRemaining = enteredQty;
+//       if (existing) {
+//         const oldQty = Number(existing.quantity) || 0;
+//         const oldRem = existing.remainingStock !== undefined && existing.remainingStock !== null ? Number(existing.remainingStock) : oldQty;
+//         const diff = enteredQty - oldQty;
+//         newRemaining = Math.max(0, oldRem + diff);
+//       }
+
+//       const updated = await Product.findByIdAndUpdate(
+//         id,
+//         {
+//           name,
+//           category,
+//           mrp: Number(mrp),
+//           price: Number(price),
+//           quantity: enteredQty,
+//           remainingStock: newRemaining,
+//           rating: Number(rating) || 4.5,
+//           reviewsCount: Number(reviewsCount) || 142,
+//           images: processedImages,
+//           image: processedImages[0],
+//           description: description || ''
+//         },
+//         { new: true }
+//       );
+//       try { io.emit('product_updated', updated); } catch (e) {}
+//       return res.json(updated);
+//     } else {
+//       const prod = memoryProducts.find(p => p._id === id);
+//       if (prod) {
+//         const oldQty = Number(prod.quantity) || 0;
+//         const oldRem = prod.remainingStock !== undefined && prod.remainingStock !== null ? Number(prod.remainingStock) : oldQty;
+//         const diff = enteredQty - oldQty;
+
+//         prod.name = name;
+//         prod.category = category;
+//         prod.mrp = Number(mrp);
+//         prod.price = Number(price);
+//         prod.quantity = enteredQty;
+//         prod.remainingStock = Math.max(0, oldRem + diff);
+//         prod.rating = Number(rating) || 4.5;
+//         prod.reviewsCount = Number(reviewsCount) || 142;
+//         prod.images = processedImages;
+//         prod.image = processedImages[0];
+//         prod.description = description || '';
+//         try { io.emit('product_updated', prod); } catch (e) {}
+//         return res.json(prod);
+//       }
+//       return res.status(404).json({ message: 'Product not found' });
+//     }
+//   } catch (err) {
+//     res.status(500).json({ message: err.message });
+//   }
+// });
+
+// app.delete(['/api/products/:id', '/products/:id'], async (req, res) => {
+//   try {
+//     const { id } = req.params;
+//     clearProductCache();
+//     if (isMongoConnected()) {
+//       await Product.findByIdAndDelete(id);
+//     } else {
+//       memoryProducts = memoryProducts.filter(p => p._id !== id);
+//     }
+//     try { io.emit('product_deleted', id); } catch (e) {}
+//     res.json({ message: 'Product deleted successfully' });
+//   } catch (err) {
+//     res.status(500).json({ message: err.message });
+//   }
+// });
+
+
+
+// --- PRODUCT MUTATION ROUTES (server.js) ---
+
+// 1. CREATE PRODUCT (POST)
 app.post(['/api/products', '/products'], upload.array('images', 5), async (req, res) => {
   try {
-    const { name, category, mrp, price, quantity, description, rating, reviewsCount } = req.body;
+    const { name, category, mrp, price, quantity, description, rating, reviewsCount, availableSizes } = req.body;
     let imagesInput = req.body.images;
     if (typeof imagesInput === 'string') {
       try { imagesInput = JSON.parse(imagesInput); } catch (e) { imagesInput = [imagesInput]; }
@@ -1188,9 +1343,18 @@ app.post(['/api/products', '/products'], upload.array('images', 5), async (req, 
       return res.status(400).json({ message: 'Product title, category, MRP, and offer price are required' });
     }
 
-    clearProductCache();
+    // Clear API Cache instantly
+    if (typeof clearProductCache === 'function') {
+      clearProductCache();
+    }
 
     const enteredQty = Number(quantity) || 10;
+
+    // Parse Available Sizes Safely
+    let parsedSizes = availableSizes;
+    if (typeof parsedSizes === 'string') {
+      try { parsedSizes = JSON.parse(parsedSizes); } catch (e) { parsedSizes = []; }
+    }
 
     if (isMongoConnected()) {
       const prod = await Product.create({
@@ -1201,13 +1365,15 @@ app.post(['/api/products', '/products'], upload.array('images', 5), async (req, 
         quantity: enteredQty,
         remainingStock: enteredQty,
         rating: Number(rating) || 4.5,
-        reviewsCount: Number(reviewsCount) || 142,
+        reviewsCount: Number(reviewsCount) || 1,
         images: processedImages,
         image: processedImages[0],
-        description: description || ''
+        description: description || '',
+        availableSizes: Array.isArray(parsedSizes) ? parsedSizes : []
       });
+
       try { io.emit('product_added', prod); } catch (e) {}
-      return res.json(prod);
+      return res.status(201).json(prod);
     } else {
       const prod = {
         _id: 'p_' + Date.now(),
@@ -1218,24 +1384,27 @@ app.post(['/api/products', '/products'], upload.array('images', 5), async (req, 
         quantity: enteredQty,
         remainingStock: enteredQty,
         rating: Number(rating) || 4.5,
-        reviewsCount: Number(reviewsCount) || 142,
+        reviewsCount: Number(reviewsCount) || 1,
         images: processedImages,
         image: processedImages[0],
-        description: description || ''
+        description: description || '',
+        availableSizes: Array.isArray(parsedSizes) ? parsedSizes : []
       };
       memoryProducts.unshift(prod);
       try { io.emit('product_added', prod); } catch (e) {}
-      return res.json(prod);
+      return res.status(201).json(prod);
     }
   } catch (err) {
+    console.error('Error creating product:', err.message);
     res.status(500).json({ message: err.message });
   }
 });
 
+// 2. UPDATE PRODUCT (PUT)
 app.put(['/api/products/:id', '/products/:id'], upload.array('images', 5), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, category, mrp, price, quantity, description, rating, reviewsCount } = req.body;
+    const { name, category, mrp, price, quantity, description, rating, reviewsCount, availableSizes } = req.body;
     let imagesInput = req.body.images;
     if (typeof imagesInput === 'string') {
       try { imagesInput = JSON.parse(imagesInput); } catch (e) { imagesInput = [imagesInput]; }
@@ -1247,9 +1416,18 @@ app.put(['/api/products/:id', '/products/:id'], upload.array('images', 5), async
       return res.status(400).json({ message: 'Product title, category, MRP, and offer price are required' });
     }
 
-    clearProductCache();
+    // Clear API Cache instantly
+    if (typeof clearProductCache === 'function') {
+      clearProductCache();
+    }
 
     const enteredQty = Number(quantity) || 10;
+
+    // Parse Available Sizes Safely
+    let parsedSizes = availableSizes;
+    if (typeof parsedSizes === 'string') {
+      try { parsedSizes = JSON.parse(parsedSizes); } catch (e) { parsedSizes = []; }
+    }
 
     if (isMongoConnected()) {
       const existing = await Product.findById(id);
@@ -1274,10 +1452,12 @@ app.put(['/api/products/:id', '/products/:id'], upload.array('images', 5), async
           reviewsCount: Number(reviewsCount) || 142,
           images: processedImages,
           image: processedImages[0],
-          description: description || ''
+          description: description || '',
+          availableSizes: Array.isArray(parsedSizes) ? parsedSizes : []
         },
         { new: true }
       );
+
       try { io.emit('product_updated', updated); } catch (e) {}
       return res.json(updated);
     } else {
@@ -1298,31 +1478,43 @@ app.put(['/api/products/:id', '/products/:id'], upload.array('images', 5), async
         prod.images = processedImages;
         prod.image = processedImages[0];
         prod.description = description || '';
+        prod.availableSizes = Array.isArray(parsedSizes) ? parsedSizes : [];
+
         try { io.emit('product_updated', prod); } catch (e) {}
         return res.json(prod);
       }
       return res.status(404).json({ message: 'Product not found' });
     }
   } catch (err) {
+    console.error('Error updating product:', err.message);
     res.status(500).json({ message: err.message });
   }
 });
 
+// 3. DELETE PRODUCT (DELETE)
 app.delete(['/api/products/:id', '/products/:id'], async (req, res) => {
   try {
     const { id } = req.params;
-    clearProductCache();
+    
+    // Clear API Cache instantly
+    if (typeof clearProductCache === 'function') {
+      clearProductCache();
+    }
+
     if (isMongoConnected()) {
       await Product.findByIdAndDelete(id);
     } else {
       memoryProducts = memoryProducts.filter(p => p._id !== id);
     }
+
     try { io.emit('product_deleted', id); } catch (e) {}
-    res.json({ message: 'Product deleted successfully' });
+    res.json({ success: true, message: 'Product deleted successfully' });
   } catch (err) {
+    console.error('Error deleting product:', err.message);
     res.status(500).json({ message: err.message });
   }
 });
+
 
 // --- REAL-TIME SSE (SERVER-SENT EVENTS) ORDER STREAM ---
 let sseAdminClients = [];
