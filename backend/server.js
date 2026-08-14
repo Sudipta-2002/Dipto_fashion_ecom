@@ -991,8 +991,24 @@ app.get(['/api/products', '/products'], async (req, res) => {
       }
 
       let totalProducts = await Product.countDocuments(query);
+      const totalPages = Math.ceil(totalProducts / limitNum) || 1;
 
-      let queryExec = Product.find(query).sort({ createdAt: -1 });
+      if (isPaginated && (pageNum > totalPages || skip >= totalProducts) && totalProducts > 0) {
+        const emptyResponse = {
+          products: [],
+          currentPage: pageNum,
+          totalPages: totalPages,
+          totalProducts: totalProducts,
+          hasMore: false
+        };
+        apiCache.set(cacheKey, emptyResponse);
+        return res.json(emptyResponse);
+      }
+
+      let queryExec = Product.find(query)
+        .select('name price mrp image category rating reviewsCount quantity remainingStock description isFeatured')
+        .sort({ createdAt: -1 });
+
       if (isPaginated) {
         queryExec = queryExec.skip(skip).limit(limitNum);
       }
@@ -1011,7 +1027,6 @@ app.get(['/api/products', '/products'], async (req, res) => {
         }
       }
 
-      const totalPages = Math.ceil(totalProducts / limitNum) || 1;
       const responseData = isPaginated ? {
         products: prods,
         currentPage: pageNum,
@@ -1037,13 +1052,25 @@ app.get(['/api/products', '/products'], async (req, res) => {
       }
 
       const totalProducts = filtered.length;
-      let prods = filtered;
+      const totalPages = Math.ceil(totalProducts / limitNum) || 1;
 
+      if (isPaginated && (pageNum > totalPages || skip >= totalProducts) && totalProducts > 0) {
+        const emptyResponse = {
+          products: [],
+          currentPage: pageNum,
+          totalPages: totalPages,
+          totalProducts: totalProducts,
+          hasMore: false
+        };
+        apiCache.set(cacheKey, emptyResponse);
+        return res.json(emptyResponse);
+      }
+
+      let prods = filtered;
       if (isPaginated) {
         prods = filtered.slice(skip, skip + limitNum);
       }
 
-      const totalPages = Math.ceil(totalProducts / limitNum) || 1;
       const responseData = isPaginated ? {
         products: prods,
         currentPage: pageNum,

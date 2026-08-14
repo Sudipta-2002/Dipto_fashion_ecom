@@ -362,6 +362,7 @@ function App() {
   const [apiError, setApiError] = useState(null);
 
   const loaderRef = useRef(null);
+  const isFetchingRef = useRef(false);
 
   const fetchCategories = async () => {
     try {
@@ -376,8 +377,12 @@ function App() {
   };
 
   const fetchProducts = async (pageNum = 1, forceRefresh = false) => {
+    if (isFetchingRef.current && !forceRefresh) return;
+    isFetchingRef.current = true;
+
     const sanitizedCat = (!selectedCategory || selectedCategory === 'All') ? '' : selectedCategory.trim();
-    const cacheKey = `products_cat_${sanitizedCat || 'all'}_search_${searchTerm.trim()}_p${pageNum}`;
+    const limitNum = pageNum === 1 ? 16 : 12;
+    const cacheKey = `products_cat_${sanitizedCat || 'all'}_search_${searchTerm.trim()}_p${pageNum}_l${limitNum}`;
     
     try {
       if (pageNum === 1) {
@@ -392,7 +397,7 @@ function App() {
         if (sanitizedCat) params.append('category', sanitizedCat);
         if (searchTerm.trim()) params.append('search', searchTerm.trim());
         params.append('page', p);
-        params.append('limit', 12);
+        params.append('limit', limitNum);
         params.append('t', Date.now());
         return `${API_URL}/api/products?${params.toString()}`;
       };
@@ -421,6 +426,10 @@ function App() {
         moreAvailable = false;
       }
 
+      if (fetchedProducts.length === 0) {
+        moreAvailable = false;
+      }
+
       if (pageNum === 1) {
         setProducts(fetchedProducts);
       } else {
@@ -442,6 +451,7 @@ function App() {
     } finally {
       setLoading(false);
       setLoadingMore(false);
+      isFetchingRef.current = false;
     }
   };
 
@@ -687,11 +697,11 @@ function App() {
 
     const observer = new IntersectionObserver(
       (entries) => {
-        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading) {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && !loading && !isFetchingRef.current) {
           fetchProducts(page + 1);
         }
       },
-      { threshold: 0.1, rootMargin: '200px' }
+      { threshold: 0.1, rootMargin: '300px' }
     );
 
     const currentLoader = loaderRef.current;
@@ -1210,12 +1220,16 @@ function App() {
                 </div>
 
                 {/* Infinite Scroll Trigger & Skeleton Spinner for Next Page */}
-                <div ref={loaderRef} style={{ width: '100%', minHeight: '60px', marginTop: '1.5rem', textAlign: 'center' }}>
-                  {loadingMore && (
+                <div ref={loaderRef} style={{ width: '100%', minHeight: '40px', marginTop: '1.5rem', textAlign: 'center' }}>
+                  {loadingMore ? (
                     <div style={{ display: 'flex', justifyContent: 'center', padding: '1rem' }}>
                       <ProductGridSkeleton count={4} />
                     </div>
-                  )}
+                  ) : !hasMore && displayedProducts.length > 0 ? (
+                    <div style={{ padding: '1.5rem 0', color: '#94a3b8', fontSize: '0.85rem', fontWeight: '600' }}>
+                      ✨ You've reached the end of the collection
+                    </div>
+                  ) : null}
                 </div>
               </>
             )}
