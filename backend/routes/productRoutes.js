@@ -260,12 +260,53 @@ router.get('/', async (req, res) => {
   }
 });
 
-// POST /
-router.post('/', async (req, res) => {
+import { uploadBase64ToCloudinary, upload } from '../config/cloudinaryConfig.js';
+
+// Helper to convert Base64 array / files to Cloudinary URLs
+const processProductImages = async (imagesList, files) => {
+  let finalUrls = [];
+
+  // If files were uploaded via multipart/form-data
+  if (files && files.length > 0) {
+    for (const file of files) {
+      if (file.path) {
+        finalUrls.push(file.path);
+      }
+    }
+  }
+
+  // If images array was passed (Base64 strings or URLs)
+  if (Array.isArray(imagesList)) {
+    for (const img of imagesList) {
+      if (typeof img === 'string') {
+        if (img.startsWith('data:image')) {
+          const uploadedUrl = await uploadBase64ToCloudinary(img, 'products');
+          finalUrls.push(uploadedUrl);
+        } else {
+          finalUrls.push(img);
+        }
+      }
+    }
+  }
+
+  return finalUrls.length > 0 ? finalUrls : [
+    'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80'
+  ];
+};
+
+// POST / (Create product with optional Multer file upload)
+router.post('/', upload.array('images', 5), async (req, res) => {
   try {
-    const { name, category, mrp, price, quantity, images, description, rating, reviewsCount } = req.body;
-    if (!name || !category || !mrp || !price || !images || images.length === 0) {
-      return res.status(400).json({ message: 'Product title, category, MRP, offer price, and at least 1 image are required' });
+    const { name, category, mrp, price, quantity, description, rating, reviewsCount } = req.body;
+    let imagesInput = req.body.images;
+    if (typeof imagesInput === 'string') {
+      try { imagesInput = JSON.parse(imagesInput); } catch (e) { imagesInput = [imagesInput]; }
+    }
+
+    const processedImages = await processProductImages(imagesInput, req.files);
+
+    if (!name || !category || !mrp || !price) {
+      return res.status(400).json({ message: 'Product title, category, MRP, and offer price are required' });
     }
 
     clearProductCache();
@@ -282,8 +323,8 @@ router.post('/', async (req, res) => {
         remainingStock: enteredQty,
         rating: Number(rating) || 4.5,
         reviewsCount: Number(reviewsCount) || 1,
-        images,
-        image: images[0],
+        images: processedImages,
+        image: processedImages[0],
         description: description || ''
       });
       const reqIo = req.app.get('io');
@@ -300,8 +341,8 @@ router.post('/', async (req, res) => {
         remainingStock: enteredQty,
         rating: Number(rating) || 4.5,
         reviewsCount: Number(reviewsCount) || 1,
-        images,
-        image: images[0],
+        images: processedImages,
+        image: processedImages[0],
         description: description || ''
       };
       memoryProducts.push(newProd);
@@ -314,13 +355,20 @@ router.post('/', async (req, res) => {
   }
 });
 
-// PUT /:id
-router.put('/:id', async (req, res) => {
+// PUT /:id (Update product with optional Multer file upload)
+router.put('/:id', upload.array('images', 5), async (req, res) => {
   try {
     const { id } = req.params;
-    const { name, category, mrp, price, quantity, images, description, rating, reviewsCount } = req.body;
-    if (!name || !category || !mrp || !price || !images || images.length === 0) {
-      return res.status(400).json({ message: 'At least 1 image is required for product update' });
+    const { name, category, mrp, price, quantity, description, rating, reviewsCount } = req.body;
+    let imagesInput = req.body.images;
+    if (typeof imagesInput === 'string') {
+      try { imagesInput = JSON.parse(imagesInput); } catch (e) { imagesInput = [imagesInput]; }
+    }
+
+    const processedImages = await processProductImages(imagesInput, req.files);
+
+    if (!name || !category || !mrp || !price) {
+      return res.status(400).json({ message: 'Product title, category, MRP, and offer price are required' });
     }
 
     clearProductCache();
@@ -348,8 +396,8 @@ router.put('/:id', async (req, res) => {
           remainingStock: newRemaining,
           rating: Number(rating) || 4.5,
           reviewsCount: Number(reviewsCount) || 142,
-          images,
-          image: images[0],
+          images: processedImages,
+          image: processedImages[0],
           description: description || ''
         },
         { new: true }
@@ -372,8 +420,8 @@ router.put('/:id', async (req, res) => {
         prod.remainingStock = Math.max(0, oldRem + diff);
         prod.rating = Number(rating) || 4.5;
         prod.reviewsCount = Number(reviewsCount) || 142;
-        prod.images = images;
-        prod.image = images[0];
+        prod.images = processedImages;
+        prod.image = processedImages[0];
         prod.description = description || '';
         const reqIo = req.app.get('io');
         if (reqIo) reqIo.emit('product_updated', prod);

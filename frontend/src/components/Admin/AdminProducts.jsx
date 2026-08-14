@@ -157,14 +157,17 @@ const AdminProducts = () => {
   const handleStartEdit = (prod) => {
     setEditingProduct(prod);
     setFormData({
-      name: prod.name,
-      category: prod.category,
-      mrp: prod.mrp,
-      price: prod.price,
-      quantity: prod.quantity,
+      name: prod.name || prod.title || '',
+      category: prod.category || 'Saree',
+      mrp: prod.mrp || prod.price || '',
+      price: prod.price || prod.offerPrice || '',
+      quantity: prod.quantity !== undefined ? prod.quantity : 10,
       description: prod.description || ''
     });
-    setUploadedImages(prod.images && prod.images.length > 0 ? prod.images : [prod.image]);
+    const imgs = Array.isArray(prod.images) && prod.images.length > 0
+      ? prod.images
+      : (prod.image ? [prod.image] : []);
+    setUploadedImages(imgs);
     setSelectedSizes(prod.availableSizes || []);
     setShowAddForm(true);
     setUploadError('');
@@ -509,16 +512,31 @@ const AdminProducts = () => {
           </thead>
           <tbody>
             {(Array.isArray(products) ? products : []).map((p) => {
-              const discountPercent = Math.round(((p.mrp - p.price) / p.mrp) * 100);
-              const imgCount = p.images ? p.images.length : (p.image ? 1 : 0);
-              const mainImg = p.images && p.images.length > 0 ? p.images[0] : p.image;
-              const remStock = p.remainingStock !== undefined && p.remainingStock !== null ? p.remainingStock : p.quantity;
+              const mrpVal = Number(p.mrp) || Number(p.price) || 0;
+              const priceVal = Number(p.price) || Number(p.offerPrice) || Number(p.mrp) || 0;
+              const discountPercent = mrpVal > 0 ? Math.max(0, Math.round(((mrpVal - priceVal) / mrpVal) * 100)) : 0;
+              
+              const rawImages = Array.isArray(p.images) && p.images.length > 0
+                ? p.images
+                : (p.image ? [p.image] : ['https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80']);
+
+              const imgCount = rawImages.length;
+              const mainImg = rawImages[0];
+              const remStock = p.remainingStock !== undefined && p.remainingStock !== null ? p.remainingStock : (p.quantity || 0);
+              const prodTitle = p.name || p.title || 'Fashion Product';
 
               return (
-                <tr key={p._id}>
+                <tr key={p._id || p.id}>
                   <td>
                     <div style={{ position: 'relative', width: '48px', height: '48px' }}>
-                      <img src={mainImg} alt={p.name} style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px' }} />
+                      <img
+                        src={mainImg}
+                        alt={prodTitle}
+                        style={{ width: '48px', height: '48px', objectFit: 'cover', borderRadius: '6px' }}
+                        onError={(e) => {
+                          e.target.src = 'https://images.unsplash.com/photo-1610030469983-98e550d6193c?auto=format&fit=crop&w=800&q=80';
+                        }}
+                      />
                       {imgCount > 1 && (
                         <span style={{ position: 'absolute', bottom: '-4px', right: '-4px', background: '#c026d3', color: 'white', fontSize: '0.65rem', fontWeight: '800', padding: '1px 5px', borderRadius: '8px' }}>
                           {imgCount} PICS
@@ -527,19 +545,19 @@ const AdminProducts = () => {
                     </div>
                   </td>
                   <td>
-                    <strong style={{ fontSize: '0.95rem' }}>{p.name}</strong>
+                    <strong style={{ fontSize: '0.95rem' }}>{prodTitle}</strong>
                   </td>
                   <td>
                     <span style={{ background: '#fdf4ff', color: '#c026d3', padding: '2px 8px', borderRadius: '12px', fontWeight: '700', fontSize: '0.8rem' }}>
-                      {p.category}
+                      {p.category || 'General'}
                     </span>
                   </td>
-                  <td style={{ textDecoration: 'line-through', color: '#94a3b8' }}>₹{p.mrp}</td>
-                  <td style={{ fontWeight: '800', color: '#0f172a' }}>₹{p.price}</td>
+                  <td style={{ textDecoration: 'line-through', color: '#94a3b8' }}>₹{mrpVal}</td>
+                  <td style={{ fontWeight: '800', color: '#0f172a' }}>₹{priceVal}</td>
                   <td>
                     <span style={{ color: '#16a34a', fontWeight: '700' }}>{discountPercent}% OFF</span>
                   </td>
-                  <td><strong>{p.quantity}</strong></td>
+                  <td><strong>{p.quantity || 0}</strong></td>
                   <td><strong>{remStock}</strong></td>
                   <td>
                     <div style={{ display: 'flex', gap: '0.5rem' }}>
@@ -552,7 +570,7 @@ const AdminProducts = () => {
                         <Edit size={14} /> Edit
                       </button>
                       <button
-                        onClick={() => handleDeleteProduct(p._id)}
+                        onClick={() => handleDeleteProduct(p._id || p.id)}
                         style={{ background: '#fef2f2', color: '#ef4444', border: '1px solid #fca5a5', padding: '0.35rem 0.6rem', borderRadius: '6px' }}
                         title="Delete Product"
                       >

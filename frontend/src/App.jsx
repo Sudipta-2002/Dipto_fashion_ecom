@@ -542,14 +542,6 @@ function App() {
     return list;
   }, [products, selectedCategory, searchTerm, appliedFilters]);
 
-  const [visibleCount, setVisibleCount] = useState(16);
-
-  useEffect(() => {
-    setVisibleCount(16);
-  }, [selectedCategory, searchTerm, appliedFilters]);
-
-  const visibleProducts = displayedProducts.slice(0, visibleCount);
-
   // Modals & Selected Product History
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
