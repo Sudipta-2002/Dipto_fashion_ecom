@@ -1635,65 +1635,171 @@ let memoryLiveSale = {
   endTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
 };
 
-// GET LIVE SALE CONFIG FOR STOREFRONT (PUBLIC ACCESSIBLE MULTI-DEVICE)
+// // GET LIVE SALE CONFIG FOR STOREFRONT (PUBLIC ACCESSIBLE MULTI-DEVICE)
+// app.get(['/api/live-sale', '/live-sale', '/api/live-sale/active', '/live-sale/active'], async (req, res) => {
+//   res.setHeader('Access-Control-Allow-Origin', '*');
+//   try {
+//     if (mongoose.connection.readyState === 1) {
+//       let sale = await LiveSale.findOne().sort({ updatedAt: -1 });
+//       if (!sale) {
+//         sale = await LiveSale.create(memoryLiveSale);
+//       }
+//       return res.json(sale);
+//     } else {
+//       return res.json(memoryLiveSale);
+//     }
+//   } catch (err) {
+//     return res.json(memoryLiveSale);
+//   }
+// });
+
+// // ADMIN POST UPDATE LIVE SALE CONFIG
+// app.post(['/api/admin/live-sale', '/admin/live-sale', '/api/live-sale', '/live-sale'], async (req, res) => {
+//   console.log('>>> [POST /api/admin/live-sale] Request body received:', req.body);
+//   try {
+//     const { isActive, title, offerDetails, targetCategory, endTime } = req.body;
+
+//     const updatedData = {
+//       isActive: Boolean(isActive),
+//       title: title ? title.trim() : '🔥 MEGA FESTIVE SALE IS LIVE!',
+//       offerDetails: offerDetails ? offerDetails.trim() : 'Up to 50% OFF on Banarasi Sarees & Royal Kurtas',
+//       targetCategory: targetCategory || 'All',
+//       endTime: endTime ? new Date(endTime) : new Date(Date.now() + 24 * 60 * 60 * 1000)
+//     };
+
+//     const isConnected = mongoose.connection.readyState === 1;
+//     console.log(`>>> MongoDB connection readyState for LiveSale: ${mongoose.connection.readyState} (Connected: ${isConnected})`);
+
+//     if (isConnected) {
+//       try {
+//         const sale = await LiveSale.findOneAndUpdate({}, updatedData, { upsert: true, new: true, runValidators: true });
+//         console.log('>>> MongoDB LiveSale updated successfully:', sale._id);
+//         try { io.emit('live_sale_updated', sale.toObject ? sale.toObject() : sale); } catch (e) {}
+//         return res.status(200).json({ success: true, message: 'Saved to MongoDB', data: sale, liveSale: sale });
+//       } catch (dbErr) {
+//         console.error('>>> ERROR: Mongoose LiveSale upsert failed:', dbErr);
+//         return res.status(500).json({ success: false, error: dbErr.message, message: dbErr.message });
+//       }
+//     } else {
+//       console.warn('>>> MongoDB not connected (readyState !== 1). Saving LiveSale to memory.');
+//       memoryLiveSale = {
+//         ...updatedData,
+//         endTime: new Date(updatedData.endTime).toISOString()
+//       };
+//       try { io.emit('live_sale_updated', memoryLiveSale); } catch (e) {}
+//       return res.status(200).json({ success: true, message: 'Saved to memory (DB offline)', data: memoryLiveSale, liveSale: memoryLiveSale });
+//     }
+//   } catch (err) {
+//     console.error('>>> ERROR in POST /api/admin/live-sale:', err);
+//     return res.status(500).json({ success: false, error: err.message, message: err.message || 'Failed to update live sale config' });
+//   }
+// });
+
+
+// --- LIVE SALE MULTI-BANNER SCHEMA & MODEL ---
+const liveSaleBannerSchema = new mongoose.Schema(
+  {
+    title: { type: String, default: '🔥 MEGA FESTIVE SALE IS LIVE!' },
+    offerDetails: { type: String, default: 'Up to 50% OFF on Selected Items' },
+    targetCategory: { type: String, default: 'All' },
+    endTime: { type: Date, default: () => new Date(Date.now() + 24 * 60 * 60 * 1000) },
+    isActive: { type: Boolean, default: true },
+    order: { type: Number, default: 0 }
+  },
+  { timestamps: true }
+);
+
+const LiveSale = mongoose.models.LiveSale || mongoose.model('LiveSale', liveSaleBannerSchema);
+
+// In-Memory Multi-banner Fallback
+let memoryLiveSales = [
+  {
+    _id: 'sale_1',
+    title: '🔥 MEGA FESTIVE SALE IS LIVE!',
+    offerDetails: 'Up to 50% OFF on Banarasi Sarees & Royal Kurtas',
+    targetCategory: 'All',
+    endTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+    isActive: true,
+    order: 1
+  }
+];
+
+// GET ALL LIVE SALE BANNERS (STOREFRONT / PUBLIC)
 app.get(['/api/live-sale', '/live-sale', '/api/live-sale/active', '/live-sale/active'], async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
   try {
     if (mongoose.connection.readyState === 1) {
-      let sale = await LiveSale.findOne().sort({ updatedAt: -1 });
-      if (!sale) {
-        sale = await LiveSale.create(memoryLiveSale);
-      }
-      return res.json(sale);
+      const sales = await LiveSale.find({ isActive: true }).sort({ order: 1, updatedAt: -1 }).lean().maxTimeMS(3000);
+      return res.status(200).json(sales || []);
     } else {
-      return res.json(memoryLiveSale);
+      const activeMem = memoryLiveSales.filter(s => s.isActive);
+      return res.status(200).json(activeMem);
     }
   } catch (err) {
-    return res.json(memoryLiveSale);
+    return res.status(200).json(memoryLiveSales.filter(s => s.isActive));
   }
 });
 
-// ADMIN POST UPDATE LIVE SALE CONFIG
-app.post(['/api/admin/live-sale', '/admin/live-sale', '/api/live-sale', '/live-sale'], async (req, res) => {
-  console.log('>>> [POST /api/admin/live-sale] Request body received:', req.body);
+// GET ALL BANNERS FOR ADMIN (ACTIVE & INACTIVE)
+app.get(['/api/admin/live-sales', '/admin/live-sales'], async (req, res) => {
   try {
-    const { isActive, title, offerDetails, targetCategory, endTime } = req.body;
-
-    const updatedData = {
-      isActive: Boolean(isActive),
-      title: title ? title.trim() : '🔥 MEGA FESTIVE SALE IS LIVE!',
-      offerDetails: offerDetails ? offerDetails.trim() : 'Up to 50% OFF on Banarasi Sarees & Royal Kurtas',
-      targetCategory: targetCategory || 'All',
-      endTime: endTime ? new Date(endTime) : new Date(Date.now() + 24 * 60 * 60 * 1000)
-    };
-
-    const isConnected = mongoose.connection.readyState === 1;
-    console.log(`>>> MongoDB connection readyState for LiveSale: ${mongoose.connection.readyState} (Connected: ${isConnected})`);
-
-    if (isConnected) {
-      try {
-        const sale = await LiveSale.findOneAndUpdate({}, updatedData, { upsert: true, new: true, runValidators: true });
-        console.log('>>> MongoDB LiveSale updated successfully:', sale._id);
-        try { io.emit('live_sale_updated', sale.toObject ? sale.toObject() : sale); } catch (e) {}
-        return res.status(200).json({ success: true, message: 'Saved to MongoDB', data: sale, liveSale: sale });
-      } catch (dbErr) {
-        console.error('>>> ERROR: Mongoose LiveSale upsert failed:', dbErr);
-        return res.status(500).json({ success: false, error: dbErr.message, message: dbErr.message });
-      }
+    if (mongoose.connection.readyState === 1) {
+      const sales = await LiveSale.find().sort({ order: 1, createdAt: -1 }).lean().maxTimeMS(3000);
+      return res.status(200).json(sales || []);
     } else {
-      console.warn('>>> MongoDB not connected (readyState !== 1). Saving LiveSale to memory.');
-      memoryLiveSale = {
-        ...updatedData,
-        endTime: new Date(updatedData.endTime).toISOString()
-      };
-      try { io.emit('live_sale_updated', memoryLiveSale); } catch (e) {}
-      return res.status(200).json({ success: true, message: 'Saved to memory (DB offline)', data: memoryLiveSale, liveSale: memoryLiveSale });
+      return res.status(200).json(memoryLiveSales);
     }
   } catch (err) {
-    console.error('>>> ERROR in POST /api/admin/live-sale:', err);
-    return res.status(500).json({ success: false, error: err.message, message: err.message || 'Failed to update live sale config' });
+    return res.status(200).json(memoryLiveSales);
   }
 });
+
+// SAVE / CREATE / UPDATE BANNERS ARRAY (UP TO 3 BANNERS)
+app.post(['/api/admin/live-sale', '/admin/live-sale', '/api/live-sale', '/live-sale'], async (req, res) => {
+  try {
+    const { banners } = req.body; // Expecting array of banners (1 to 3)
+    let bannerList = Array.isArray(banners) ? banners : [req.body];
+
+    // Restrict to max 3 banners
+    bannerList = bannerList.slice(0, 3).map((b, idx) => ({
+      title: b.title ? b.title.trim() : '🔥 SPECIAL SALE IS LIVE!',
+      offerDetails: b.offerDetails ? b.offerDetails.trim() : 'Exclusive Discounts Available',
+      targetCategory: b.targetCategory || 'All',
+      endTime: b.endTime ? new Date(b.endTime) : new Date(Date.now() + 24 * 60 * 60 * 1000),
+      isActive: b.isActive !== undefined ? Boolean(b.isActive) : true,
+      order: idx + 1
+    }));
+
+    if (mongoose.connection.readyState === 1) {
+      // Overwrite/sync banner collection with updated 1-3 banners
+      await LiveSale.deleteMany({});
+      const savedDocs = await LiveSale.insertMany(bannerList);
+
+      try {
+        const activeDocs = savedDocs.filter(d => d.isActive);
+        io.emit('live_sale_updated', activeDocs);
+      } catch (e) {}
+
+      return res.status(200).json({ success: true, message: 'All banners updated successfully!', data: savedDocs });
+    } else {
+      memoryLiveSales = bannerList.map((b, i) => ({
+        ...b,
+        _id: `sale_${Date.now()}_${i}`,
+        endTime: new Date(b.endTime).toISOString()
+      }));
+
+      try {
+        io.emit('live_sale_updated', memoryLiveSales.filter(d => d.isActive));
+      } catch (e) {}
+
+      return res.status(200).json({ success: true, message: 'Saved to memory (DB offline)', data: memoryLiveSales });
+    }
+  } catch (err) {
+    console.error('Error in live-sale banner update:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 
 // --- COUPON API ENDPOINTS ---
 app.use('/api/admin/coupons', couponRoutes);
