@@ -2729,81 +2729,104 @@ app.get('/api/admin/billing', async (req, res) => {
     let ordersList = [];
     if (isMongoConnected()) {
       ordersList = await Order.find()
-        .select('orderId user userName userEmail email shippingAddress items totalAmount paymentMethod status cancellationDetails returnDetails createdAt updatedAt')
+        .select('orderId user userName userEmail email shippingAddress items totalAmount paymentMethod status cancellationDetails returnDetails utrNumber createdAt updatedAt stockDeducted')
         .sort({ createdAt: -1 })
         .lean();
     } else {
-      ordersList = [...memoryOrders];
+      ordersList = Array.isArray(memoryOrders) ? [...memoryOrders] : [];
     }
 
-    const ledger = [];
+    const rawLedger = [];
     let totalCredit = 0;
     let totalDebit = 0;
-    let runningBalance = 0;
 
-    // Process orders to build transaction ledger
-    ordersList.forEach((order) => {
-      const amt = order.totalAmount || 0;
-      const wasShipped = ['Shipped', 'Out for Delivery', 'Delivered', 'Return Requested', 'Return Approved', 'Refund Completed', 'Cancellation Requested', 'Cancelled', 'Returned'].includes(order.status) || order.stockDeducted;
-      const isShippedCurrent = ['Shipped', 'Out for Delivery', 'Delivered'].includes(order.status);
-      const isApprovedRefund = ['Returned', 'Cancelled', 'Return Approved', 'Refund Completed'].includes(order.status);
+    // Process orders to build transaction entries
+    (ordersList || []).forEach((order) => {
+      if (!order) return;
 
-      // 1. If order was shipped (or current status is Shipped/Delivered), record + (positive credit)
-      if (wasShipped || isShippedCurrent) {
+      const statusLower = String(order?.status || '').trim().toLowerCase();
+      const amt = Number(order?.totalAmount) || 0;
+      const orderIdStr = String(order?.orderId || order?._id || 'N/A');
+      const custName = String(order?.shippingAddress?.userName || order?.userName || 'Customer');
+      const userMail = String(order?.userEmail || order?.email || order?.shippingAddress?.email || 'N/A');
+      const utrStr = String(order?.utrNumber || 'N/A');
+      const createdDate = order?.createdAt || order?.updatedAt || new Date().toISOString();
+
+      const isShippedOrDelivered = ['shipped', 'out for delivery', 'delivered'].includes(statusLower) || Boolean(order?.stockDeducted);
+      const isDebitStatus = ['cancelled', 'returned', 'return approved', 'refund completed', 'refunded', 'cancellation requested'].includes(statusLower);
+
+      // 1. Credit (+) Transaction if order is shipped/delivered or was previously shipped
+      if (isShippedOrDelivered || isDebitStatus) {
         totalCredit += amt;
-        ledger.push({
-          id: order._id || order.orderId,
-          date: order.createdAt || order.updatedAt,
-          orderId: order.orderId,
-          customerName: order.shippingAddress?.userName || order.userName || 'Customer',
-          userEmail: order.userEmail || order.email || order.shippingAddress?.email || '',
-          utrNumber: order.utrNumber || 'N/A',
+        rawLedger.push({
+          id: String(order?._id || orderIdStr) + '_credit',
+          date: createdDate,
+          orderId: orderIdStr,
+          customerName: custName,
+          userEmail: userMail,
+          utrNumber: utrStr,
           type: 'credit',
           sign: '+',
-          label: `Sale (Shipped)`,
+          label: `Sale (${order?.status || 'Shipped'})`,
           amount: amt,
-          status: isApprovedRefund ? 'Shipped (Past)' : order.status
+          rawAmount: amt,
+          status: isDebitStatus ? 'Shipped (Past)' : (order?.status || 'Shipped')
         });
       }
 
-      // 2. If return or cancellation was submitted & approved by admin, record - (negative debit)
-      if (isApprovedRefund) {
+      // 2. Debit (-) Transaction if order status is cancelled/returned/refunded
+      if (isDebitStatus) {
         totalDebit += amt;
-        ledger.push({
-          id: (order._id || order.orderId) + '_refund',
-          date: order.returnDetails?.returnedAt || order.cancellationDetails?.cancelledAt || order.updatedAt || order.createdAt,
-          orderId: order.orderId,
-          customerName: order.shippingAddress?.userName || order.userName || 'Customer',
-          userEmail: order.userEmail || order.email || order.shippingAddress?.email || '',
-          utrNumber: order.utrNumber || 'N/A',
+        const refundDate = order?.returnDetails?.returnedAt || order?.cancellationDetails?.cancelledAt || order?.updatedAt || createdDate;
+        rawLedger.push({
+          id: String(order?._id || orderIdStr) + '_debit',
+          date: refundDate,
+          orderId: orderIdStr,
+          customerName: custName,
+          userEmail: userMail,
+          utrNumber: utrStr,
           type: 'debit',
           sign: '-',
-          label: `Refund (${order.status})`,
+          label: `Refund (${order?.status || 'Refunded'})`,
           amount: -amt,
           rawAmount: amt,
-          status: order.status
+          status: order?.status || 'Refunded'
         });
       }
     });
 
-    // Sort ledger entries chronologically ascending to calculate running balance
-    ledger.sort((a, b) => new Date(a.date) - new Date(b.date));
-    ledger.forEach((entry) => {
-      runningBalance += entry.amount;
-      entry.runningBalance = runningBalance;
+    // Sort entries chronologically ascending to calculate accurate cumulative running balance
+    rawLedger.sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
+    
+    let cumBalance = 0;
+    const ledger = rawLedger.map((entry) => {
+      cumBalance += Number(entry.amount) || 0;
+      return {
+        ...entry,
+        runningBalance: cumBalance
+      };
     });
 
-    // Sort descending for UI presentation
-    ledger.sort((a, b) => new Date(b.date) - new Date(a.date));
+    // Sort descending for display (newest transaction first)
+    ledger.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
 
-    res.json({
+    return res.status(200).json({
+      success: true,
       totalCredit,
       totalDebit,
       netTotal: totalCredit - totalDebit,
       ledger
     });
   } catch (err) {
-    res.status(500).json({ message: err.message });
+    console.error('Error in GET /api/admin/billing:', err);
+    return res.status(500).json({
+      success: false,
+      message: err?.message || 'Internal server error processing billing history',
+      totalCredit: 0,
+      totalDebit: 0,
+      netTotal: 0,
+      ledger: []
+    });
   }
 });
 

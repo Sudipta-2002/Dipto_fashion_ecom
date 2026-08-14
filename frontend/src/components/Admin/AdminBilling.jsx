@@ -1,14 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
   Receipt,
-  Download,
   Filter,
   Calendar,
   ArrowUpRight,
   ArrowDownRight,
   DollarSign,
-  CheckCircle2,
-  AlertTriangle,
   FileSpreadsheet
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
@@ -44,7 +41,7 @@ const AdminBilling = () => {
       fetchBillingLedger(true);
     }, 30000);
 
-    // Also listen for new order events to refresh billing immediately
+    // Listen for new order events
     const handleNewOrder = () => fetchBillingLedger(true);
     window.addEventListener('df_new_order_placed', handleNewOrder);
 
@@ -55,30 +52,35 @@ const AdminBilling = () => {
   }, []);
 
   const fetchBillingLedger = async (forceRefresh = false) => {
-    const { data: cachedData } = await fetchWithCache(
-      'admin_billing',
-      async () => {
-        const res = await fetch(`${API_URL}/api/admin/billing`);
-        const data = await res.json();
-        return data.ledger || [];
-      },
-      { forceRefresh }
-    );
+    try {
+      const { data: cachedData } = await fetchWithCache(
+        'admin_billing',
+        async () => {
+          const res = await fetch(`${API_URL}/api/admin/billing`);
+          if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
+          const data = await res.json();
+          return data.ledger || [];
+        },
+        { forceRefresh }
+      );
 
-    if (cachedData) {
-      setLedgerData(cachedData);
+      if (cachedData) {
+        setLedgerData(cachedData);
+      }
+    } catch (err) {
+      console.error("Billing fetch error:", err);
+      setLedgerData([]);
+    } finally {
       setLoading(false);
-    } else {
-      setLoading(true);
     }
   };
 
   // Filter logic
   const getFilteredLedger = () => {
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
 
     return ledgerData.filter((entry) => {
+      if (!entry.date) return true;
       const entryDate = new Date(entry.date);
       const entryDateStr = entryDate.toISOString().split('T')[0];
 
@@ -113,11 +115,11 @@ const AdminBilling = () => {
   // Summary calculations
   const totalSoldAmount = filteredEntries
     .filter((e) => e.type === 'credit')
-    .reduce((sum, e) => sum + (e.amount || 0), 0);
+    .reduce((sum, e) => sum + (e.rawAmount || e.amount || 0), 0);
 
   const totalRefundAmount = filteredEntries
     .filter((e) => e.type === 'debit')
-    .reduce((sum, e) => sum + Math.abs(e.amount || 0), 0);
+    .reduce((sum, e) => sum + Math.abs(e.rawAmount || e.amount || 0), 0);
 
   const netTotalBill = totalSoldAmount - totalRefundAmount;
 
@@ -128,10 +130,11 @@ const AdminBilling = () => {
     if (!chartMap[dateKey]) {
       chartMap[dateKey] = { date: dateKey, credit: 0, debit: 0 };
     }
+    const val = Math.abs(e.rawAmount || e.amount || 0);
     if (e.type === 'credit') {
-      chartMap[dateKey].credit += e.amount;
+      chartMap[dateKey].credit += val;
     } else {
-      chartMap[dateKey].debit += Math.abs(e.amount);
+      chartMap[dateKey].debit += val;
     }
   });
 
@@ -153,8 +156,8 @@ const AdminBilling = () => {
       [reportTitle],
       [`Filter Duration: ${periodLabel}`, '', '', `Generated On: ${exportDate}`],
       [`Total Sold Sales (+): ₹${totalSoldAmount.toLocaleString('en-IN')}`, '', `Total Refunds (-): ₹${totalRefundAmount.toLocaleString('en-IN')}`, `NET TOTAL BILL: ₹${netTotalBill.toLocaleString('en-IN')}`],
-      [], // blank line
-      ['Date', 'Order ID', 'Customer Name', 'UTR Number', 'Transaction Type', 'Order Status', 'Amount (₹)']
+      [],
+      ['Date & Time', 'Order ID', 'Customer Email', 'UTR', 'Status', 'Running Balance']
     ];
 
     filteredEntries.forEach((item) => {
@@ -166,16 +169,13 @@ const AdminBilling = () => {
         minute: '2-digit'
       });
 
-      const amountFormatted = item.type === 'credit' ? `+ ₹${item.amount.toLocaleString('en-IN')}` : `- ₹${Math.abs(item.amount).toLocaleString('en-IN')}`;
-
       worksheetData.push([
         formattedDate,
-        item.orderId,
-        item.customerName,
-        item.utrNumber,
-        item.label,
-        item.status,
-        amountFormatted
+        item.orderId || 'N/A',
+        item.userEmail || 'N/A',
+        item.utrNumber || 'N/A',
+        item.status || 'N/A',
+        `₹${(item.runningBalance || 0).toLocaleString('en-IN')}`
       ]);
     });
 
@@ -186,28 +186,23 @@ const AdminBilling = () => {
       '',
       '',
       '',
-      '',
       'NET REVENUE',
       `₹${netTotalBill.toLocaleString('en-IN')}`
     ]);
 
-    // Create workbook & worksheet
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'Billing History');
 
-    // Set column widths
     worksheet['!cols'] = [
-      { wch: 20 },
-      { wch: 15 },
       { wch: 22 },
       { wch: 18 },
-      { wch: 24 },
+      { wch: 26 },
       { wch: 18 },
-      { wch: 16 }
+      { wch: 18 },
+      { wch: 18 }
     ];
 
-    // Download file
     const fileName = `Dipto_Fashion_Billing_${filterPeriod}_${Date.now()}.xlsx`;
     XLSX.writeFile(workbook, fileName);
   };
@@ -236,228 +231,236 @@ const AdminBilling = () => {
       </div>
 
       {loading ? (
-        <TableSkeleton rows={5} cols={5} />
+        <TableSkeleton rows={5} cols={6} />
       ) : (
         <>
-          {/* FILTER CONTROL BAR: ALL, WEEKLY, MONTHLY, YEARLY, DATE-TO-DATE */}
+          {/* FILTER CONTROL BAR */}
           <div style={{ background: 'white', padding: '1rem 1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0', display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '1rem' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
               <span style={{ fontSize: '0.85rem', fontWeight: '800', color: '#475569', display: 'flex', alignItems: 'center', gap: '4px', marginRight: '0.5rem' }}>
                 <Filter size={16} color="#c026d3" /> Duration Filter:
               </span>
 
-          {[
-            { id: 'all', label: 'All History' },
-            { id: 'weekly', label: 'Weekly (Last 7 Days)' },
-            { id: 'monthly', label: 'Monthly' },
-            { id: 'yearly', label: 'Yearly (2026)' },
-            { id: 'custom', label: 'Date-to-Date' }
-          ].map((item) => {
-            const isSel = filterPeriod === item.id;
-            return (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => setFilterPeriod(item.id)}
-                style={{
-                  padding: '6px 14px',
-                  borderRadius: '20px',
-                  fontSize: '0.82rem',
-                  fontWeight: '800',
-                  cursor: 'pointer',
-                  background: isSel ? '#c026d3' : '#f8fafc',
-                  color: isSel ? 'white' : '#334155',
-                  border: isSel ? '1.5px solid #c026d3' : '1px solid #cbd5e1',
-                  boxShadow: isSel ? '0 2px 6px rgba(192,38,211,0.25)' : 'none',
-                  transition: 'all 0.15s ease'
-                }}
-              >
-                {item.label}
-              </button>
-            );
-          })}
-        </div>
+              {[
+                { id: 'all', label: 'All History' },
+                { id: 'weekly', label: 'Weekly (Last 7 Days)' },
+                { id: 'monthly', label: 'Monthly' },
+                { id: 'yearly', label: 'Yearly (2026)' },
+                { id: 'custom', label: 'Date-to-Date' }
+              ].map((item) => {
+                const isSel = filterPeriod === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => setFilterPeriod(item.id)}
+                    style={{
+                      padding: '6px 14px',
+                      borderRadius: '20px',
+                      fontSize: '0.82rem',
+                      fontWeight: '800',
+                      cursor: 'pointer',
+                      background: isSel ? '#c026d3' : '#f8fafc',
+                      color: isSel ? 'white' : '#334155',
+                      border: isSel ? '1.5px solid #c026d3' : '1px solid #cbd5e1',
+                      boxShadow: isSel ? '0 2px 6px rgba(192,38,211,0.25)' : 'none',
+                      transition: 'all 0.15s ease'
+                    }}
+                  >
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
 
-        {/* CUSTOM DATE-TO-DATE INPUTS */}
-        {filterPeriod === 'custom' && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fdf4ff', padding: '4px 10px', borderRadius: '10px', border: '1px solid #f0abfc' }}>
-            <Calendar size={16} color="#c026d3" />
-            <input
-              type="date"
-              value={fromDate}
-              onChange={(e) => setFromDate(e.target.value)}
-              style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '3px 6px', fontSize: '0.8rem' }}
-            />
-            <span style={{ fontSize: '0.8rem', color: '#701a75', fontWeight: '800' }}>to</span>
-            <input
-              type="date"
-              value={toDate}
-              onChange={(e) => setToDate(e.target.value)}
-              style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '3px 6px', fontSize: '0.8rem' }}
-            />
+            {/* CUSTOM DATE-TO-DATE INPUTS */}
+            {filterPeriod === 'custom' && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', background: '#fdf4ff', padding: '4px 10px', borderRadius: '10px', border: '1px solid #f0abfc' }}>
+                <Calendar size={16} color="#c026d3" />
+                <input
+                  type="date"
+                  value={fromDate}
+                  onChange={(e) => setFromDate(e.target.value)}
+                  style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '3px 6px', fontSize: '0.8rem' }}
+                />
+                <span style={{ fontSize: '0.8rem', color: '#701a75', fontWeight: '800' }}>to</span>
+                <input
+                  type="date"
+                  value={toDate}
+                  onChange={(e) => setToDate(e.target.value)}
+                  style={{ border: '1px solid #cbd5e1', borderRadius: '6px', padding: '3px 6px', fontSize: '0.8rem' }}
+                />
+              </div>
+            )}
           </div>
-        )}
-      </div>
 
-      {/* SUMMARY STAT CARDS */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
-        {/* TOTAL SOLD ITEMS CREDIT (+ GREEN) */}
-        <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '12px', padding: '1.1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a', marginBottom: '0.4rem' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase' }}>Total Sold Sales (+)</span>
-            <ArrowUpRight size={22} />
-          </div>
-          <div style={{ fontSize: '1.65rem', fontWeight: '900', color: '#15803d' }}>
-            + ₹{totalSoldAmount.toLocaleString('en-IN')}
-          </div>
-          <p style={{ fontSize: '0.75rem', color: '#16a34a', margin: '4px 0 0 0', fontWeight: '600' }}>
-            Shipped & Delivered Orders Revenue
-          </p>
-        </div>
+          {/* SUMMARY STAT CARDS */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+            {/* TOTAL SOLD ITEMS CREDIT */}
+            <div style={{ background: '#f0fdf4', border: '1.5px solid #bbf7d0', borderRadius: '12px', padding: '1.1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#16a34a', marginBottom: '0.4rem' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase' }}>Total Sold Sales (+)</span>
+                <ArrowUpRight size={22} />
+              </div>
+              <div style={{ fontSize: '1.65rem', fontWeight: '900', color: '#15803d' }}>
+                + ₹{totalSoldAmount.toLocaleString('en-IN')}
+              </div>
+              <p style={{ fontSize: '0.75rem', color: '#16a34a', margin: '4px 0 0 0', fontWeight: '600' }}>
+                Shipped & Delivered Orders Revenue
+              </p>
+            </div>
 
-        {/* TOTAL RETURNED ITEMS DEBIT (- RED) */}
-        <div style={{ background: '#fff1f2', border: '1.5px solid #fecdd3', borderRadius: '12px', padding: '1.1rem' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', color: '#dc2626', marginBottom: '0.4rem' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase' }}>Total Returned Refunds (-)</span>
-            <ArrowDownRight size={22} />
-          </div>
-          <div style={{ fontSize: '1.65rem', fontWeight: '900', color: '#b91c1c' }}>
-            - ₹{totalRefundAmount.toLocaleString('en-IN')}
-          </div>
-          <p style={{ fontSize: '0.75rem', color: '#be123c', margin: '4px 0 0 0', fontWeight: '600' }}>
-            Customer Returns & Refund Expenses
-          </p>
-        </div>
+            {/* TOTAL RETURNED ITEMS DEBIT */}
+            <div style={{ background: '#fff1f2', border: '1.5px solid #fecdd3', borderRadius: '12px', padding: '1.1rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', color: '#dc2626', marginBottom: '0.4rem' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase' }}>Total Returned Refunds (-)</span>
+                <ArrowDownRight size={22} />
+              </div>
+              <div style={{ fontSize: '1.65rem', fontWeight: '900', color: '#b91c1c' }}>
+                - ₹{totalRefundAmount.toLocaleString('en-IN')}
+              </div>
+              <p style={{ fontSize: '0.75rem', color: '#be123c', margin: '4px 0 0 0', fontWeight: '600' }}>
+                Customer Returns & Refund Expenses
+              </p>
+            </div>
 
-        {/* NET TOTAL BILL AMOUNT */}
-        <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)', borderRadius: '12px', padding: '1.1rem', color: 'white', boxShadow: '0 8px 20px rgba(112,26,117,0.2)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.9, marginBottom: '0.4rem' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase' }}>NET TOTAL BILL AMOUNT</span>
-            <DollarSign size={22} color="#facc15" />
+            {/* NET TOTAL BILL AMOUNT */}
+            <div style={{ background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)', borderRadius: '12px', padding: '1.1rem', color: 'white', boxShadow: '0 8px 20px rgba(112,26,117,0.2)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', opacity: 0.9, marginBottom: '0.4rem' }}>
+                <span style={{ fontSize: '0.8rem', fontWeight: '800', textTransform: 'uppercase' }}>NET TOTAL BILL AMOUNT</span>
+                <DollarSign size={22} color="#facc15" />
+              </div>
+              <div style={{ fontSize: '1.75rem', fontWeight: '900', color: '#facc15' }}>
+                ₹{netTotalBill.toLocaleString('en-IN')}
+              </div>
+              <p style={{ fontSize: '0.75rem', opacity: 0.85, margin: '4px 0 0 0' }}>
+                Final Bill (Sales [+] minus Returns [-])
+              </p>
+            </div>
           </div>
-          <div style={{ fontSize: '1.75rem', fontWeight: '900', color: '#facc15' }}>
-            ₹{netTotalBill.toLocaleString('en-IN')}
-          </div>
-          <p style={{ fontSize: '0.75rem', opacity: 0.85, margin: '4px 0 0 0' }}>
-            Final Bill (Sales [+] minus Returns [-])
-          </p>
-        </div>
-      </div>
 
-      {/* RECHARTS BILLING TREND GRAPH */}
-      {chartData.length > 0 && (
-        <div style={{ background: 'white', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
-          <h4 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a', marginBottom: '1rem' }}>
-            Billing Sales vs Returns Overview ({filterPeriod.toUpperCase()})
-          </h4>
-          <div style={{ width: '100%', height: 250 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                <XAxis dataKey="date" stroke="#94a3b8" />
-                <YAxis stroke="#94a3b8" />
-                <Tooltip formatter={(val) => `₹${val.toLocaleString('en-IN')}`} />
-                <Legend />
-                <Bar dataKey="credit" name="Sold Amount (+)" fill="#16a34a" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="debit" name="Returned Refund (-)" fill="#dc2626" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      )}
+          {/* RECHARTS BILLING TREND GRAPH */}
+          {chartData.length > 0 && (
+            <div style={{ background: 'white', padding: '1.25rem', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+              <h4 style={{ fontSize: '0.95rem', fontWeight: '800', color: '#0f172a', marginBottom: '1rem' }}>
+                Billing Sales vs Returns Overview ({filterPeriod.toUpperCase()})
+              </h4>
+              <div style={{ width: '100%', height: 250 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
+                    <XAxis dataKey="date" stroke="#94a3b8" />
+                    <YAxis stroke="#94a3b8" />
+                    <Tooltip formatter={(val) => `₹${val.toLocaleString('en-IN')}`} />
+                    <Legend />
+                    <Bar dataKey="credit" name="Sold Amount (+)" fill="#16a34a" radius={[4, 4, 0, 0]} />
+                    <Bar dataKey="debit" name="Returned Refund (-)" fill="#dc2626" radius={[4, 4, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          )}
 
-      {/* BILLING HISTORY LEDGER TABLE */}
-      <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-        <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#0f172a', margin: 0 }}>
-            Itemized Financial Ledger ({filteredEntries.length} Records)
-          </h3>
-          <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '600' }}>
-            Showing: {filterPeriod.toUpperCase()}
-          </span>
-        </div>
+          {/* BILLING HISTORY LEDGER TABLE */}
+          <div style={{ background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+            <div style={{ padding: '1rem 1.25rem', borderBottom: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: '800', color: '#0f172a', margin: 0 }}>
+                Itemized Financial Ledger ({filteredEntries.length} Records)
+              </h3>
+              <span style={{ fontSize: '0.8rem', color: '#64748b', fontWeight: '600' }}>
+                Showing: {filterPeriod.toUpperCase()}
+              </span>
+            </div>
 
-        {loading ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
-            Loading Billing Ledger...
-          </div>
-        ) : filteredEntries.length === 0 ? (
-          <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
-            No billing records found for the selected duration filter.
-          </div>
-        ) : (
-          <div className="table-responsive">
-            <table className="admin-table">
-              <thead>
-                <tr>
-                  <th>Order ID / Ref</th>
-                  <th>User Details</th>
-                  <th>Date & Time</th>
-                  <th>Type</th>
-                  <th>Amount</th>
-                  <th style={{ textAlign: 'right' }}>Running Balance</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filteredEntries.map((entry) => {
-                  const isCredit = entry.type === 'credit';
-                  return (
-                    <tr key={entry.id}>
-                      <td style={{ fontWeight: '800', color: '#0f172a' }}>{entry.orderId}</td>
-                      <td style={{ fontSize: '0.85rem', color: '#334155' }}>
-                        <div style={{ fontWeight: '700' }}>{entry.customerName}</div>
-                        {entry.userEmail && <div style={{ fontSize: '0.75rem', color: '#64748b' }}>{entry.userEmail}</div>}
+            {filteredEntries.length === 0 ? (
+              <div style={{ padding: '3rem', textAlign: 'center', color: '#94a3b8' }}>
+                No billing records found for the selected duration filter.
+              </div>
+            ) : (
+              <div className="table-responsive">
+                <table className="admin-table">
+                  <thead>
+                    <tr>
+                      <th>Date & Time</th>
+                      <th>Order ID</th>
+                      <th>Customer Email</th>
+                      <th>UTR</th>
+                      <th>Status</th>
+                      <th style={{ textAlign: 'right' }}>Running Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredEntries.map((entry) => {
+                      const isCredit = entry.type === 'credit';
+                      return (
+                        <tr key={entry.id}>
+                          {/* 1. Date & Time */}
+                          <td style={{ fontSize: '0.82rem', color: '#475569', fontWeight: '600' }}>
+                            {new Date(entry.date).toLocaleDateString('en-GB', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })}
+                          </td>
+
+                          {/* 2. Order ID */}
+                          <td style={{ fontWeight: '800', color: '#0f172a' }}>
+                            {entry.orderId || 'N/A'}
+                          </td>
+
+                          {/* 3. Customer Email */}
+                          <td style={{ fontSize: '0.85rem', color: '#334155', fontWeight: '600' }}>
+                            {entry.userEmail || 'N/A'}
+                          </td>
+
+                          {/* 4. UTR */}
+                          <td style={{ fontSize: '0.82rem', color: '#64748b', fontWeight: '700' }}>
+                            {entry.utrNumber || 'N/A'}
+                          </td>
+
+                          {/* 5. Status */}
+                          <td>
+                            <span
+                              style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '3px 10px',
+                                borderRadius: '12px',
+                                fontSize: '0.75rem',
+                                fontWeight: '800',
+                                background: isCredit ? '#dcfce7' : '#fee2e2',
+                                color: isCredit ? '#15803d' : '#b91c1c'
+                              }}
+                            >
+                              {entry.status || (isCredit ? 'Shipped' : 'Cancelled')}
+                            </span>
+                          </td>
+
+                          {/* 6. Running Balance */}
+                          <td style={{ textAlign: 'right', fontWeight: '800', fontSize: '0.95rem', color: (entry.runningBalance || 0) >= 0 ? '#0f172a' : '#b91c1c' }}>
+                            ₹{(entry.runningBalance || 0).toLocaleString('en-IN')}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ background: '#f8fafc', borderTop: '2px solid #e2e8f0' }}>
+                      <td colSpan={5} style={{ fontWeight: '900', fontSize: '0.95rem', color: '#0f172a', textAlign: 'right' }}>
+                        NET REVENUE BALANCE:
                       </td>
-                      <td style={{ fontSize: '0.82rem', color: '#475569', fontWeight: '600' }}>
-                        {new Date(entry.date).toLocaleDateString('en-GB', {
-                          day: '2-digit',
-                          month: '2-digit',
-                          year: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </td>
-                      <td>
-                        <span
-                          style={{
-                            display: 'inline-flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            padding: '3px 10px',
-                            borderRadius: '12px',
-                            fontSize: '0.75rem',
-                            fontWeight: '800',
-                            background: isCredit ? '#dcfce7' : '#fee2e2',
-                            color: isCredit ? '#15803d' : '#b91c1c'
-                          }}
-                        >
-                          {entry.label || (isCredit ? 'Sale (Shipped)' : 'Refund (Return/Cancel)')}
-                        </span>
-                      </td>
-                      <td style={{ fontWeight: '800', fontSize: '0.95rem', color: isCredit ? '#15803d' : '#b91c1c' }}>
-                        {isCredit ? `+ ₹${entry.amount.toLocaleString('en-IN')}` : `- ₹${Math.abs(entry.amount).toLocaleString('en-IN')}`}
-                      </td>
-                      <td style={{ textAlign: 'right', fontWeight: '800', fontSize: '0.95rem', color: entry.runningBalance >= 0 ? '#0f172a' : '#b91c1c' }}>
-                        ₹{(entry.runningBalance || 0).toLocaleString('en-IN')}
+                      <td style={{ textAlign: 'right', fontWeight: '900', fontSize: '1.25rem', color: '#c026d3' }}>
+                        ₹{netTotalBill.toLocaleString('en-IN')}
                       </td>
                     </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr style={{ background: '#f8fafc', borderTop: '2px solid #e2e8f0' }}>
-                  <td colSpan={5} style={{ fontWeight: '900', fontSize: '0.95rem', color: '#0f172a', textAlign: 'right' }}>
-                    NET REVENUE BALANCE:
-                  </td>
-                  <td style={{ textAlign: 'right', fontWeight: '900', fontSize: '1.25rem', color: '#c026d3' }}>
-                    ₹{netTotalBill.toLocaleString('en-IN')}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
+                  </tfoot>
+                </table>
+              </div>
+            )}
           </div>
-        )}
-      </div>
         </>
       )}
     </div>
