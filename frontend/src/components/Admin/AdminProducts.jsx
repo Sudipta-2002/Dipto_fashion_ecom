@@ -67,9 +67,11 @@ const AdminProducts = () => {
         },
         { forceRefresh }
       );
-      if (data) setProducts(data);
+      const productList = Array.isArray(data) ? data : (data?.products || data?.data || []);
+      setProducts(productList);
     } catch (e) {
       console.error('Error fetching products:', e);
+      setProducts([]);
     }
   };
 
@@ -506,7 +508,7 @@ const AdminProducts = () => {
             </tr>
           </thead>
           <tbody>
-            {products.map((p) => {
+            {(Array.isArray(products) ? products : []).map((p) => {
               const discountPercent = Math.round(((p.mrp - p.price) / p.mrp) * 100);
               const imgCount = p.images ? p.images.length : (p.image ? 1 : 0);
               const mainImg = p.images && p.images.length > 0 ? p.images[0] : p.image;

@@ -384,7 +384,9 @@ function App() {
   }, [appliedFilters]);
 
   const displayedProducts = useMemo(() => {
-    let list = allProducts.length > 0 ? allProducts : products;
+    const validAll = Array.isArray(allProducts) ? allProducts : [];
+    const validProds = Array.isArray(products) ? products : [];
+    let list = validAll.length > 0 ? validAll : validProds;
 
     // 1. Category Filter (from Category Sidebar OR Filter Modal)
     if (selectedCategory && selectedCategory !== 'All') {
