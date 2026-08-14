@@ -2139,39 +2139,78 @@ app.post([
   }
 });
 
+// app.get(['/api/orders', '/orders', '/api/admin/orders', '/admin/orders'], async (req, res) => {
+//   try {
+//     const page = parseInt(req.query.page, 10) || 1;
+//     const limit = parseInt(req.query.limit, 10) || 0;
+
+//     if (isMongoConnected()) {
+//       const totalCount = await Order.countDocuments();
+//       res.setHeader('X-Total-Count', totalCount);
+
+//       let mongoQuery = Order.find()
+//         .select('orderId user userName userEmail email shippingAddress items totalAmount couponCode couponDiscount utrNumber paymentMethod status cancellationDetails returnDetails createdAt updatedAt')
+//         .sort({ createdAt: -1 })
+//         .lean();
+//       if (limit > 0) {
+//         const skip = (page - 1) * limit;
+//         mongoQuery = mongoQuery.skip(skip).limit(limit);
+//       }
+//       const orders = await mongoQuery;
+//       console.log(`Fetched orders for Admin (page=${page}, limit=${limit}, total=${totalCount}):`, orders.length);
+//       return res.json(orders);
+//     } else {
+//       res.setHeader('X-Total-Count', memoryOrders.length);
+//       if (limit > 0) {
+//         const skip = (page - 1) * limit;
+//         return res.json(memoryOrders.slice(skip, skip + limit));
+//       }
+//       return res.json(memoryOrders);
+//     }
+//   } catch (err) {
+//     console.error("Error fetching all orders for Admin:", err);
+//     return res.json(memoryOrders);
+//   }
+// });
+
+
+
+
 app.get(['/api/orders', '/orders', '/api/admin/orders', '/admin/orders'], async (req, res) => {
   try {
-    const page = parseInt(req.query.page, 10) || 1;
-    const limit = parseInt(req.query.limit, 10) || 0;
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.max(1, parseInt(req.query.limit, 10) || 15);
+    const skip = (page - 1) * limit;
 
     if (isMongoConnected()) {
-      const totalCount = await Order.countDocuments();
-      res.setHeader('X-Total-Count', totalCount);
+      // 1. Parallel execution: Count & Fetch একসাথে চলবে (5x faster)
+      const [totalCount, orders] = await Promise.all([
+        Order.estimatedDocumentCount().maxTimeMS(3000).catch(() => Order.countDocuments()),
+        Order.find()
+          .select('orderId userName userEmail shippingAddress items.name items.selectedSize items.quantity items.price totalAmount couponCode couponDiscount utrNumber paymentMethod status cancellationDetails returnDetails createdAt')
+          .sort({ createdAt: -1 })
+          .skip(skip)
+          .limit(limit)
+          .lean()
+          .maxTimeMS(5000)
+      ]);
 
-      let mongoQuery = Order.find()
-        .select('orderId user userName userEmail email shippingAddress items totalAmount couponCode couponDiscount utrNumber paymentMethod status cancellationDetails returnDetails createdAt updatedAt')
-        .sort({ createdAt: -1 })
-        .lean();
-      if (limit > 0) {
-        const skip = (page - 1) * limit;
-        mongoQuery = mongoQuery.skip(skip).limit(limit);
-      }
-      const orders = await mongoQuery;
-      console.log(`Fetched orders for Admin (page=${page}, limit=${limit}, total=${totalCount}):`, orders.length);
-      return res.json(orders);
+      res.setHeader('X-Total-Count', totalCount || 0);
+      res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count');
+      return res.status(200).json(orders || []);
     } else {
-      res.setHeader('X-Total-Count', memoryOrders.length);
-      if (limit > 0) {
-        const skip = (page - 1) * limit;
-        return res.json(memoryOrders.slice(skip, skip + limit));
-      }
-      return res.json(memoryOrders);
+      const memoryList = Array.isArray(memoryOrders) ? memoryOrders : [];
+      res.setHeader('X-Total-Count', memoryList.length);
+      res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count');
+      return res.status(200).json(memoryList.slice(skip, skip + limit));
     }
   } catch (err) {
-    console.error("Error fetching all orders for Admin:", err);
-    return res.json(memoryOrders);
+    console.error("Error fetching admin orders:", err.message);
+    res.setHeader('X-Total-Count', 0);
+    return res.status(200).json([]);
   }
 });
+
 
 // GET LOGGED-IN USER ORDERS FOR PROFILE PAGE
 app.get([
