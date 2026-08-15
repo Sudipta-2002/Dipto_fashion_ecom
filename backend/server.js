@@ -578,7 +578,7 @@ app.post('/api/auth/verify-reset-password', async (req, res) => {
   }
 });
 
-// 7. GOOGLE AUTHENTICATION ROUTE (SIGN IN & SIGN UP)
+// 7. OPTIMIZED HIGH-SPEED GOOGLE AUTHENTICATION ROUTE
 app.post('/api/auth/google', async (req, res) => {
   try {
     const { code, credential, redirectUri } = req.body;
@@ -649,15 +649,19 @@ app.post('/api/auth/google', async (req, res) => {
     let user = null;
 
     if (isMongoConnected()) {
-      user = await User.findOne({ email: cleanEmail });
+      // Streamlined lean indexed MongoDB query for instant retrieval
+      user = await User.findOne({ email: cleanEmail })
+        .select('_id name email phone gender avatar profilePicture googleId role addresses')
+        .lean();
 
       if (!user) {
-        // Create new account for Google Sign Up
-        const randomPassword = await bcrypt.hash(Math.random().toString(36).slice(-10) + Date.now().toString(), 10);
-        user = await User.create({
+        // Fast account creation for Google Sign Up
+        const dummyPass = Math.random().toString(36).slice(-10) + Date.now().toString();
+        const hashedPassword = await bcrypt.hash(dummyPass, 8);
+        const newUser = await User.create({
           name: userName,
           email: cleanEmail,
-          password: randomPassword,
+          password: hashedPassword,
           phone: '',
           gender: '',
           avatar: userPicture,
@@ -666,20 +670,23 @@ app.post('/api/auth/google', async (req, res) => {
           addresses: [],
           role: 'user'
         });
+        user = newUser.toObject ? newUser.toObject() : newUser;
       } else {
-        // Sign in existing user & update Google avatar/ID if missing
-        let updated = false;
-        if (!user.avatar && userPicture) {
-          user.avatar = userPicture;
-          user.profilePicture = userPicture;
-          updated = true;
-        }
-        if (!user.googleId && googleUser.sub) {
-          user.googleId = googleUser.sub;
-          updated = true;
-        }
-        if (updated) {
-          await user.save();
+        // Non-blocking asynchronous update for missing profile details
+        if ((!user.avatar && userPicture) || (!user.googleId && googleUser.sub)) {
+          setImmediate(() => {
+            const updates = {};
+            if (!user.avatar && userPicture) {
+              updates.avatar = userPicture;
+              updates.profilePicture = userPicture;
+            }
+            if (!user.googleId && googleUser.sub) {
+              updates.googleId = googleUser.sub;
+            }
+            User.updateOne({ _id: user._id }, { $set: updates }).exec().catch(err => {
+              console.error('Background user update error:', err);
+            });
+          });
         }
       }
     } else {
@@ -711,7 +718,7 @@ app.post('/api/auth/google', async (req, res) => {
         gender: user.gender || '',
         avatar: user.avatar || user.profilePicture || '',
         profilePicture: user.profilePicture || user.avatar || '',
-        role: user.role,
+        role: user.role || 'user',
         addresses: user.addresses || []
       }
     });
