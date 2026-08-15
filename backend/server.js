@@ -586,6 +586,7 @@ app.post('/api/auth/google', async (req, res) => {
 
     if (code) {
       // Exchange Google Auth Code for Tokens
+      const tokenUrl = 'https://oauth2.googleapis.com/token';
       const clientId = process.env.GOOGLE_CLIENT_ID;
       const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
       const cbRedirectUri = redirectUri || process.env.GOOGLE_REDIRECT_URI || 'https://www.diptofashion.in/auth/google/callback';
