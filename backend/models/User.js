@@ -51,6 +51,7 @@ const userSchema = new mongoose.Schema({
   gender: { type: String, enum: ['Male', 'Female', 'Other', 'Prefer not to say', ''], default: '' },
   avatar: { type: String, default: '' }, // Cloudinary image URL
   profilePicture: { type: String, default: '' }, // Alias for avatar
+  googleId: { type: String, default: '' },
   addresses: [addressSchema],
   wishlist: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Product' }],
   role: { type: String, enum: ['user', 'admin'], default: 'user' }

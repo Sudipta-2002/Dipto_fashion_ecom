@@ -5478,6 +5478,61 @@ function App() {
   const openCartModal = () => navigateTo('cart');
   const openProfileModal = () => navigateTo('profile');
   const openAuthModal = () => navigateTo('auth');
+
+  // Handle Google OAuth Callback URI (/auth/google/callback)
+  useEffect(() => {
+    const handleGoogleOAuthCallback = async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const code = urlParams.get('code');
+      const path = window.location.pathname;
+
+      if (code && (path.includes('/auth/google/callback') || path === '/auth/google/callback')) {
+        try {
+          const redirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI || 'https://www.diptofashion.in/auth/google/callback';
+          const res = await fetch(`${API_URL}/api/auth/google`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, redirectUri })
+          });
+          const data = await res.json();
+          if (!res.ok) throw new Error(data.message || 'Google authentication failed');
+
+          const sanitizeForStorage = (u) => {
+            if (!u) return u;
+            const clone = { ...u };
+            if (clone.avatar && clone.avatar.startsWith('data:')) clone.avatar = '';
+            if (clone.profilePicture && clone.profilePicture.startsWith('data:')) clone.profilePicture = '';
+            return clone;
+          };
+
+          const safeUser = sanitizeForStorage(data.user);
+          localStorage.setItem('df_token', data.token);
+          localStorage.setItem('df_user', JSON.stringify(safeUser));
+
+          if (window.opener && window.opener !== window) {
+            window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', token: data.token, user: safeUser }, '*');
+            window.close();
+            return;
+          }
+
+          setUser(safeUser);
+          window.history.replaceState({}, '', '/');
+        } catch (err) {
+          console.error('Google Auth Callback Error:', err);
+          if (window.opener && window.opener !== window) {
+            window.opener.postMessage({ type: 'GOOGLE_AUTH_ERROR', error: err.message }, '*');
+            window.close();
+          } else {
+            alert(`Google Authentication Error: ${err.message}`);
+            window.history.replaceState({}, '', '/');
+          }
+        }
+      }
+    };
+
+    handleGoogleOAuthCallback();
+  }, []);
+
   const openFilterModal = () => navigateTo('filter');
   const openAboutUsModal = () => navigateTo('about');
   const openTermsModal = (tab = 'privacy') => navigateTo('terms', { termsTab: tab });

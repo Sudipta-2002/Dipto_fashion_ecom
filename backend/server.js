@@ -571,10 +571,152 @@ app.post('/api/auth/verify-reset-password', async (req, res) => {
       if (user) {
         user.password = newPassword;
       }
-      return res.json({ success: true, message: 'Password updated successfully' });
+      return res.json({ success: true, message: 'Password has been updated successfully. You can now log in.' });
     }
   } catch (err) {
     res.status(500).json({ message: err.message });
+  }
+});
+
+// 7. GOOGLE AUTHENTICATION ROUTE (SIGN IN & SIGN UP)
+app.post('/api/auth/google', async (req, res) => {
+  try {
+    const { code, credential, redirectUri } = req.body;
+    let googleUser = null;
+
+    if (code) {
+      // Exchange Google Auth Code for Tokens
+      const clientId = process.env.GOOGLE_CLIENT_ID;
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+      const cbRedirectUri = redirectUri || process.env.GOOGLE_REDIRECT_URI || 'https://www.diptofashion.in/auth/google/callback';
+
+      const params = new URLSearchParams({
+        code,
+        client_id: clientId,
+        client_secret: clientSecret,
+        redirect_uri: cbRedirectUri,
+        grant_type: 'authorization_code'
+      });
+
+      const tokenRes = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString()
+      });
+
+      const tokenData = await tokenRes.json();
+      if (!tokenRes.ok || !tokenData.access_token) {
+        console.error('Google Token Exchange Failure:', tokenData);
+        return res.status(400).json({ message: tokenData.error_description || tokenData.error || 'Failed to exchange authorization code with Google.' });
+      }
+
+      // Fetch user info using access token
+      const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${tokenData.access_token}` }
+      });
+
+      if (!userRes.ok) {
+        return res.status(400).json({ message: 'Failed to retrieve Google user profile information' });
+      }
+
+      googleUser = await userRes.json();
+    } else if (credential) {
+      // Verify Google ID Token (from One-Tap or Google Identity Services)
+      const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
+      const verifyData = await verifyRes.json();
+      if (!verifyRes.ok || verifyData.error) {
+        return res.status(400).json({ message: verifyData.error_description || 'Invalid Google credential token provided.' });
+      }
+      googleUser = {
+        sub: verifyData.sub,
+        email: verifyData.email,
+        name: verifyData.name,
+        picture: verifyData.picture
+      };
+    } else {
+      return res.status(400).json({ message: 'Authorization code or ID credential token is required for Google authentication.' });
+    }
+
+    if (!googleUser || !googleUser.email) {
+      return res.status(400).json({ message: 'Could not extract valid email from Google user account' });
+    }
+
+    const cleanEmail = googleUser.email.trim().toLowerCase();
+    const userName = googleUser.name || cleanEmail.split('@')[0];
+    const userPicture = googleUser.picture || '';
+
+    let user = null;
+
+    if (isMongoConnected()) {
+      user = await User.findOne({ email: cleanEmail });
+
+      if (!user) {
+        // Create new account for Google Sign Up
+        const randomPassword = await bcrypt.hash(Math.random().toString(36).slice(-10) + Date.now().toString(), 10);
+        user = await User.create({
+          name: userName,
+          email: cleanEmail,
+          password: randomPassword,
+          phone: '',
+          gender: '',
+          avatar: userPicture,
+          profilePicture: userPicture,
+          googleId: googleUser.sub || '',
+          addresses: [],
+          role: 'user'
+        });
+      } else {
+        // Sign in existing user & update Google avatar/ID if missing
+        let updated = false;
+        if (!user.avatar && userPicture) {
+          user.avatar = userPicture;
+          user.profilePicture = userPicture;
+          updated = true;
+        }
+        if (!user.googleId && googleUser.sub) {
+          user.googleId = googleUser.sub;
+          updated = true;
+        }
+        if (updated) {
+          await user.save();
+        }
+      }
+    } else {
+      user = memoryUsers.find(u => u.email === cleanEmail);
+      if (!user) {
+        user = {
+          _id: 'u_' + Date.now(),
+          name: userName,
+          email: cleanEmail,
+          phone: '',
+          avatar: userPicture,
+          role: 'user',
+          addresses: []
+        };
+        memoryUsers.push(user);
+      }
+    }
+
+    const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+
+    return res.json({
+      success: true,
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone || '',
+        gender: user.gender || '',
+        avatar: user.avatar || user.profilePicture || '',
+        profilePicture: user.profilePicture || user.avatar || '',
+        role: user.role,
+        addresses: user.addresses || []
+      }
+    });
+  } catch (err) {
+    console.error('Google Auth Controller Error:', err);
+    res.status(500).json({ message: err.message || 'Internal server error during Google authentication' });
   }
 });
 
