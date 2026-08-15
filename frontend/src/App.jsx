@@ -10096,6 +10096,16 @@ function App() {
   const [showNotificationBubble, setShowNotificationBubble] = useState(false);
   const [latestNotificationTitle, setLatestNotificationTitle] = useState('');
 
+  // Calculate ONLY Unread Notifications Count
+  const unreadNotificationCount = useMemo(() => {
+    const currentId = user?._id || user?.id || '';
+    return notifications.filter((n) => {
+      const isReadInStorage = readNotificationIds.includes(n._id);
+      const isReadInDb = currentId && Array.isArray(n.readBy) && n.readBy.includes(currentId);
+      return !isReadInStorage && !isReadInDb;
+    }).length;
+  }, [notifications, readNotificationIds, user]);
+
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [productHistory, setProductHistory] = useState([]);
@@ -10327,12 +10337,6 @@ function App() {
 
   const openNotificationsModal = () => {
     setShowNotificationBubble(false);
-    const allIds = notifications.map(n => n._id);
-    const updatedRead = Array.from(new Set([...readNotificationIds, ...allIds]));
-    setReadNotificationIds(updatedRead);
-    try {
-      localStorage.setItem('df_read_notifications', JSON.stringify(updatedRead));
-    } catch (e) {}
     navigateTo('notifications');
   };
 
@@ -10370,7 +10374,7 @@ function App() {
   };
 
   const handleMarkAllNotificationsAsRead = () => {
-    const allIds = notifications.map(n => n._id);
+    const allIds = notifications.map((n) => n._id);
     const updated = Array.from(new Set([...readNotificationIds, ...allIds]));
     setReadNotificationIds(updated);
     try {
@@ -10749,7 +10753,7 @@ function App() {
         categories={categories}
         allProducts={products}
         onSelectProduct={handleOpenProductDetail}
-        unreadNotificationCount={notifications.length}
+        unreadNotificationCount={unreadNotificationCount}
         showNotificationBubble={showNotificationBubble}
         latestNotificationTitle={latestNotificationTitle}
         onOpenNotifications={openNotificationsModal}
@@ -10974,6 +10978,7 @@ function App() {
         onAuthSuccess={(userData) => setUser(userData)}
       />
 
+      {/* USER PROFILE MODAL - Closes directly to Home when clicking (X) */}
       <UserProfileModal
         isOpen={isProfileOpen}
         onClose={closeToHome}
