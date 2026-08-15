@@ -5516,6 +5516,9 @@ function App() {
           }
 
           setUser(safeUser);
+          setIsAuthOpen(false);
+          closeAllModals();
+          setCurrentView('shop');
           window.history.replaceState({}, '', '/');
         } catch (err) {
           console.error('Google Auth Callback Error:', err);
@@ -5531,7 +5534,19 @@ function App() {
     };
 
     handleGoogleOAuthCallback();
-  }, []);
+  }, [closeAllModals]);
+
+  // Authenticated route protection: automatically close auth modal and redirect to home if logged in
+  useEffect(() => {
+    if (isAuthOpen && (user || localStorage.getItem('df_token'))) {
+      setIsAuthOpen(false);
+      closeAllModals();
+      setCurrentView('shop');
+      if (window.location.pathname !== '/') {
+        window.history.replaceState({}, '', '/');
+      }
+    }
+  }, [isAuthOpen, user, closeAllModals]);
 
   const openFilterModal = () => navigateTo('filter');
   const openAboutUsModal = () => navigateTo('about');
@@ -6311,8 +6326,17 @@ function App() {
 
       <AuthModal
         isOpen={isAuthOpen}
-        onClose={() => window.history.back()}
-        onAuthSuccess={(userData) => setUser(userData)}
+        onClose={() => {
+          setIsAuthOpen(false);
+          sessionStorage.removeItem('df_active_modal');
+        }}
+        onAuthSuccess={(userData) => {
+          setUser(userData);
+          setIsAuthOpen(false);
+          closeAllModals();
+          setCurrentView('shop');
+          window.history.replaceState({}, '', '/');
+        }}
       />
 
       {/* USER PROFILE MODAL - Closes directly to Home when clicking (X) */}

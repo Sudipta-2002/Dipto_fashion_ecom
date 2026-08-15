@@ -186,12 +186,16 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     }
   };
 
-  // Automatically reset all form fields whenever the modal opens
+  // Automatically close modal if user is already authenticated, or reset form fields when opening
   useEffect(() => {
     if (isOpen) {
+      if (localStorage.getItem('df_token')) {
+        onClose();
+        return;
+      }
       resetForm();
     }
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   // Resend Timer Countdown for OTP
   useEffect(() => {
