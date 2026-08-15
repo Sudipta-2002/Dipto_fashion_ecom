@@ -5341,7 +5341,227 @@ function App() {
   // ============================================================
   // UNIFIED STACK-BASED HISTORY CONTROLLER
   // ============================================================
-  const closeAllModals = useCallback(() => {
+  // const closeAllModals = useCallback(() => {
+  //   setIsCartOpen(false);
+  //   setIsProfileOpen(false);
+  //   setIsAuthOpen(false);
+  //   setIsDetailOpen(false);
+  //   setIsLightboxOpen(false);
+  //   setIsCheckoutOpen(false);
+  //   setIsPaymentOpen(false);
+  //   setIsNotificationsOpen(false);
+  //   setIsFilterModalOpen(false);
+  //   setIsAboutUsOpen(false);
+  //   setIsTermsOpen(false);
+  //   sessionStorage.removeItem('df_active_modal');
+  // }, []);
+
+  // const applyNavigationState = useCallback((state) => {
+  //   const isPathAdmin = window.location.pathname.toLowerCase() === '/admin' || window.location.pathname.toLowerCase().startsWith('/admin');
+
+  //   if (!state || !state.modal) {
+  //     closeAllModals();
+  //     if (state && state.view) {
+  //       setCurrentView(state.view);
+  //     } else {
+  //       setCurrentView(isPathAdmin ? 'admin' : 'shop');
+  //     }
+  //     return;
+  //   }
+
+  //   if (state.view) {
+  //     setCurrentView(state.view);
+  //   } else {
+  //     setCurrentView(isPathAdmin ? 'admin' : 'shop');
+  //   }
+
+  //   closeAllModals();
+  //   sessionStorage.setItem('df_active_modal', state.modal);
+
+  //   if (state.modal === 'cart') {
+  //     setIsCartOpen(true);
+  //   } else if (state.modal === 'profile') {
+  //     setIsProfileOpen(true);
+  //   } else if (state.modal === 'auth') {
+  //     setIsAuthOpen(true);
+  //   } else if (state.modal === 'detail') {
+  //     if (state.product) {
+  //       setSelectedProduct(state.product);
+  //     } else if (state.productId) {
+  //       const found = productsRef.current.find(p => String(p._id || p.id) === String(state.productId));
+  //       if (found) setSelectedProduct(found);
+  //     }
+  //     setIsDetailOpen(true);
+  //   } else if (state.modal === 'lightbox') {
+  //     if (state.product) setLightboxProduct(state.product);
+  //     setIsLightboxOpen(true);
+  //   } else if (state.modal === 'checkout') {
+  //     setIsCheckoutOpen(true);
+  //   } else if (state.modal === 'payment') {
+  //     if (state.deliveryAddress) setDeliveryAddress(state.deliveryAddress);
+  //     setIsPaymentOpen(true);
+  //   } else if (state.modal === 'notifications') {
+  //     setIsNotificationsOpen(true);
+  //   } else if (state.modal === 'filter') {
+  //     setIsFilterModalOpen(true);
+  //   } else if (state.modal === 'about') {
+  //     setIsAboutUsOpen(true);
+  //   } else if (state.modal === 'terms') {
+  //     if (state.termsTab) setTermsTab(state.termsTab);
+  //     setIsTermsOpen(true);
+  //   }
+  // }, [closeAllModals]);
+
+  // const navigateTo = useCallback((modalName, extraData = {}) => {
+  //   const statePayload = {
+  //     modal: modalName,
+  //     view: currentView,
+  //     ...extraData
+  //   };
+  //   try {
+  //     window.history.pushState(statePayload, '', window.location.href);
+  //   } catch (e) {}
+  //   applyNavigationState(statePayload);
+  // }, [currentView, applyNavigationState]);
+
+  // const closeToHome = useCallback(() => {
+  //   closeAllModals();
+  //   try {
+  //     window.history.pushState({ modal: null, view: 'shop' }, '', '/');
+  //   } catch (e) {}
+  // }, [closeAllModals]);
+
+  // useEffect(() => {
+  //   const isPathAdmin = window.location.pathname.toLowerCase() === '/admin' || window.location.pathname.toLowerCase().startsWith('/admin');
+  //   const savedModal = window.history.state?.modal || sessionStorage.getItem('df_active_modal');
+
+  //   if (isPathAdmin) {
+  //     setCurrentView('admin');
+  //   } else if (savedModal) {
+  //     applyNavigationState(window.history.state || { modal: savedModal, view: 'shop' });
+  //   } else if (!window.history.state) {
+  //     window.history.replaceState(
+  //       { modal: null, view: isPathAdmin ? 'admin' : 'shop' },
+  //       '',
+  //       window.location.href
+  //     );
+  //   }
+
+  //   const handlePopState = (e) => {
+  //     applyNavigationState(e.state);
+  //   };
+
+  //   const handleKeyDown = (e) => {
+  //     if (e.key === 'Escape') {
+  //       window.history.back();
+  //     }
+  //   };
+
+  //   window.addEventListener('popstate', handlePopState);
+  //   window.addEventListener('keydown', handleKeyDown);
+
+  //   return () => {
+  //     window.removeEventListener('popstate', handlePopState);
+  //     window.removeEventListener('keydown', handleKeyDown);
+  //   };
+  // }, [applyNavigationState]);
+
+  // const setView = (view) => {
+  //   setCurrentView(view);
+  //   if (view === 'admin') {
+  //     window.history.pushState({ modal: null, view: 'admin' }, '', '/admin');
+  //   } else {
+  //     window.history.pushState({ modal: null, view: 'shop' }, '', '/');
+  //   }
+  // };
+
+  // const openCartModal = () => navigateTo('cart');
+  // const openProfileModal = () => navigateTo('profile');
+  // const openAuthModal = () => navigateTo('auth');
+
+  // // Handle Google OAuth Callback URI (/auth/google/callback)
+  // useEffect(() => {
+  //   const handleGoogleOAuthCallback = async () => {
+  //     const urlParams = new URLSearchParams(window.location.search);
+  //     const code = urlParams.get('code');
+  //     const path = window.location.pathname;
+
+  //     if (code && (path.includes('/auth/google/callback') || path === '/auth/google/callback')) {
+  //       try {
+  //         const redirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI || 'https://www.diptofashion.in/auth/google/callback';
+  //         const res = await fetch(`${API_URL}/api/auth/google`, {
+  //           method: 'POST',
+  //           headers: { 'Content-Type': 'application/json' },
+  //           body: JSON.stringify({ code, redirectUri })
+  //         });
+  //         const data = await res.json();
+  //         if (!res.ok) throw new Error(data.message || 'Google authentication failed');
+
+  //         const sanitizeForStorage = (u) => {
+  //           if (!u) return u;
+  //           const clone = { ...u };
+  //           if (clone.avatar && clone.avatar.startsWith('data:')) clone.avatar = '';
+  //           if (clone.profilePicture && clone.profilePicture.startsWith('data:')) clone.profilePicture = '';
+  //           return clone;
+  //         };
+
+  //         const safeUser = sanitizeForStorage(data.user);
+  //         localStorage.setItem('df_token', data.token);
+  //         localStorage.setItem('df_user', JSON.stringify(safeUser));
+
+  //         if (window.opener && window.opener !== window) {
+  //           window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', token: data.token, user: safeUser }, '*');
+  //           window.close();
+  //           return;
+  //         }
+
+  //         setUser(safeUser);
+  //         setIsAuthOpen(false);
+  //         closeAllModals();
+  //         setCurrentView('shop');
+  //         window.history.replaceState({}, '', '/');
+  //       } catch (err) {
+  //         console.error('Google Auth Callback Error:', err);
+  //         if (window.opener && window.opener !== window) {
+  //           window.opener.postMessage({ type: 'GOOGLE_AUTH_ERROR', error: err.message }, '*');
+  //           window.close();
+  //         } else {
+  //           alert(`Google Authentication Error: ${err.message}`);
+  //           window.history.replaceState({}, '', '/');
+  //         }
+  //       }
+  //     }
+  //   };
+
+  //   handleGoogleOAuthCallback();
+  // }, [closeAllModals]);
+
+  // // Authenticated route protection: automatically close auth modal and redirect to home if logged in
+  // useEffect(() => {
+  //   if (isAuthOpen && (user || localStorage.getItem('df_token'))) {
+  //     setIsAuthOpen(false);
+  //     closeAllModals();
+  //     setCurrentView('shop');
+  //     if (window.location.pathname !== '/') {
+  //       window.history.replaceState({}, '', '/');
+  //     }
+  //   }
+  // }, [isAuthOpen, user, closeAllModals]);
+
+  // const openFilterModal = () => navigateTo('filter');
+  // const openAboutUsModal = () => navigateTo('about');
+  // const openTermsModal = (tab = 'privacy') => navigateTo('terms', { termsTab: tab });
+
+  // const openNotificationsModal = () => {
+  //   setShowNotificationBubble(false);
+  //   navigateTo('notifications');
+  // };
+
+
+
+
+
+const closeAllModals = useCallback(() => {
     setIsCartOpen(false);
     setIsProfileOpen(false);
     setIsAuthOpen(false);
@@ -5359,7 +5579,10 @@ function App() {
   const applyNavigationState = useCallback((state) => {
     const isPathAdmin = window.location.pathname.toLowerCase() === '/admin' || window.location.pathname.toLowerCase().startsWith('/admin');
 
-    if (!state || !state.modal) {
+    // User already logged in check: Do not open auth modal if logged in
+    const isLoggedIn = !!localStorage.getItem('df_token');
+
+    if (!state || !state.modal || (state.modal === 'auth' && isLoggedIn)) {
       closeAllModals();
       if (state && state.view) {
         setCurrentView(state.view);
@@ -5383,7 +5606,7 @@ function App() {
     } else if (state.modal === 'profile') {
       setIsProfileOpen(true);
     } else if (state.modal === 'auth') {
-      setIsAuthOpen(true);
+      if (!isLoggedIn) setIsAuthOpen(true);
     } else if (state.modal === 'detail') {
       if (state.product) {
         setSelectedProduct(state.product);
@@ -5413,6 +5636,10 @@ function App() {
   }, [closeAllModals]);
 
   const navigateTo = useCallback((modalName, extraData = {}) => {
+    // Prevent opening auth modal if user already has a token
+    if (modalName === 'auth' && localStorage.getItem('df_token')) {
+      return;
+    }
     const statePayload = {
       modal: modalName,
       view: currentView,
@@ -5426,8 +5653,9 @@ function App() {
 
   const closeToHome = useCallback(() => {
     closeAllModals();
+    sessionStorage.removeItem('df_active_modal');
     try {
-      window.history.pushState({ modal: null, view: 'shop' }, '', '/');
+      window.history.replaceState({ modal: null, view: 'shop' }, '', '/');
     } catch (e) {}
   }, [closeAllModals]);
 
@@ -5438,7 +5666,13 @@ function App() {
     if (isPathAdmin) {
       setCurrentView('admin');
     } else if (savedModal) {
-      applyNavigationState(window.history.state || { modal: savedModal, view: 'shop' });
+      if (savedModal === 'auth' && localStorage.getItem('df_token')) {
+        sessionStorage.removeItem('df_active_modal');
+        closeAllModals();
+        setCurrentView('shop');
+      } else {
+        applyNavigationState(window.history.state || { modal: savedModal, view: 'shop' });
+      }
     } else if (!window.history.state) {
       window.history.replaceState(
         { modal: null, view: isPathAdmin ? 'admin' : 'shop' },
@@ -5464,7 +5698,7 @@ function App() {
       window.removeEventListener('popstate', handlePopState);
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [applyNavigationState]);
+  }, [applyNavigationState, closeAllModals]);
 
   const setView = (view) => {
     setCurrentView(view);
@@ -5477,9 +5711,13 @@ function App() {
 
   const openCartModal = () => navigateTo('cart');
   const openProfileModal = () => navigateTo('profile');
-  const openAuthModal = () => navigateTo('auth');
+  const openAuthModal = () => {
+    if (!localStorage.getItem('df_token')) {
+      navigateTo('auth');
+    }
+  };
 
-  // Handle Google OAuth Callback URI (/auth/google/callback)
+  // Instant Google OAuth Callback Handler
   useEffect(() => {
     const handleGoogleOAuthCallback = async () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -5509,17 +5747,20 @@ function App() {
           localStorage.setItem('df_token', data.token);
           localStorage.setItem('df_user', JSON.stringify(safeUser));
 
+          // Post message to popup opener if running in popup window
           if (window.opener && window.opener !== window) {
             window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', token: data.token, user: safeUser }, '*');
             window.close();
             return;
           }
 
+          // Instant State & Route Cleanup
+          sessionStorage.removeItem('df_active_modal');
           setUser(safeUser);
           setIsAuthOpen(false);
           closeAllModals();
           setCurrentView('shop');
-          window.history.replaceState({}, '', '/');
+          window.history.replaceState({ modal: null, view: 'shop' }, '', '/');
         } catch (err) {
           console.error('Google Auth Callback Error:', err);
           if (window.opener && window.opener !== window) {
@@ -5527,7 +5768,9 @@ function App() {
             window.close();
           } else {
             alert(`Google Authentication Error: ${err.message}`);
-            window.history.replaceState({}, '', '/');
+            sessionStorage.removeItem('df_active_modal');
+            closeAllModals();
+            window.history.replaceState({ modal: null, view: 'shop' }, '', '/');
           }
         }
       }
@@ -5536,14 +5779,15 @@ function App() {
     handleGoogleOAuthCallback();
   }, [closeAllModals]);
 
-  // Authenticated route protection: automatically close auth modal and redirect to home if logged in
+  // Immediate protection: instantly hide auth modal whenever user is logged in
   useEffect(() => {
     if (isAuthOpen && (user || localStorage.getItem('df_token'))) {
       setIsAuthOpen(false);
       closeAllModals();
+      sessionStorage.removeItem('df_active_modal');
       setCurrentView('shop');
       if (window.location.pathname !== '/') {
-        window.history.replaceState({}, '', '/');
+        window.history.replaceState({ modal: null, view: 'shop' }, '', '/');
       }
     }
   }, [isAuthOpen, user, closeAllModals]);
@@ -5556,6 +5800,9 @@ function App() {
     setShowNotificationBubble(false);
     navigateTo('notifications');
   };
+
+
+
 
   const fetchCategories = async () => {
     try {
