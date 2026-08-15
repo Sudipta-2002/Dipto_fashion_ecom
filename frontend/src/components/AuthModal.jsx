@@ -67,6 +67,8 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     return clone;
   };
 
+  const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "886817252299-cjii473fvu235otmm7obct3ji39j04l8.apps.googleusercontent.com";
+
   // Listen for Google Auth postMessage from popup window
   useEffect(() => {
     const handleMessage = (event) => {
@@ -89,40 +91,64 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
     return () => window.removeEventListener('message', handleMessage);
   }, [onAuthSuccess, onClose]);
 
+  // Initialize Google Identity Services (GSI) once when component mounts and script has loaded
+  useEffect(() => {
+    const initGsi = () => {
+      if (window.google && window.google.accounts && window.google.accounts.id) {
+        try {
+          window.google.accounts.id.initialize({
+            client_id: clientId,
+            callback: async (response) => {
+              if (response && response.credential) {
+                setGoogleLoading(true);
+                try {
+                  const res = await fetch(`${API_URL}/api/auth/google`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ credential: response.credential })
+                  });
+                  const data = await res.json();
+                  if (!res.ok) throw new Error(data.message || 'Google authentication failed');
+
+                  localStorage.setItem('df_token', data.token);
+                  localStorage.setItem('df_user', JSON.stringify(sanitizeForStorage(data.user)));
+                  onAuthSuccess(data.user);
+                  onClose();
+                } catch (err) {
+                  setError(err.message || 'Google authentication failed');
+                } finally {
+                  setGoogleLoading(false);
+                }
+              }
+            }
+          });
+        } catch (e) {
+          console.warn('GSI Initialization Error:', e);
+        }
+      }
+    };
+
+    if (window.google && window.google.accounts && window.google.accounts.id) {
+      initGsi();
+    } else {
+      const interval = setInterval(() => {
+        if (window.google && window.google.accounts && window.google.accounts.id) {
+          initGsi();
+          clearInterval(interval);
+        }
+      }, 300);
+      return () => clearInterval(interval);
+    }
+  }, []);
+
   const handleGoogleAuth = async () => {
     setError('');
     setGoogleLoading(true);
 
-    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
     const redirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI || 'https://www.diptofashion.in/auth/google/callback';
 
     if (window.google && window.google.accounts && window.google.accounts.id) {
       try {
-        window.google.accounts.id.initialize({
-          client_id: clientId,
-          callback: async (response) => {
-            if (response && response.credential) {
-              try {
-                const res = await fetch(`${API_URL}/api/auth/google`, {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify({ credential: response.credential })
-                });
-                const data = await res.json();
-                if (!res.ok) throw new Error(data.message || 'Google authentication failed');
-
-                localStorage.setItem('df_token', data.token);
-                localStorage.setItem('df_user', JSON.stringify(sanitizeForStorage(data.user)));
-                onAuthSuccess(data.user);
-                onClose();
-              } catch (err) {
-                setError(err.message || 'Google authentication failed');
-              } finally {
-                setGoogleLoading(false);
-              }
-            }
-          }
-        });
         window.google.accounts.id.prompt((notification) => {
           if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
             triggerOAuthRedirect(clientId, redirectUri);
@@ -130,7 +156,7 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
         });
         return;
       } catch (e) {
-        console.warn('GIS error, falling back to OAuth redirect:', e);
+        console.warn('GIS prompt error, falling back to OAuth redirect:', e);
       }
     }
 
