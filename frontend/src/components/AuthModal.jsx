@@ -1164,26 +1164,53 @@ const AuthModal = ({ isOpen, onClose, onAuthSuccess }) => {
   const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID || "886817252299-cjii473fvu235otmm7obct3ji39j04l8.apps.googleusercontent.com";
 
   // Google Auth Success Listener
-  useEffect(() => {
-    const handleMessage = (event) => {
-      if (event.data && event.data.type === 'GOOGLE_AUTH_SUCCESS' && event.data.user) {
-        setGoogleLoading(false);
-        try {
-          localStorage.setItem('df_token', event.data.token);
-          localStorage.setItem('df_user', JSON.stringify(sanitizeForStorage(event.data.user)));
-        } catch (e) {
-          console.warn('LocalStorage error:', e);
-        }
-        onAuthSuccess(event.data.user);
-        onClose();
-      } else if (event.data && event.data.type === 'GOOGLE_AUTH_ERROR') {
-        setGoogleLoading(false);
-        setError(event.data.error || 'Google Authentication failed');
+  // useEffect(() => {
+  //   const handleMessage = (event) => {
+  //     if (event.data && event.data.type === 'GOOGLE_AUTH_SUCCESS' && event.data.user) {
+  //       setGoogleLoading(false);
+  //       try {
+  //         localStorage.setItem('df_token', event.data.token);
+  //         localStorage.setItem('df_user', JSON.stringify(sanitizeForStorage(event.data.user)));
+  //       } catch (e) {
+  //         console.warn('LocalStorage error:', e);
+  //       }
+  //       onAuthSuccess(event.data.user);
+  //       onClose();
+  //     } else if (event.data && event.data.type === 'GOOGLE_AUTH_ERROR') {
+  //       setGoogleLoading(false);
+  //       setError(event.data.error || 'Google Authentication failed');
+  //     }
+  //   };
+  //   window.addEventListener('message', handleMessage);
+  //   return () => window.removeEventListener('message', handleMessage);
+  // }, [onAuthSuccess, onClose]);
+
+
+useEffect(() => {
+  const handleMessage = (event) => {
+    if (event.data && event.data.type === 'GOOGLE_AUTH_SUCCESS' && event.data.user) {
+      setGoogleLoading(false);
+      try {
+        localStorage.setItem('df_token', event.data.token);
+        localStorage.setItem('df_user', JSON.stringify(sanitizeForStorage(event.data.user)));
+      } catch (e) {
+        console.warn('LocalStorage error:', e);
       }
-    };
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
-  }, [onAuthSuccess, onClose]);
+      onAuthSuccess(event.data.user);
+      onClose();
+      
+      // ইনস্ট্যান্ট হোমপেজ রিডাইরেক্ট নিশ্চিত করতে
+      window.location.replace('/');
+    } else if (event.data && event.data.type === 'GOOGLE_AUTH_ERROR') {
+      setGoogleLoading(false);
+      setError(event.data.error || 'Google Authentication failed');
+    }
+  };
+  window.addEventListener('message', handleMessage);
+  return () => window.removeEventListener('message', handleMessage);
+}, [onAuthSuccess, onClose]);
+
+
 
   // FAST GOOGLE AUTH CLICK HANDLER (Instant Popup, Zero Lag)
   const handleGoogleAuth = () => {

@@ -5718,6 +5718,70 @@ const closeAllModals = useCallback(() => {
   };
 
   // Instant Google OAuth Callback Handler
+  // useEffect(() => {
+  //   const handleGoogleOAuthCallback = async () => {
+  //     const urlParams = new URLSearchParams(window.location.search);
+  //     const code = urlParams.get('code');
+  //     const path = window.location.pathname;
+
+  //     if (code && (path.includes('/auth/google/callback') || path === '/auth/google/callback')) {
+  //       try {
+  //         const redirectUri = import.meta.env.VITE_GOOGLE_REDIRECT_URI || 'https://www.diptofashion.in/auth/google/callback';
+  //         const res = await fetch(`${API_URL}/api/auth/google`, {
+  //           method: 'POST',
+  //           headers: { 'Content-Type': 'application/json' },
+  //           body: JSON.stringify({ code, redirectUri })
+  //         });
+  //         const data = await res.json();
+  //         if (!res.ok) throw new Error(data.message || 'Google authentication failed');
+
+  //         const sanitizeForStorage = (u) => {
+  //           if (!u) return u;
+  //           const clone = { ...u };
+  //           if (clone.avatar && clone.avatar.startsWith('data:')) clone.avatar = '';
+  //           if (clone.profilePicture && clone.profilePicture.startsWith('data:')) clone.profilePicture = '';
+  //           return clone;
+  //         };
+
+  //         const safeUser = sanitizeForStorage(data.user);
+  //         localStorage.setItem('df_token', data.token);
+  //         localStorage.setItem('df_user', JSON.stringify(safeUser));
+
+  //         // Post message to popup opener if running in popup window
+  //         if (window.opener && window.opener !== window) {
+  //           window.opener.postMessage({ type: 'GOOGLE_AUTH_SUCCESS', token: data.token, user: safeUser }, '*');
+  //           window.close();
+  //           return;
+  //         }
+
+  //         // Instant State & Route Cleanup
+  //         sessionStorage.removeItem('df_active_modal');
+  //         setUser(safeUser);
+  //         setIsAuthOpen(false);
+  //         closeAllModals();
+  //         setCurrentView('shop');
+  //         window.history.replaceState({ modal: null, view: 'shop' }, '', '/');
+  //       } catch (err) {
+  //         console.error('Google Auth Callback Error:', err);
+  //         if (window.opener && window.opener !== window) {
+  //           window.opener.postMessage({ type: 'GOOGLE_AUTH_ERROR', error: err.message }, '*');
+  //           window.close();
+  //         } else {
+  //           alert(`Google Authentication Error: ${err.message}`);
+  //           sessionStorage.removeItem('df_active_modal');
+  //           closeAllModals();
+  //           window.history.replaceState({ modal: null, view: 'shop' }, '', '/');
+  //         }
+  //       }
+  //     }
+  //   };
+
+  //   handleGoogleOAuthCallback();
+  // }, [closeAllModals]);
+
+
+
+// Instant Google OAuth Callback Handler
   useEffect(() => {
     const handleGoogleOAuthCallback = async () => {
       const urlParams = new URLSearchParams(window.location.search);
@@ -5746,6 +5810,7 @@ const closeAllModals = useCallback(() => {
           const safeUser = sanitizeForStorage(data.user);
           localStorage.setItem('df_token', data.token);
           localStorage.setItem('df_user', JSON.stringify(safeUser));
+          sessionStorage.removeItem('df_active_modal');
 
           // Post message to popup opener if running in popup window
           if (window.opener && window.opener !== window) {
@@ -5754,13 +5819,8 @@ const closeAllModals = useCallback(() => {
             return;
           }
 
-          // Instant State & Route Cleanup
-          sessionStorage.removeItem('df_active_modal');
-          setUser(safeUser);
-          setIsAuthOpen(false);
-          closeAllModals();
-          setCurrentView('shop');
-          window.history.replaceState({ modal: null, view: 'shop' }, '', '/');
+          // Zero-delay instant redirect to home page
+          window.location.replace('/');
         } catch (err) {
           console.error('Google Auth Callback Error:', err);
           if (window.opener && window.opener !== window) {
@@ -5769,15 +5829,16 @@ const closeAllModals = useCallback(() => {
           } else {
             alert(`Google Authentication Error: ${err.message}`);
             sessionStorage.removeItem('df_active_modal');
-            closeAllModals();
-            window.history.replaceState({ modal: null, view: 'shop' }, '', '/');
+            window.location.replace('/');
           }
         }
       }
     };
 
     handleGoogleOAuthCallback();
-  }, [closeAllModals]);
+  }, []);
+
+
 
   // Immediate protection: instantly hide auth modal whenever user is logged in
   useEffect(() => {
