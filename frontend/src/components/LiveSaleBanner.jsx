@@ -253,6 +253,237 @@
 
 
 
+// import React, { useState, useEffect, useRef } from 'react';
+// import { Zap, Clock, ShoppingBag, X, ChevronRight, ChevronLeft } from 'lucide-react';
+// import { apiFetch, parseResponseSafely } from '../api';
+// import { useSocket } from '../context/SocketContext';
+
+// const LiveSaleBanner = ({ onSelectCategory }) => {
+//   const [banners, setBanners] = useState([]);
+//   const [currentIndex, setCurrentIndex] = useState(0);
+//   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, totalMs: 0 });
+//   const [isDismissed, setIsDismissed] = useState(false);
+//   const { socket } = useSocket();
+//   const slideTimerRef = useRef(null);
+
+//   useEffect(() => {
+//     fetchSaleBanners();
+//     const interval = setInterval(fetchSaleBanners, 15000);
+
+//     const handleUpdateEvent = (e) => {
+//       if (e.detail && Array.isArray(e.detail)) {
+//         setBanners(e.detail.filter((b) => b.isActive));
+//         setIsDismissed(false);
+//       }
+//     };
+//     window.addEventListener('df_live_sale_updated', handleUpdateEvent);
+
+//     const handleSocketUpdate = (data) => {
+//       if (data && Array.isArray(data)) {
+//         setBanners(data.filter((b) => b.isActive));
+//         setIsDismissed(false);
+//       }
+//     };
+
+//     if (socket) socket.on('live_sale_updated', handleSocketUpdate);
+
+//     return () => {
+//       clearInterval(interval);
+//       window.removeEventListener('df_live_sale_updated', handleUpdateEvent);
+//       if (socket) socket.off('live_sale_updated', handleSocketUpdate);
+//     };
+//   }, [socket]);
+
+//   const fetchSaleBanners = async () => {
+//     try {
+//       const res = await apiFetch('/api/live-sale/active');
+//       const data = await parseResponseSafely(res);
+//       if (res.ok && Array.isArray(data)) {
+//         setBanners(data.filter((b) => b.isActive));
+//       } else if (res.ok && data && typeof data === 'object') {
+//         setBanners(data.isActive ? [data] : []);
+//       } else {
+//         loadLocalStorageConfig();
+//       }
+//     } catch (e) {
+//       loadLocalStorageConfig();
+//     }
+//   };
+
+//   const loadLocalStorageConfig = () => {
+//     try {
+//       const saved = localStorage.getItem('df_live_sale_banners');
+//       if (saved) {
+//         const list = JSON.parse(saved);
+//         if (Array.isArray(list)) setBanners(list.filter((b) => b.isActive));
+//       }
+//     } catch (e) {}
+//   };
+
+//   // AUTO-SLIDE CAROUSEL (Every 4 seconds if > 1 banner)
+//   useEffect(() => {
+//     if (banners.length <= 1) return;
+
+//     slideTimerRef.current = setInterval(() => {
+//       setCurrentIndex((prev) => (prev + 1) % banners.length);
+//     }, 4000);
+
+//     return () => {
+//       if (slideTimerRef.current) clearInterval(slideTimerRef.current);
+//     };
+//   }, [banners.length]);
+
+//   const currentBanner = banners[currentIndex] || banners[0];
+
+//   // COUNTDOWN TIMER CALCULATION
+//   useEffect(() => {
+//     if (!currentBanner || !currentBanner.endTime) return;
+
+//     const calculateTimer = () => {
+//       const targetTime = new Date(currentBanner.endTime).getTime();
+//       const now = new Date().getTime();
+//       const diffMs = targetTime - now;
+
+//       if (diffMs <= 0) {
+//         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0, totalMs: 0 });
+//         return;
+//       }
+
+//       setTimeLeft({
+//         days: Math.floor(diffMs / (1000 * 60 * 60 * 24)),
+//         hours: Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+//         minutes: Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60)),
+//         seconds: Math.floor((diffMs % (1000 * 60)) / 1000),
+//         totalMs: diffMs
+//       });
+//     };
+
+//     calculateTimer();
+//     const interval = setInterval(calculateTimer, 1000);
+//     return () => clearInterval(interval);
+//   }, [currentBanner]);
+
+//   if (!banners.length || !currentBanner || isDismissed || timeLeft.totalMs <= 0) {
+//     return null;
+//   }
+
+//   const formatDigit = (num) => String(num).padStart(2, '0');
+
+//   const handleBannerClick = () => {
+//     if (onSelectCategory && currentBanner.targetCategory) {
+//       onSelectCategory(currentBanner.targetCategory === 'All' ? 'All' : currentBanner.targetCategory);
+//     }
+//   };
+
+//   return (
+//     <div
+//       style={{
+//         background: 'linear-gradient(135deg, #701a75 0%, #c026d3 50%, #ea580c 100%)',
+//         color: '#ffffff',
+//         padding: '0.55rem 1rem',
+//         position: 'relative',
+//         zIndex: 99,
+//         boxShadow: '0 4px 15px rgba(112, 26, 117, 0.25)',
+//         borderBottom: '1px solid rgba(255, 255, 255, 0.2)',
+//         display: 'flex',
+//         alignItems: 'center',
+//         justifyContent: 'center',
+//         transition: 'all 0.3s ease'
+//       }}
+//     >
+//       <div style={{ maxWidth: '1280px', width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
+        
+//         {/* SALE TITLE & DETAILS */}
+//         <div onClick={handleBannerClick} style={{ cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '0.65rem', flexWrap: 'wrap' }}>
+//           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '5px', background: 'rgba(255,255,255,0.2)', padding: '3px 10px', borderRadius: '20px', fontSize: '0.78rem', fontWeight: '800', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+//             <Zap size={14} /> LIVE SALE {banners.length > 1 ? `(${currentIndex + 1}/${banners.length})` : ''}
+//           </div>
+
+//           <span style={{ fontSize: '0.92rem', fontWeight: '900', letterSpacing: '-0.2px' }}>
+//             {currentBanner.title}
+//           </span>
+
+//           <span style={{ fontSize: '0.82rem', fontWeight: '600', opacity: 0.95 }}>
+//             • {currentBanner.offerDetails}
+//           </span>
+//         </div>
+
+//         {/* TIMER, ACTION & CONTROLS */}
+//         <div style={{ display: 'flex', alignItems: 'center', gap: '0.85rem', flexWrap: 'wrap' }}>
+//           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+//             <Clock size={15} style={{ opacity: 0.9, marginRight: '3px' }} />
+//             <span style={{ fontSize: '0.72rem', fontWeight: '700', textTransform: 'uppercase', opacity: 0.9 }}>Ends in:</span>
+
+//             {timeLeft.days > 0 && (
+//               <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+//                 <span style={{ background: '#0f172a', color: '#ffffff', padding: '3px 6px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: '900' }}>
+//                   {formatDigit(timeLeft.days)}
+//                 </span>
+//                 <span style={{ fontWeight: '800', fontSize: '0.78rem' }}>d</span>
+//               </div>
+//             )}
+
+//             <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+//               <span style={{ background: '#0f172a', color: '#ffffff', padding: '3px 6px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: '900' }}>
+//                 {formatDigit(timeLeft.hours)}
+//               </span>
+//               <span style={{ fontWeight: '800', fontSize: '0.78rem' }}>h</span>
+//             </div>
+
+//             <span style={{ fontWeight: '900', opacity: 0.7 }}>:</span>
+
+//             <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+//               <span style={{ background: '#0f172a', color: '#ffffff', padding: '3px 6px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: '900' }}>
+//                 {formatDigit(timeLeft.minutes)}
+//               </span>
+//               <span style={{ fontWeight: '800', fontSize: '0.78rem' }}>m</span>
+//             </div>
+
+//             <span style={{ fontWeight: '900', opacity: 0.7 }}>:</span>
+
+//             <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+//               <span style={{ background: '#16a34a', color: '#ffffff', padding: '3px 6px', borderRadius: '6px', fontSize: '0.82rem', fontWeight: '900', border: '1px solid rgba(255,255,255,0.4)' }}>
+//                 {formatDigit(timeLeft.seconds)}
+//               </span>
+//               <span style={{ fontWeight: '800', fontSize: '0.78rem' }}>s</span>
+//             </div>
+//           </div>
+
+//           {/* SHOP BUTTON */}
+//           <button
+//             type="button"
+//             onClick={handleBannerClick}
+//             style={{ background: '#ffffff', color: '#701a75', border: 'none', padding: '0.35rem 0.85rem', borderRadius: '20px', fontSize: '0.82rem', fontWeight: '900', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}
+//           >
+//             <ShoppingBag size={14} /> Shop Sale <ChevronRight size={14} />
+//           </button>
+
+//           {/* DISMISS BUTTON */}
+//           <button
+//             type="button"
+//             onClick={() => setIsDismissed(true)}
+//             style={{ background: 'rgba(255,255,255,0.2)', border: 'none', color: 'white', width: '24px', height: '24px', borderRadius: '50%', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+//             title="Hide Live Sale Banner"
+//           >
+//             <X size={14} />
+//           </button>
+//         </div>
+//       </div>
+//     </div>
+//   );
+// };
+
+// export default LiveSaleBanner;
+
+
+
+
+
+
+
+
+
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Zap, Clock, ShoppingBag, X, ChevronRight, ChevronLeft } from 'lucide-react';
 import { apiFetch, parseResponseSafely } from '../api';
@@ -263,7 +494,8 @@ const LiveSaleBanner = ({ onSelectCategory }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0, totalMs: 0 });
   const [isDismissed, setIsDismissed] = useState(false);
-  const { socket } = useSocket();
+  const socketContext = useSocket();
+  const socket = socketContext?.socket || (socketContext?.on ? socketContext : null);
   const slideTimerRef = useRef(null);
 
   useEffect(() => {
@@ -282,15 +514,24 @@ const LiveSaleBanner = ({ onSelectCategory }) => {
       if (data && Array.isArray(data)) {
         setBanners(data.filter((b) => b.isActive));
         setIsDismissed(false);
+      } else if (data && typeof data === 'object') {
+        setBanners(data.isActive ? [data] : []);
+        setIsDismissed(false);
       }
     };
 
-    if (socket) socket.on('live_sale_updated', handleSocketUpdate);
+    // Safe socket listener binding
+    const isSocketReady = socket && typeof socket.on === 'function';
+    if (isSocketReady) {
+      socket.on('live_sale_updated', handleSocketUpdate);
+    }
 
     return () => {
       clearInterval(interval);
       window.removeEventListener('df_live_sale_updated', handleUpdateEvent);
-      if (socket) socket.off('live_sale_updated', handleSocketUpdate);
+      if (socket && typeof socket.off === 'function') {
+        socket.off('live_sale_updated', handleSocketUpdate);
+      }
     };
   }, [socket]);
 
