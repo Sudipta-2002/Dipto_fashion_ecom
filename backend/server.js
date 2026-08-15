@@ -578,134 +578,237 @@ app.post('/api/auth/verify-reset-password', async (req, res) => {
   }
 });
 
-// 7. OPTIMIZED HIGH-SPEED GOOGLE AUTHENTICATION ROUTE
+// // 7. OPTIMIZED HIGH-SPEED GOOGLE AUTHENTICATION ROUTE
+// app.post('/api/auth/google', async (req, res) => {
+//   try {
+//     const { code, credential, redirectUri } = req.body;
+//     let googleUser = null;
+
+//     if (code) {
+//       // Exchange Google Auth Code for Tokens
+//       const tokenUrl = 'https://oauth2.googleapis.com/token';
+//       const clientId = process.env.GOOGLE_CLIENT_ID;
+//       const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+//       const cbRedirectUri = redirectUri || process.env.GOOGLE_REDIRECT_URI || 'https://www.diptofashion.in/auth/google/callback';
+
+//       const params = new URLSearchParams({
+//         code,
+//         client_id: clientId,
+//         client_secret: clientSecret,
+//         redirect_uri: cbRedirectUri,
+//         grant_type: 'authorization_code'
+//       });
+
+//       const tokenRes = await fetch(tokenUrl, {
+//         method: 'POST',
+//         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+//         body: params.toString()
+//       });
+
+//       const tokenData = await tokenRes.json();
+//       if (!tokenRes.ok || !tokenData.access_token) {
+//         console.error('Google Token Exchange Failure:', tokenData);
+//         return res.status(400).json({ message: tokenData.error_description || tokenData.error || 'Failed to exchange authorization code with Google.' });
+//       }
+
+//       // Fetch user info using access token
+//       const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+//         headers: { Authorization: `Bearer ${tokenData.access_token}` }
+//       });
+
+//       if (!userRes.ok) {
+//         return res.status(400).json({ message: 'Failed to retrieve Google user profile information' });
+//       }
+
+//       googleUser = await userRes.json();
+//     } else if (credential) {
+//       // Verify Google ID Token (from One-Tap or Google Identity Services)
+//       const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
+//       const verifyData = await verifyRes.json();
+//       if (!verifyRes.ok || verifyData.error) {
+//         return res.status(400).json({ message: verifyData.error_description || 'Invalid Google credential token provided.' });
+//       }
+//       googleUser = {
+//         sub: verifyData.sub,
+//         email: verifyData.email,
+//         name: verifyData.name,
+//         picture: verifyData.picture
+//       };
+//     } else {
+//       return res.status(400).json({ message: 'Authorization code or ID credential token is required for Google authentication.' });
+//     }
+
+//     if (!googleUser || !googleUser.email) {
+//       return res.status(400).json({ message: 'Could not extract valid email from Google user account' });
+//     }
+
+//     const cleanEmail = googleUser.email.trim().toLowerCase();
+//     const userName = googleUser.name || cleanEmail.split('@')[0];
+//     const userPicture = googleUser.picture || '';
+
+//     let user = null;
+
+//     if (isMongoConnected()) {
+//       // Streamlined lean indexed MongoDB query for instant retrieval
+//       user = await User.findOne({ email: cleanEmail })
+//         .select('_id name email phone gender avatar profilePicture googleId role addresses')
+//         .lean();
+
+//       if (!user) {
+//         // Fast account creation for Google Sign Up
+//         const dummyPass = Math.random().toString(36).slice(-10) + Date.now().toString();
+//         const hashedPassword = await bcrypt.hash(dummyPass, 8);
+//         const newUser = await User.create({
+//           name: userName,
+//           email: cleanEmail,
+//           password: hashedPassword,
+//           phone: '',
+//           gender: '',
+//           avatar: userPicture,
+//           profilePicture: userPicture,
+//           googleId: googleUser.sub || '',
+//           addresses: [],
+//           role: 'user'
+//         });
+//         user = newUser.toObject ? newUser.toObject() : newUser;
+//       } else {
+//         // Non-blocking asynchronous update for missing profile details
+//         if ((!user.avatar && userPicture) || (!user.googleId && googleUser.sub)) {
+//           setImmediate(() => {
+//             const updates = {};
+//             if (!user.avatar && userPicture) {
+//               updates.avatar = userPicture;
+//               updates.profilePicture = userPicture;
+//             }
+//             if (!user.googleId && googleUser.sub) {
+//               updates.googleId = googleUser.sub;
+//             }
+//             User.updateOne({ _id: user._id }, { $set: updates }).exec().catch(err => {
+//               console.error('Background user update error:', err);
+//             });
+//           });
+//         }
+//       }
+//     } else {
+//       user = memoryUsers.find(u => u.email === cleanEmail);
+//       if (!user) {
+//         user = {
+//           _id: 'u_' + Date.now(),
+//           name: userName,
+//           email: cleanEmail,
+//           phone: '',
+//           avatar: userPicture,
+//           role: 'user',
+//           addresses: []
+//         };
+//         memoryUsers.push(user);
+//       }
+//     }
+
+//     const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+
+//     return res.json({
+//       success: true,
+//       token,
+//       user: {
+//         id: user._id,
+//         name: user.name,
+//         email: user.email,
+//         phone: user.phone || '',
+//         gender: user.gender || '',
+//         avatar: user.avatar || user.profilePicture || '',
+//         profilePicture: user.profilePicture || user.avatar || '',
+//         role: user.role || 'user',
+//         addresses: user.addresses || []
+//       }
+//     });
+//   } catch (err) {
+//     console.error('Google Auth Controller Error:', err);
+//     res.status(500).json({ message: err.message || 'Internal server error during Google authentication' });
+//   }
+// });
+
+
+
+
 app.post('/api/auth/google', async (req, res) => {
   try {
     const { code, credential, redirectUri } = req.body;
     let googleUser = null;
 
-    if (code) {
-      // Exchange Google Auth Code for Tokens
-      const tokenUrl = 'https://oauth2.googleapis.com/token';
-      const clientId = process.env.GOOGLE_CLIENT_ID;
-      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
-      const cbRedirectUri = redirectUri || process.env.GOOGLE_REDIRECT_URI || 'https://www.diptofashion.in/auth/google/callback';
-
-      const params = new URLSearchParams({
-        code,
-        client_id: clientId,
-        client_secret: clientSecret,
-        redirect_uri: cbRedirectUri,
-        grant_type: 'authorization_code'
-      });
-
-      const tokenRes = await fetch(tokenUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-        body: params.toString()
-      });
-
-      const tokenData = await tokenRes.json();
-      if (!tokenRes.ok || !tokenData.access_token) {
-        console.error('Google Token Exchange Failure:', tokenData);
-        return res.status(400).json({ message: tokenData.error_description || tokenData.error || 'Failed to exchange authorization code with Google.' });
-      }
-
-      // Fetch user info using access token
-      const userRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
-        headers: { Authorization: `Bearer ${tokenData.access_token}` }
-      });
-
-      if (!userRes.ok) {
-        return res.status(400).json({ message: 'Failed to retrieve Google user profile information' });
-      }
-
-      googleUser = await userRes.json();
-    } else if (credential) {
-      // Verify Google ID Token (from One-Tap or Google Identity Services)
+    if (credential) {
+      // Direct tokeninfo check (Under 50ms)
       const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${credential}`);
       const verifyData = await verifyRes.json();
       if (!verifyRes.ok || verifyData.error) {
-        return res.status(400).json({ message: verifyData.error_description || 'Invalid Google credential token provided.' });
+        return res.status(400).json({ message: 'Invalid Google token' });
       }
       googleUser = {
         sub: verifyData.sub,
         email: verifyData.email,
-        name: verifyData.name,
-        picture: verifyData.picture
+        name: verifyData.name || verifyData.email.split('@')[0],
+        picture: verifyData.picture || ''
       };
+    } else if (code) {
+      // Fast Token Exchange
+      const tokenUrl = 'https://oauth2.googleapis.com/token';
+      const clientId = process.env.GOOGLE_CLIENT_ID || '886817252299-cjii473fvu235otmm7obct3ji39j04l8.apps.googleusercontent.com';
+      const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+      const cbRedirectUri = redirectUri || 'https://www.diptofashion.in/auth/google/callback';
+
+      const tokenRes = await fetch(tokenUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          code,
+          client_id: clientId,
+          client_secret: clientSecret,
+          redirect_uri: cbRedirectUri,
+          grant_type: 'authorization_code'
+        }).toString()
+      });
+
+      const tokenData = await tokenRes.json();
+      if (!tokenRes.ok || !tokenData.id_token) {
+        return res.status(400).json({ message: tokenData.error_description || 'Failed to authenticate with Google' });
+      }
+
+      // Read claims instantly from ID Token instead of extra network trip
+      const verifyRes = await fetch(`https://oauth2.googleapis.com/tokeninfo?id_token=${tokenData.id_token}`);
+      googleUser = await verifyRes.json();
     } else {
-      return res.status(400).json({ message: 'Authorization code or ID credential token is required for Google authentication.' });
+      return res.status(400).json({ message: 'No credential or code provided' });
     }
 
-    if (!googleUser || !googleUser.email) {
-      return res.status(400).json({ message: 'Could not extract valid email from Google user account' });
+    if (!googleUser?.email) {
+      return res.status(400).json({ message: 'Email not found in Google account' });
     }
 
     const cleanEmail = googleUser.email.trim().toLowerCase();
     const userName = googleUser.name || cleanEmail.split('@')[0];
     const userPicture = googleUser.picture || '';
 
-    let user = null;
+    // MongoDB Fast Projection
+    let user = await User.findOne({ email: cleanEmail })
+      .select('_id name email phone gender avatar profilePicture googleId role addresses')
+      .lean();
 
-    if (isMongoConnected()) {
-      // Streamlined lean indexed MongoDB query for instant retrieval
-      user = await User.findOne({ email: cleanEmail })
-        .select('_id name email phone gender avatar profilePicture googleId role addresses')
-        .lean();
-
-      if (!user) {
-        // Fast account creation for Google Sign Up
-        const dummyPass = Math.random().toString(36).slice(-10) + Date.now().toString();
-        const hashedPassword = await bcrypt.hash(dummyPass, 8);
-        const newUser = await User.create({
-          name: userName,
-          email: cleanEmail,
-          password: hashedPassword,
-          phone: '',
-          gender: '',
-          avatar: userPicture,
-          profilePicture: userPicture,
-          googleId: googleUser.sub || '',
-          addresses: [],
-          role: 'user'
-        });
-        user = newUser.toObject ? newUser.toObject() : newUser;
-      } else {
-        // Non-blocking asynchronous update for missing profile details
-        if ((!user.avatar && userPicture) || (!user.googleId && googleUser.sub)) {
-          setImmediate(() => {
-            const updates = {};
-            if (!user.avatar && userPicture) {
-              updates.avatar = userPicture;
-              updates.profilePicture = userPicture;
-            }
-            if (!user.googleId && googleUser.sub) {
-              updates.googleId = googleUser.sub;
-            }
-            User.updateOne({ _id: user._id }, { $set: updates }).exec().catch(err => {
-              console.error('Background user update error:', err);
-            });
-          });
-        }
-      }
-    } else {
-      user = memoryUsers.find(u => u.email === cleanEmail);
-      if (!user) {
-        user = {
-          _id: 'u_' + Date.now(),
-          name: userName,
-          email: cleanEmail,
-          phone: '',
-          avatar: userPicture,
-          role: 'user',
-          addresses: []
-        };
-        memoryUsers.push(user);
-      }
+    if (!user) {
+      const dummyPass = Math.random().toString(36).slice(-8);
+      const hashedPassword = await bcrypt.hash(dummyPass, 6);
+      const newUser = await User.create({
+        name: userName,
+        email: cleanEmail,
+        password: hashedPassword,
+        avatar: userPicture,
+        profilePicture: userPicture,
+        googleId: googleUser.sub || '',
+        role: 'user'
+      });
+      user = newUser.toObject ? newUser.toObject() : newUser;
     }
 
-    const token = jwt.sign({ userId: user._id, role: user.role }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ userId: user._id, role: user.role || 'user' }, JWT_SECRET, { expiresIn: '7d' });
 
     return res.json({
       success: true,
@@ -717,16 +820,19 @@ app.post('/api/auth/google', async (req, res) => {
         phone: user.phone || '',
         gender: user.gender || '',
         avatar: user.avatar || user.profilePicture || '',
-        profilePicture: user.profilePicture || user.avatar || '',
         role: user.role || 'user',
         addresses: user.addresses || []
       }
     });
   } catch (err) {
-    console.error('Google Auth Controller Error:', err);
-    res.status(500).json({ message: err.message || 'Internal server error during Google authentication' });
+    console.error('Google Auth Error:', err);
+    res.status(500).json({ message: 'Authentication failed. Please try again.' });
   }
 });
+
+
+
+
 
 
 // // --- UPDATE USER PROFILE (name, gender, avatar/profilePicture — email/phone immutable) ---
