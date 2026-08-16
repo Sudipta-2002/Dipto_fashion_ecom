@@ -156,8 +156,10 @@ const CartDrawer = ({
         className="modal-card"
         style={{
           width: '100%',
-          maxWidth: '400px',
-          height: '100dvh',
+          maxWidth: '440px',
+          height: '100%',
+          minHeight: '100dvh',
+          maxHeight: '100dvh',
           borderRadius: '0',
           position: 'fixed',
           right: '0',
@@ -166,7 +168,9 @@ const CartDrawer = ({
           padding: 0,
           display: 'flex',
           flexDirection: 'column',
-          overflow: 'hidden'
+          overflow: 'hidden',
+          background: '#ffffff',
+          boxShadow: '-4px 0 25px rgba(0, 0, 0, 0.2)'
         }}
         onClick={(e) => e.stopPropagation()}
       >
@@ -176,7 +180,9 @@ const CartDrawer = ({
           <div
             style={{
               padding: '0.95rem 1.15rem',
-              paddingTop: 'max(0.95rem, env(safe-area-inset-top))',
+              paddingTop: 'max(0.95rem, calc(0.5rem + env(safe-area-inset-top, 12px)))',
+              paddingLeft: 'max(1.15rem, env(safe-area-inset-left, 12px))',
+              paddingRight: 'max(1.15rem, env(safe-area-inset-right, 12px))',
               background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)',
               color: 'white',
               display: 'flex',
@@ -247,7 +253,22 @@ const CartDrawer = ({
         </div>
 
         {/* SCROLLABLE BODY */}
-        <div className="modal-body overflow-y-auto pb-52 md:pb-8" style={{ display: 'flex', flexDirection: 'column', flex: 1, overflowY: 'auto', padding: '1.15rem', paddingBottom: 'calc(210px + env(safe-area-inset-bottom))', minHeight: 0 }}>
+        <div
+          className="modal-body"
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            flex: '1 1 auto',
+            overflowY: 'auto',
+            WebkitOverflowScrolling: 'touch',
+            overscrollBehavior: 'contain',
+            padding: '1rem',
+            paddingLeft: 'max(1rem, env(safe-area-inset-left, 12px))',
+            paddingRight: 'max(1rem, env(safe-area-inset-right, 12px))',
+            paddingBottom: 'max(140px, calc(100px + env(safe-area-inset-bottom, 24px)))',
+            minHeight: 0
+          }}
+        >
           {cartItems.length === 0 ? (
             <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b' }}>
               <p style={{ fontSize: '1.1rem', fontWeight: '600', marginBottom: '0.5rem' }}>Your cart is empty</p>
@@ -358,12 +379,13 @@ const CartDrawer = ({
                           }}
                           style={{
                             flex: 1,
+                            minWidth: 0,
                             padding: '0.55rem 0.75rem',
                             border: couponError ? '1.5px solid #ef4444' : '1px solid #cbd5e1',
                             borderRadius: '8px',
                             textTransform: 'uppercase',
                             fontWeight: '700',
-                            fontSize: '0.85rem',
+                            fontSize: '16px',
                             letterSpacing: '0.5px'
                           }}
                         />
