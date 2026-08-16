@@ -1692,11 +1692,8 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
   const [typing, setTyping] = useState(false);
   const [orders, setOrders] = useState(userOrders);
 
-  // রিয়েল-টাইম ভিউপোর্ট কোঅর্ডিনেট
-  const [viewportDims, setViewportDims] = useState({
-    top: 0,
-    height: '100dvh'
-  });
+  // রিয়েল-টাইম ভিউপোর্ট ট্র্যাকিং (কীবোর্ড হ্যান্ডলিং)
+  const [vpHeight, setVpHeight] = useState('100dvh');
 
   const chatEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -1751,57 +1748,47 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
     scrollToBottom();
   }, [messages, typing]);
 
-  // মোবাইল কীবোর্ড ও ব্রাউজার অ্যাড্রেস বার স্ক্রোল লক
+  // WhatsApp Style Body & Viewport Lock
   useEffect(() => {
     if (!isOpen) return;
 
     const originalOverflow = document.body.style.overflow;
     const originalPosition = document.body.style.position;
     const originalInset = document.body.style.inset;
-    const originalWidth = document.body.style.width;
-    const originalHeight = document.body.style.height;
 
+    // বডি পুরোপুরি ব্যাকগ্রাউন্ডে লক করা
     document.body.style.overflow = 'hidden';
     document.body.style.position = 'fixed';
     document.body.style.inset = '0';
     document.body.style.width = '100%';
     document.body.style.height = '100%';
-    document.body.style.overscrollBehavior = 'none';
-
     document.documentElement.style.overflow = 'hidden';
-    document.documentElement.style.overscrollBehavior = 'none';
 
-    const handleViewportChange = () => {
+    const handleResize = () => {
       if (window.visualViewport) {
-        setViewportDims({
-          top: window.visualViewport.offsetTop,
-          height: `${window.visualViewport.height}px`
-        });
+        setVpHeight(`${window.visualViewport.height}px`);
         window.scrollTo(0, 0);
         scrollToBottom('auto');
       }
     };
 
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleViewportChange);
-      window.visualViewport.addEventListener('scroll', handleViewportChange);
-      handleViewportChange();
+      window.visualViewport.addEventListener('resize', handleResize);
+      window.visualViewport.addEventListener('scroll', handleResize);
+      handleResize();
     }
 
     return () => {
       document.body.style.overflow = originalOverflow;
       document.body.style.position = originalPosition;
       document.body.style.inset = originalInset;
-      document.body.style.width = originalWidth;
-      document.body.style.height = originalHeight;
-      document.body.style.overscrollBehavior = '';
-
+      document.body.style.width = '';
+      document.body.style.height = '';
       document.documentElement.style.overflow = '';
-      document.documentElement.style.overscrollBehavior = '';
 
       if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleViewportChange);
-        window.visualViewport.removeEventListener('scroll', handleViewportChange);
+        window.visualViewport.removeEventListener('resize', handleResize);
+        window.visualViewport.removeEventListener('scroll', handleResize);
       }
     };
   }, [isOpen]);
@@ -1932,11 +1919,11 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
       style={{
         zIndex: 99999999,
         position: 'fixed',
-        top: isMobile ? `${viewportDims.top}px` : 0,
+        top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        height: isMobile ? viewportDims.height : '100vh',
+        height: isMobile ? vpHeight : '100vh',
         width: '100vw',
         display: 'flex',
         alignItems: 'center',
@@ -1963,12 +1950,13 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 1. TOP HEADER WITH SAFE-ZONE CLEARANCE */}
+        {/* 1. WHATSAPP STYLE FIXED HEADER */}
         <div
           style={{
             background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)',
             padding: '0.85rem 1.15rem',
-            paddingTop: isMobile ? 'calc(50px + env(safe-area-inset-top, 0px))' : '0.85rem',
+            paddingTop: isMobile ? 'calc(54px + env(safe-area-inset-top, 0px))' : '0.85rem',
+            paddingBottom: '0.85rem',
             color: 'white',
             display: 'flex',
             alignItems: 'center',
@@ -2020,7 +2008,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           </button>
         </div>
 
-        {/* 2. QUICK QUESTION CHIPS */}
+        {/* 2. FIXED QUICK QUESTION CHIPS */}
         <div
           style={{
             background: '#f8fafc',
@@ -2060,7 +2048,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           ))}
         </div>
 
-        {/* 3. ISOLATED MESSAGES SCROLL AREA */}
+        {/* 3. ONLY SCROLLABLE AREA (MESSAGES CONTAINER) */}
         <div
           ref={messagesContainerRef}
           style={{
@@ -2068,7 +2056,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
             minHeight: 0,
             padding: '1rem',
             overflowY: 'auto',
-            background: '#ffffff',
+            background: '#f8fafc',
             display: 'flex',
             flexDirection: 'column',
             gap: '0.85rem',
@@ -2092,7 +2080,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
                   width: '30px',
                   height: '30px',
                   borderRadius: '50%',
-                  background: m.sender === 'user' ? '#c026d3' : '#f0fdf4',
+                  background: m.sender === 'user' ? '#c026d3' : '#ffffff',
                   color: m.sender === 'user' ? 'white' : '#16a34a',
                   display: 'flex',
                   alignItems: 'center',
@@ -2100,7 +2088,8 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
                   fontSize: '0.75rem',
                   fontWeight: '800',
                   border: m.sender === 'bot' ? '1px solid #bbf7d0' : 'none',
-                  flexShrink: 0
+                  flexShrink: 0,
+                  boxShadow: '0 1px 2px rgba(0,0,0,0.05)'
                 }}
               >
                 {m.sender === 'user' ? <User size={16} /> : <Bot size={16} />}
@@ -2108,7 +2097,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
               <div
                 style={{
                   maxWidth: '85%',
-                  background: m.sender === 'user' ? '#c026d3' : '#f8fafc',
+                  background: m.sender === 'user' ? '#c026d3' : '#ffffff',
                   color: m.sender === 'user' ? 'white' : '#0f172a',
                   padding: '0.75rem 0.95rem',
                   borderRadius: '14px',
@@ -2117,7 +2106,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
                   border: m.sender === 'user' ? 'none' : '1px solid #e2e8f0',
                   whiteSpace: 'pre-line',
                   wordBreak: 'break-word',
-                  boxShadow: '0 1px 3px rgba(0,0,0,0.04)'
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.05)'
                 }}
               >
                 {m.text}
@@ -2132,17 +2121,18 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
                   width: '30px',
                   height: '30px',
                   borderRadius: '50%',
-                  background: '#f0fdf4',
+                  background: '#ffffff',
                   color: '#16a34a',
                   display: 'flex',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  flexShrink: 0
+                  flexShrink: 0,
+                  border: '1px solid #bbf7d0'
                 }}
               >
                 <Bot size={16} />
               </div>
-              <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.5rem 0.85rem', borderRadius: '14px', fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
+              <div style={{ background: '#ffffff', border: '1px solid #e2e8f0', padding: '0.5rem 0.85rem', borderRadius: '14px', fontSize: '0.8rem', color: '#64748b', fontStyle: 'italic' }}>
                 Dipto AI is checking your orders...
               </div>
             </div>
@@ -2150,7 +2140,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           <div ref={chatEndRef} style={{ height: '4px', flexShrink: 0 }} />
         </div>
 
-        {/* 4. PINNED BOTTOM INPUT BAR */}
+        {/* 4. PINNED BOTTOM INPUT BAR (OVERLAP-FREE) */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -2158,14 +2148,14 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           }}
           style={{
             padding: '0.65rem 0.75rem',
-            paddingBottom: isMobile ? 'calc(0.65rem + env(safe-area-inset-bottom, 8px))' : '0.65rem',
+            paddingBottom: isMobile ? 'calc(14px + env(safe-area-inset-bottom, 0px))' : '0.65rem',
             background: '#ffffff',
             borderTop: '1.5px solid #e2e8f0',
             display: 'flex',
             gap: '0.5rem',
             alignItems: 'center',
             flexShrink: 0,
-            zIndex: 20,
+            zIndex: 30,
             boxShadow: '0 -2px 10px rgba(0,0,0,0.05)'
           }}
         >
