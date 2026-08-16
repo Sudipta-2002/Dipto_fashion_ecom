@@ -2,9 +2,7 @@
 
 
 
-
-
-// //final version
+// // final version - Keyboard Retention & Fixed Navbar Scroll Fix
 
 // import React, { useState, useEffect, useRef } from 'react';
 // import { createPortal } from 'react-dom';
@@ -29,11 +27,9 @@
 //   const [typing, setTyping] = useState(false);
 //   const [orders, setOrders] = useState(userOrders);
 
-//   // Dynamic visual viewport state for mobile keyboards
-//   const [viewportStyle, setViewportStyle] = useState({
-//     height: '100dvh',
-//     top: '0px'
-//   });
+//   // Dynamic visual viewport height for mobile keyboards
+//   const [viewportHeight, setViewportHeight] = useState('100%');
+//   const [viewportTop, setViewportTop] = useState(0);
 
 //   const chatEndRef = useRef(null);
 //   const messagesContainerRef = useRef(null);
@@ -73,19 +69,13 @@
 //     }
 //   };
 
-//   // Smooth & Accurate Auto-Scroll to bottom
+//   // Smooth & Accurate Auto-Scroll to bottom inside the messages container only
 //   const scrollToBottom = (instant = false) => {
 //     requestAnimationFrame(() => {
 //       if (messagesContainerRef.current) {
 //         messagesContainerRef.current.scrollTo({
 //           top: messagesContainerRef.current.scrollHeight,
 //           behavior: instant ? 'auto' : 'smooth'
-//         });
-//       }
-//       if (chatEndRef.current) {
-//         chatEndRef.current.scrollIntoView({
-//           behavior: instant ? 'auto' : 'smooth',
-//           block: 'end'
 //         });
 //       }
 //     });
@@ -95,16 +85,18 @@
 //     scrollToBottom();
 //   }, [messages, typing]);
 
-//   // Handle Mobile Virtual Keyboard
+//   // Handle Mobile Virtual Keyboard without shaking the Navbar
 //   useEffect(() => {
 //     if (!isOpen) return;
 
+//     // Prevent background page scrolling when modal is open
+//     const originalOverflow = document.body.style.overflow;
+//     document.body.style.overflow = 'hidden';
+
 //     const handleViewportChange = () => {
 //       if (window.visualViewport) {
-//         setViewportStyle({
-//           height: `${window.visualViewport.height}px`,
-//           top: `${window.visualViewport.offsetTop}px`
-//         });
+//         setViewportHeight(`${window.visualViewport.height}px`);
+//         setViewportTop(window.visualViewport.offsetTop);
 //         scrollToBottom(true);
 //       }
 //     };
@@ -116,6 +108,7 @@
 //     }
 
 //     return () => {
+//       document.body.style.overflow = originalOverflow;
 //       if (window.visualViewport) {
 //         window.visualViewport.removeEventListener('resize', handleViewportChange);
 //         window.visualViewport.removeEventListener('scroll', handleViewportChange);
@@ -126,13 +119,20 @@
 //   if (!isOpen) return null;
 
 //   const handleSend = (textToSend) => {
-//     const query = textToSend || inputMsg.trim();
+//     const query = (textToSend || inputMsg).trim();
 //     if (!query) return;
 
 //     const newMsgs = [...messages, { sender: 'user', text: query }];
 //     setMessages(newMsgs);
 //     setInputMsg('');
 //     setTyping(true);
+
+//     // Keep mobile keyboard open & focused after sending
+//     requestAnimationFrame(() => {
+//       if (inputRef.current) {
+//         inputRef.current.focus();
+//       }
+//     });
 
 //     setTimeout(() => {
 //       let botResponse = getAiResponse(query);
@@ -152,7 +152,7 @@
 //     if (orderIdMatch) {
 //       const searchedId = orderIdMatch[0].toUpperCase().replace('DF', 'DF-');
 //       const foundOrder = orders.find(
-//         (o) => o.orderId.toUpperCase() === searchedId || o.orderId.toUpperCase().replace('-', '') === searchedId.replace('-', '')
+//         (o) => o.orderId?.toUpperCase() === searchedId || o.orderId?.toUpperCase().replace('-', '') === searchedId.replace('-', '')
 //       );
 
 //       if (foundOrder) {
@@ -239,18 +239,19 @@
 //     <div
 //       className="modal-overlay"
 //       style={{
-//         zIndex: 999999, // Mounted directly to body, strictly above bottom nav
+//         zIndex: 999999,
 //         position: 'fixed',
-//         top: viewportStyle.top,
+//         top: `${viewportTop}px`,
 //         left: 0,
 //         right: 0,
-//         height: viewportStyle.height,
+//         height: viewportHeight,
 //         display: 'flex',
 //         alignItems: 'center',
 //         justifyContent: 'center',
 //         background: window.innerWidth < 640 ? '#ffffff' : 'rgba(15, 23, 42, 0.75)',
 //         backdropFilter: window.innerWidth < 640 ? 'none' : 'blur(4px)',
-//         overflow: 'hidden'
+//         overflow: 'hidden',
+//         touchAction: 'none' // Disables parent viewport drag on mobile
 //       }}
 //       onClick={onClose}
 //     >
@@ -271,7 +272,7 @@
 //         }}
 //         onClick={(e) => e.stopPropagation()}
 //       >
-//         {/* Header */}
+//         {/* FIXED TOP HEADER (Will never scroll away) */}
 //         <div
 //           style={{
 //             background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)',
@@ -282,6 +283,7 @@
 //             alignItems: 'center',
 //             justifyContent: 'space-between',
 //             flexShrink: 0,
+//             zIndex: 10,
 //             boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
 //           }}
 //         >
@@ -327,7 +329,7 @@
 //           </button>
 //         </div>
 
-//         {/* Quick Question Chips */}
+//         {/* FIXED QUICK QUESTION CHIPS */}
 //         <div
 //           style={{
 //             background: '#f8fafc',
@@ -338,6 +340,7 @@
 //             overflowX: 'auto',
 //             whiteSpace: 'nowrap',
 //             flexShrink: 0,
+//             zIndex: 9,
 //             WebkitOverflowScrolling: 'touch'
 //           }}
 //         >
@@ -345,6 +348,8 @@
 //             <button
 //               key={idx}
 //               type="button"
+//               onMouseDown={(e) => e.preventDefault()} // Keeps input focused
+//               onTouchStart={(e) => e.preventDefault()}
 //               onClick={() => handleSend(q)}
 //               style={{
 //                 background: 'white',
@@ -364,7 +369,7 @@
 //           ))}
 //         </div>
 
-//         {/* Chat Messages Container */}
+//         {/* ISOLATED CHAT MESSAGES CONTAINER (Only this scrolls smoothly) */}
 //         <div
 //           ref={messagesContainerRef}
 //           style={{
@@ -376,7 +381,8 @@
 //             flexDirection: 'column',
 //             gap: '0.85rem',
 //             WebkitOverflowScrolling: 'touch',
-//             overscrollBehavior: 'contain'
+//             overscrollBehavior: 'contain',
+//             touchAction: 'pan-y'
 //           }}
 //         >
 //           {messages.map((m, idx) => (
@@ -452,7 +458,7 @@
 //           <div ref={chatEndRef} style={{ height: '4px', flexShrink: 0 }} />
 //         </div>
 
-//         {/* Message Input Bar (Always completely visible above bottom nav & locks to virtual keyboard) */}
+//         {/* FIXED MESSAGE INPUT BAR (Locks above mobile keyboard & prevents blur on submit) */}
 //         <form
 //           onSubmit={(e) => {
 //             e.preventDefault();
@@ -467,6 +473,7 @@
 //             gap: '0.5rem',
 //             alignItems: 'center',
 //             flexShrink: 0,
+//             zIndex: 10,
 //             boxShadow: '0 -2px 10px rgba(0,0,0,0.05)'
 //           }}
 //         >
@@ -495,6 +502,12 @@
 //           <button
 //             type="submit"
 //             className="btn-primary"
+//             onMouseDown={(e) => e.preventDefault()} // Prevents keyboard dismissal on click
+//             onTouchStart={(e) => e.preventDefault()} // Prevents keyboard dismissal on mobile tap
+//             onClick={(e) => {
+//               e.preventDefault();
+//               handleSend();
+//             }}
 //             style={{
 //               borderRadius: '50%',
 //               width: '42px',
@@ -529,6 +542,11 @@
 
 
 
+
+
+//gemini code
+
+
 // final version - Keyboard Retention & Fixed Navbar Scroll Fix
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -555,8 +573,7 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
   const [orders, setOrders] = useState(userOrders);
 
   // Dynamic visual viewport height for mobile keyboards
-  const [viewportHeight, setViewportHeight] = useState('100%');
-  const [viewportTop, setViewportTop] = useState(0);
+  const [viewportHeight, setViewportHeight] = useState('100dvh');
 
   const chatEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -612,18 +629,24 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
     scrollToBottom();
   }, [messages, typing]);
 
-  // Handle Mobile Virtual Keyboard without shaking the Navbar
+  // Handle Mobile Virtual Keyboard without shaking or scrolling the Navbar
   useEffect(() => {
     if (!isOpen) return;
 
-    // Prevent background page scrolling when modal is open
+    // Prevent background body scrolling when modal is open
     const originalOverflow = document.body.style.overflow;
+    const originalPosition = document.body.style.position;
+    const originalWidth = document.body.style.width;
+
     document.body.style.overflow = 'hidden';
+    document.body.style.position = 'fixed';
+    document.body.style.width = '100%';
 
     const handleViewportChange = () => {
       if (window.visualViewport) {
         setViewportHeight(`${window.visualViewport.height}px`);
-        setViewportTop(window.visualViewport.offsetTop);
+        // Always keep scroll position pinned to 0,0 to avoid page shift
+        window.scrollTo(0, 0);
         scrollToBottom(true);
       }
     };
@@ -636,6 +659,8 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
 
     return () => {
       document.body.style.overflow = originalOverflow;
+      document.body.style.position = originalPosition;
+      document.body.style.width = originalWidth;
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', handleViewportChange);
         window.visualViewport.removeEventListener('scroll', handleViewportChange);
@@ -768,24 +793,26 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
       style={{
         zIndex: 999999,
         position: 'fixed',
-        top: `${viewportTop}px`,
+        top: 0,
         left: 0,
         right: 0,
+        bottom: 0,
         height: viewportHeight,
+        maxHeight: viewportHeight,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: window.innerWidth < 640 ? '#ffffff' : 'rgba(15, 23, 42, 0.75)',
-        backdropFilter: window.innerWidth < 640 ? 'none' : 'blur(4px)',
+        background: 'rgba(15, 23, 42, 0.75)',
+        backdropFilter: 'blur(4px)',
         overflow: 'hidden',
-        touchAction: 'none' // Disables parent viewport drag on mobile
+        touchAction: 'none'
       }}
       onClick={onClose}
     >
       <div
         className="modal-card"
         style={{
-          maxWidth: '460px',
+          maxWidth: '480px',
           width: '100%',
           height: '100%',
           maxHeight: '100%',
@@ -799,7 +826,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* FIXED TOP HEADER (Will never scroll away) */}
+        {/* 1. FIXED TOP HEADER */}
         <div
           style={{
             background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)',
@@ -856,7 +883,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           </button>
         </div>
 
-        {/* FIXED QUICK QUESTION CHIPS */}
+        {/* 2. FIXED QUICK QUESTION CHIPS */}
         <div
           style={{
             background: '#f8fafc',
@@ -875,7 +902,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
             <button
               key={idx}
               type="button"
-              onMouseDown={(e) => e.preventDefault()} // Keeps input focused
+              onMouseDown={(e) => e.preventDefault()}
               onTouchStart={(e) => e.preventDefault()}
               onClick={() => handleSend(q)}
               style={{
@@ -896,7 +923,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           ))}
         </div>
 
-        {/* ISOLATED CHAT MESSAGES CONTAINER (Only this scrolls smoothly) */}
+        {/* 3. ISOLATED CHAT MESSAGES CONTAINER */}
         <div
           ref={messagesContainerRef}
           style={{
@@ -985,7 +1012,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           <div ref={chatEndRef} style={{ height: '4px', flexShrink: 0 }} />
         </div>
 
-        {/* FIXED MESSAGE INPUT BAR (Locks above mobile keyboard & prevents blur on submit) */}
+        {/* 4. FIXED MESSAGE INPUT BAR */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -1010,6 +1037,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
             placeholder="Enter Order ID, ask 'last order' or 'return'..."
             value={inputMsg}
             onFocus={() => {
+              window.scrollTo(0, 0);
               setTimeout(() => {
                 scrollToBottom(true);
               }, 250);
@@ -1029,8 +1057,8 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           <button
             type="submit"
             className="btn-primary"
-            onMouseDown={(e) => e.preventDefault()} // Prevents keyboard dismissal on click
-            onTouchStart={(e) => e.preventDefault()} // Prevents keyboard dismissal on mobile tap
+            onMouseDown={(e) => e.preventDefault()}
+            onTouchStart={(e) => e.preventDefault()}
             onClick={(e) => {
               e.preventDefault();
               handleSend();

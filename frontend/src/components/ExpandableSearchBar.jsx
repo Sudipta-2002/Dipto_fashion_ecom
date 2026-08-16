@@ -328,6 +328,7 @@ const ExpandableSearchBar = ({
             display: 'flex',
             alignItems: 'center',
             width: expandedMaxWidth,
+            maxWidth: 'calc(100vw - 560px)',
             zIndex: 300,
             gap: '8px'
           }}

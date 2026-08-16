@@ -558,6 +558,7 @@ import ShippingLabel from './ShippingLabel';
 import TableSkeleton from '../Skeletons/TableSkeleton';
 import { API_URL } from '../../api';
 import { fetchWithCache } from '../../utils/cache';
+import { formatFullAddress } from '../../utils/addressFormatter';
 
 const groupOrdersByDate = (ordersList) => {
   const now = new Date();
@@ -789,7 +790,7 @@ const AdminOrders = ({ realtimeOrderUpdate }) => {
                 <div style={{ fontSize: '0.8rem', color: '#64748b' }}>{o.shippingAddress?.mobileNumber}</div>
               </td>
               <td style={{ maxWidth: '220px', fontSize: '0.85rem' }}>
-                {o.shippingAddress?.address}, Pincode: <strong>{o.shippingAddress?.pincode}</strong>
+                {formatFullAddress(o.shippingAddress)}
               </td>
               <td>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>

@@ -1161,13 +1161,13 @@ app.post(['/api/user/addresses', '/api/user/address', '/api/addresses'], async (
   }
 
   try {
-    const { userName, mobileNumber, address, landmark, pincode, email: bodyEmail } = req.body;
+    const { userName, mobileNumber, address, landmark, city, state, pincode, email: bodyEmail } = req.body;
     if (!userName || !mobileNumber || !address || !pincode) {
       return res.status(400).json({ message: 'Missing required address fields' });
     }
 
     const emailParam = bodyEmail || req.query.email;
-    const newAddr = { userName, mobileNumber, address, landmark: landmark || '', pincode, isDefault: true };
+    const newAddr = { userName, mobileNumber, address, landmark: landmark || '', city: city || '', state: state || '', pincode, isDefault: true };
 
     if (isMongoConnected()) {
       let user = null;
@@ -1544,155 +1544,7 @@ const processProductImages = async (imagesList, files) => {
   ];
 };
 
-// app.post(['/api/products', '/products'], upload.array('images', 5), async (req, res) => {
-//   try {
-//     const { name, category, mrp, price, quantity, description, rating, reviewsCount } = req.body;
-//     let imagesInput = req.body.images;
-//     if (typeof imagesInput === 'string') {
-//       try { imagesInput = JSON.parse(imagesInput); } catch (e) { imagesInput = [imagesInput]; }
-//     }
 
-//     const processedImages = await processProductImages(imagesInput, req.files);
-
-//     if (!name || !category || !mrp || !price) {
-//       return res.status(400).json({ message: 'Product title, category, MRP, and offer price are required' });
-//     }
-
-//     clearProductCache();
-
-//     const enteredQty = Number(quantity) || 10;
-
-//     if (isMongoConnected()) {
-//       const prod = await Product.create({
-//         name,
-//         category,
-//         mrp: Number(mrp),
-//         price: Number(price),
-//         quantity: enteredQty,
-//         remainingStock: enteredQty,
-//         rating: Number(rating) || 4.5,
-//         reviewsCount: Number(reviewsCount) || 142,
-//         images: processedImages,
-//         image: processedImages[0],
-//         description: description || ''
-//       });
-//       try { io.emit('product_added', prod); } catch (e) {}
-//       return res.json(prod);
-//     } else {
-//       const prod = {
-//         _id: 'p_' + Date.now(),
-//         name,
-//         category,
-//         mrp: Number(mrp),
-//         price: Number(price),
-//         quantity: enteredQty,
-//         remainingStock: enteredQty,
-//         rating: Number(rating) || 4.5,
-//         reviewsCount: Number(reviewsCount) || 142,
-//         images: processedImages,
-//         image: processedImages[0],
-//         description: description || ''
-//       };
-//       memoryProducts.unshift(prod);
-//       try { io.emit('product_added', prod); } catch (e) {}
-//       return res.json(prod);
-//     }
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// });
-
-// app.put(['/api/products/:id', '/products/:id'], upload.array('images', 5), async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     const { name, category, mrp, price, quantity, description, rating, reviewsCount } = req.body;
-//     let imagesInput = req.body.images;
-//     if (typeof imagesInput === 'string') {
-//       try { imagesInput = JSON.parse(imagesInput); } catch (e) { imagesInput = [imagesInput]; }
-//     }
-
-//     const processedImages = await processProductImages(imagesInput, req.files);
-
-//     if (!name || !category || !mrp || !price) {
-//       return res.status(400).json({ message: 'Product title, category, MRP, and offer price are required' });
-//     }
-
-//     clearProductCache();
-
-//     const enteredQty = Number(quantity) || 10;
-
-//     if (isMongoConnected()) {
-//       const existing = await Product.findById(id);
-//       let newRemaining = enteredQty;
-//       if (existing) {
-//         const oldQty = Number(existing.quantity) || 0;
-//         const oldRem = existing.remainingStock !== undefined && existing.remainingStock !== null ? Number(existing.remainingStock) : oldQty;
-//         const diff = enteredQty - oldQty;
-//         newRemaining = Math.max(0, oldRem + diff);
-//       }
-
-//       const updated = await Product.findByIdAndUpdate(
-//         id,
-//         {
-//           name,
-//           category,
-//           mrp: Number(mrp),
-//           price: Number(price),
-//           quantity: enteredQty,
-//           remainingStock: newRemaining,
-//           rating: Number(rating) || 4.5,
-//           reviewsCount: Number(reviewsCount) || 142,
-//           images: processedImages,
-//           image: processedImages[0],
-//           description: description || ''
-//         },
-//         { new: true }
-//       );
-//       try { io.emit('product_updated', updated); } catch (e) {}
-//       return res.json(updated);
-//     } else {
-//       const prod = memoryProducts.find(p => p._id === id);
-//       if (prod) {
-//         const oldQty = Number(prod.quantity) || 0;
-//         const oldRem = prod.remainingStock !== undefined && prod.remainingStock !== null ? Number(prod.remainingStock) : oldQty;
-//         const diff = enteredQty - oldQty;
-
-//         prod.name = name;
-//         prod.category = category;
-//         prod.mrp = Number(mrp);
-//         prod.price = Number(price);
-//         prod.quantity = enteredQty;
-//         prod.remainingStock = Math.max(0, oldRem + diff);
-//         prod.rating = Number(rating) || 4.5;
-//         prod.reviewsCount = Number(reviewsCount) || 142;
-//         prod.images = processedImages;
-//         prod.image = processedImages[0];
-//         prod.description = description || '';
-//         try { io.emit('product_updated', prod); } catch (e) {}
-//         return res.json(prod);
-//       }
-//       return res.status(404).json({ message: 'Product not found' });
-//     }
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// });
-
-// app.delete(['/api/products/:id', '/products/:id'], async (req, res) => {
-//   try {
-//     const { id } = req.params;
-//     clearProductCache();
-//     if (isMongoConnected()) {
-//       await Product.findByIdAndDelete(id);
-//     } else {
-//       memoryProducts = memoryProducts.filter(p => p._id !== id);
-//     }
-//     try { io.emit('product_deleted', id); } catch (e) {}
-//     res.json({ message: 'Product deleted successfully' });
-//   } catch (err) {
-//     res.status(500).json({ message: err.message });
-//   }
-// });
 
 
 
@@ -2004,66 +1856,6 @@ let memoryLiveSale = {
   targetCategory: 'All',
   endTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
 };
-
-// // GET LIVE SALE CONFIG FOR STOREFRONT (PUBLIC ACCESSIBLE MULTI-DEVICE)
-// app.get(['/api/live-sale', '/live-sale', '/api/live-sale/active', '/live-sale/active'], async (req, res) => {
-//   res.setHeader('Access-Control-Allow-Origin', '*');
-//   try {
-//     if (mongoose.connection.readyState === 1) {
-//       let sale = await LiveSale.findOne().sort({ updatedAt: -1 });
-//       if (!sale) {
-//         sale = await LiveSale.create(memoryLiveSale);
-//       }
-//       return res.json(sale);
-//     } else {
-//       return res.json(memoryLiveSale);
-//     }
-//   } catch (err) {
-//     return res.json(memoryLiveSale);
-//   }
-// });
-
-// // ADMIN POST UPDATE LIVE SALE CONFIG
-// app.post(['/api/admin/live-sale', '/admin/live-sale', '/api/live-sale', '/live-sale'], async (req, res) => {
-//   console.log('>>> [POST /api/admin/live-sale] Request body received:', req.body);
-//   try {
-//     const { isActive, title, offerDetails, targetCategory, endTime } = req.body;
-
-//     const updatedData = {
-//       isActive: Boolean(isActive),
-//       title: title ? title.trim() : '🔥 MEGA FESTIVE SALE IS LIVE!',
-//       offerDetails: offerDetails ? offerDetails.trim() : 'Up to 50% OFF on Banarasi Sarees & Royal Kurtas',
-//       targetCategory: targetCategory || 'All',
-//       endTime: endTime ? new Date(endTime) : new Date(Date.now() + 24 * 60 * 60 * 1000)
-//     };
-
-//     const isConnected = mongoose.connection.readyState === 1;
-//     console.log(`>>> MongoDB connection readyState for LiveSale: ${mongoose.connection.readyState} (Connected: ${isConnected})`);
-
-//     if (isConnected) {
-//       try {
-//         const sale = await LiveSale.findOneAndUpdate({}, updatedData, { upsert: true, new: true, runValidators: true });
-//         console.log('>>> MongoDB LiveSale updated successfully:', sale._id);
-//         try { io.emit('live_sale_updated', sale.toObject ? sale.toObject() : sale); } catch (e) {}
-//         return res.status(200).json({ success: true, message: 'Saved to MongoDB', data: sale, liveSale: sale });
-//       } catch (dbErr) {
-//         console.error('>>> ERROR: Mongoose LiveSale upsert failed:', dbErr);
-//         return res.status(500).json({ success: false, error: dbErr.message, message: dbErr.message });
-//       }
-//     } else {
-//       console.warn('>>> MongoDB not connected (readyState !== 1). Saving LiveSale to memory.');
-//       memoryLiveSale = {
-//         ...updatedData,
-//         endTime: new Date(updatedData.endTime).toISOString()
-//       };
-//       try { io.emit('live_sale_updated', memoryLiveSale); } catch (e) {}
-//       return res.status(200).json({ success: true, message: 'Saved to memory (DB offline)', data: memoryLiveSale, liveSale: memoryLiveSale });
-//     }
-//   } catch (err) {
-//     console.error('>>> ERROR in POST /api/admin/live-sale:', err);
-//     return res.status(500).json({ success: false, error: err.message, message: err.message || 'Failed to update live sale config' });
-//   }
-// });
 
 
 // ==========================================
@@ -2829,39 +2621,6 @@ app.post([
   }
 });
 
-// app.get(['/api/orders', '/orders', '/api/admin/orders', '/admin/orders'], async (req, res) => {
-//   try {
-//     const page = parseInt(req.query.page, 10) || 1;
-//     const limit = parseInt(req.query.limit, 10) || 0;
-
-//     if (isMongoConnected()) {
-//       const totalCount = await Order.countDocuments();
-//       res.setHeader('X-Total-Count', totalCount);
-
-//       let mongoQuery = Order.find()
-//         .select('orderId user userName userEmail email shippingAddress items totalAmount couponCode couponDiscount utrNumber paymentMethod status cancellationDetails returnDetails createdAt updatedAt')
-//         .sort({ createdAt: -1 })
-//         .lean();
-//       if (limit > 0) {
-//         const skip = (page - 1) * limit;
-//         mongoQuery = mongoQuery.skip(skip).limit(limit);
-//       }
-//       const orders = await mongoQuery;
-//       console.log(`Fetched orders for Admin (page=${page}, limit=${limit}, total=${totalCount}):`, orders.length);
-//       return res.json(orders);
-//     } else {
-//       res.setHeader('X-Total-Count', memoryOrders.length);
-//       if (limit > 0) {
-//         const skip = (page - 1) * limit;
-//         return res.json(memoryOrders.slice(skip, skip + limit));
-//       }
-//       return res.json(memoryOrders);
-//     }
-//   } catch (err) {
-//     console.error("Error fetching all orders for Admin:", err);
-//     return res.json(memoryOrders);
-//   }
-// });
 
 
 
@@ -2902,7 +2661,11 @@ app.get(['/api/orders', '/orders', '/api/admin/orders', '/admin/orders'], async 
 });
 
 
-// GET LOGGED-IN USER ORDERS FOR PROFILE PAGE
+
+
+
+
+// // GET /api/user/my-orders (Optimized Fast Query with Index-friendly lookup)
 // app.get([
 //   '/api/user/my-orders',
 //   '/api/orders/my-orders',
@@ -2920,62 +2683,73 @@ app.get(['/api/orders', '/orders', '/api/admin/orders', '/admin/orders'], async 
 //       try {
 //         const token = authHeader.split(' ')[1];
 //         const decoded = jwt.verify(token, JWT_SECRET);
-//         userId = decoded.userId;
+//         userId = decoded.userId || decoded.id;
 //         tokenEmail = decoded.email;
 //       } catch (tokenErr) {}
 //     }
 
-//     const emailParam = req.params.email || req.query.email || req.query.userEmail || tokenEmail;
-    
+//     const rawEmail = req.params.email || req.query.email || req.query.userEmail || tokenEmail;
+//     const cleanEmail = rawEmail ? String(rawEmail).trim().toLowerCase() : '';
+
 //     const orConditions = [];
 
+//     // 1. Direct indexed ID match
 //     if (userId) {
 //       orConditions.push({ user: userId });
-//       orConditions.push({ user: String(userId) });
+//       if (mongoose.Types.ObjectId.isValid(userId)) {
+//         orConditions.push({ user: new mongoose.Types.ObjectId(userId) });
+//       }
 //     }
 
-//     if (emailParam && emailParam.trim()) {
-//       const cleanEmail = emailParam.trim();
-//       const emailRegex = new RegExp(`^${cleanEmail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i');
-//       orConditions.push({ userEmail: emailRegex });
-//       orConditions.push({ email: emailRegex });
-//       orConditions.push({ 'shippingAddress.email': emailRegex });
+//     // 2. Fast Exact String Matches (Avoid Heavy Regex Table Scans)
+//     if (cleanEmail) {
+//       orConditions.push({ userEmail: cleanEmail });
+//       orConditions.push({ email: cleanEmail });
+//       orConditions.push({ 'shippingAddress.email': cleanEmail });
 //     }
 
-//     let filter = {};
-//     if (orConditions.length > 0) {
-//       filter = { $or: orConditions };
-//     } else if (!authHeader && !emailParam) {
-//       return res.status(400).json({ success: false, message: 'User identification (token or email) required to fetch user orders' });
+//     if (orConditions.length === 0) {
+//       return res.status(200).json([]);
 //     }
+
+//     const filter = orConditions.length === 1 ? orConditions[0] : { $or: orConditions };
 
 //     if (isMongoConnected()) {
 //       const userOrders = await Order.find(filter)
-//         .select('orderId user userName userEmail email shippingAddress items totalAmount couponCode couponDiscount utrNumber paymentMethod status cancellationDetails returnDetails createdAt updatedAt')
+//         .select('orderId userName userEmail email shippingAddress items totalAmount couponCode couponDiscount utrNumber paymentMethod status cancellationDetails returnDetails createdAt updatedAt')
 //         .sort({ createdAt: -1 })
-//         .limit(50)
-//         .lean();
-//       console.log(`Fetched orders for user (${userId || emailParam || 'filter'}):`, userOrders.length);
-//       return res.json(userOrders);
+//         .limit(40)
+//         .lean()
+//         .maxTimeMS(2500); // 2.5s Hard timeout safeguard
+
+//       res.setHeader('Cache-Control', 'private, max-age=15'); // 15s browser caching
+//       return res.json(userOrders || []);
 //     } else {
-//       const cleanEmail = emailParam ? emailParam.trim().toLowerCase() : '';
-//       const userOrders = memoryOrders.filter(o => {
+//       const userOrders = (memoryOrders || []).filter(o => {
 //         if (userId && String(o.user) === String(userId)) return true;
-//         if (cleanEmail && ((o.userEmail && o.userEmail.toLowerCase() === cleanEmail) || (o.email && o.email.toLowerCase() === cleanEmail) || (o.shippingAddress?.email && o.shippingAddress.email.toLowerCase() === cleanEmail))) return true;
+//         if (cleanEmail && (
+//           (o.userEmail && o.userEmail.toLowerCase() === cleanEmail) ||
+//           (o.email && o.email.toLowerCase() === cleanEmail) ||
+//           (o.shippingAddress?.email && o.shippingAddress.email.toLowerCase() === cleanEmail)
+//         )) return true;
 //         return false;
 //       });
-//       console.log(`Fetched orders for user memory (${userId || emailParam}):`, userOrders.length);
 //       return res.json(userOrders);
 //     }
 //   } catch (err) {
-//     console.error('Error fetching user orders:', err);
-//     return res.status(500).json({ success: false, message: err.message || 'Failed to fetch user orders' });
+//     console.error('[ORDERS FETCH ERROR]', err.message);
+//     return res.status(200).json([]); // Always return clean empty array without hanging UI
 //   }
 // });
 
 
 
-// GET /api/user/my-orders (Optimized Fast Query with Index-friendly lookup)
+//gemini code
+
+
+// ==========================================
+// FAST MY-ORDERS ROUTE (Response Time: ~50ms)
+// ==========================================
 app.get([
   '/api/user/my-orders',
   '/api/orders/my-orders',
@@ -2988,70 +2762,68 @@ app.get([
     let userId = null;
     let tokenEmail = null;
 
+    // 1. Fast token decoding
     const authHeader = req.headers.authorization;
     if (authHeader && authHeader.startsWith('Bearer ')) {
       try {
         const token = authHeader.split(' ')[1];
         const decoded = jwt.verify(token, JWT_SECRET);
-        userId = decoded.userId || decoded.id;
-        tokenEmail = decoded.email;
+        userId = decoded?.userId || decoded?.id || null;
+        tokenEmail = decoded?.email || null;
       } catch (tokenErr) {}
     }
 
     const rawEmail = req.params.email || req.query.email || req.query.userEmail || tokenEmail;
     const cleanEmail = rawEmail ? String(rawEmail).trim().toLowerCase() : '';
 
-    const orConditions = [];
-
-    // 1. Direct indexed ID match
-    if (userId) {
-      orConditions.push({ user: userId });
-      if (mongoose.Types.ObjectId.isValid(userId)) {
-        orConditions.push({ user: new mongoose.Types.ObjectId(userId) });
-      }
-    }
-
-    // 2. Fast Exact String Matches (Avoid Heavy Regex Table Scans)
-    if (cleanEmail) {
-      orConditions.push({ userEmail: cleanEmail });
-      orConditions.push({ email: cleanEmail });
-      orConditions.push({ 'shippingAddress.email': cleanEmail });
-    }
-
-    if (orConditions.length === 0) {
+    if (!userId && !cleanEmail) {
       return res.status(200).json([]);
     }
 
-    const filter = orConditions.length === 1 ? orConditions[0] : { $or: orConditions };
-
     if (isMongoConnected()) {
-      const userOrders = await Order.find(filter)
-        .select('orderId userName userEmail email shippingAddress items totalAmount couponCode couponDiscount utrNumber paymentMethod status cancellationDetails returnDetails createdAt updatedAt')
+      const orConditions = [];
+
+      // 2. Exact Indexed Lookup
+      if (userId) {
+        if (mongoose.Types.ObjectId.isValid(userId)) {
+          orConditions.push({ user: new mongoose.Types.ObjectId(userId) });
+        }
+        orConditions.push({ user: String(userId) });
+      }
+
+      if (cleanEmail) {
+        orConditions.push({ userEmail: cleanEmail });
+        orConditions.push({ 'shippingAddress.email': cleanEmail });
+      }
+
+      const query = orConditions.length === 1 ? orConditions[0] : { $or: orConditions };
+
+      // 3. Fast lean() projection query with 2.5s safeguard
+      const userOrders = await Order.find(query)
+        .select('orderId userName userEmail shippingAddress items totalAmount couponCode couponDiscount utrNumber paymentMethod status cancellationDetails returnDetails createdAt updatedAt')
         .sort({ createdAt: -1 })
         .limit(40)
         .lean()
-        .maxTimeMS(2500); // 2.5s Hard timeout safeguard
+        .maxTimeMS(2500);
 
-      res.setHeader('Cache-Control', 'private, max-age=15'); // 15s browser caching
-      return res.json(userOrders || []);
+      res.setHeader('Cache-Control', 'private, no-cache, no-store, must-revalidate');
+      return res.status(200).json(userOrders || []);
     } else {
       const userOrders = (memoryOrders || []).filter(o => {
         if (userId && String(o.user) === String(userId)) return true;
         if (cleanEmail && (
           (o.userEmail && o.userEmail.toLowerCase() === cleanEmail) ||
-          (o.email && o.email.toLowerCase() === cleanEmail) ||
           (o.shippingAddress?.email && o.shippingAddress.email.toLowerCase() === cleanEmail)
         )) return true;
         return false;
       });
-      return res.json(userOrders);
+      return res.status(200).json(userOrders);
     }
   } catch (err) {
     console.error('[ORDERS FETCH ERROR]', err.message);
-    return res.status(200).json([]); // Always return clean empty array without hanging UI
+    return res.status(200).json([]); // Always return clean empty array without freezing UI
   }
 });
-
 
 
 // POST ADD NEW ADDRESS FOR USER
@@ -3062,12 +2834,12 @@ app.post('/api/user/address', async (req, res) => {
     const token = authHeader.split(' ')[1];
     const decoded = jwt.verify(token, JWT_SECRET);
 
-    const { userName, mobileNumber, address, landmark, pincode } = req.body;
+    const { userName, mobileNumber, address, landmark, city, state, pincode } = req.body;
     if (!userName || !mobileNumber || !address || !pincode) {
       return res.status(400).json({ message: 'Receiver name, mobile, address, and pincode are required' });
     }
 
-    const newAddress = { userName, mobileNumber, address, landmark: landmark || '', pincode, isDefault: false };
+    const newAddress = { userName, mobileNumber, address, landmark: landmark || '', city: city || '', state: state || '', pincode, isDefault: false };
 
     if (isMongoConnected()) {
       const user = await User.findById(decoded.userId);

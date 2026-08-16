@@ -39,6 +39,8 @@ const addressSchema = new mongoose.Schema({
   mobileNumber: { type: String, required: true },
   address: { type: String, required: true },
   landmark: { type: String, default: '' },
+  city: { type: String, default: '' },
+  state: { type: String, default: '' },
   pincode: { type: String, required: true },
   isDefault: { type: Boolean, default: false }
 }, { timestamps: true });

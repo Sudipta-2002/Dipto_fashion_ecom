@@ -4,6 +4,7 @@ import { CheckCircle, AlertTriangle, X, Clock, RefreshCw, Copy, Check, ShieldChe
 import CheckoutProgressTracker from './CheckoutProgressTracker';
 import { API_URL, RAZORPAY_KEY_ID, apiFetch } from '../api';
 import { loadRazorpayScript } from '../utils/loadRazorpay';
+import { formatFullAddress } from '../utils/addressFormatter';
 
 const PaymentModal = ({
   isOpen,
@@ -592,8 +593,8 @@ const PaymentModal = ({
                 </div>
                 <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                   <span style={{ color: '#64748b', fontSize: '0.78rem' }}>Deliver To:</span>
-                  <span style={{ fontWeight: '600', textAlign: 'right', fontSize: '0.78rem' }}>
-                    {currentDisplayOrder.shippingAddress?.userName || deliveryAddress?.userName}, Pincode: {currentDisplayOrder.shippingAddress?.pincode || deliveryAddress?.pincode}
+                  <span style={{ fontWeight: '600', textAlign: 'right', fontSize: '0.78rem', maxWidth: '240px' }}>
+                    {currentDisplayOrder.shippingAddress?.userName || deliveryAddress?.userName} ({formatFullAddress(currentDisplayOrder.shippingAddress || deliveryAddress)})
                   </span>
                 </div>
               </div>

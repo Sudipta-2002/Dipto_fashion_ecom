@@ -2,6 +2,7 @@ import React, { useRef } from 'react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { Download, CheckCircle, ShieldCheck } from 'lucide-react';
+import { formatFullAddress } from '../../utils/addressFormatter';
 
 const ShippingLabel = ({ order, onClose }) => {
   const docketRef = useRef(null);
@@ -83,10 +84,7 @@ const ShippingLabel = ({ order, onClose }) => {
                 DELIVER TO (RECIPIENT ADDRESS):
               </span>
               <div style={{ fontSize: '1.05rem', fontWeight: '900', color: '#000' }}>{shippingAddress?.userName || userName}</div>
-              <div style={{ fontSize: '0.9rem', margin: '4px 0', lineHeight: '1.3' }}>{shippingAddress?.address}</div>
-              {shippingAddress?.landmark && (
-                <div style={{ fontSize: '0.82rem', fontStyle: 'italic' }}>Landmark: {shippingAddress.landmark}</div>
-              )}
+              <div style={{ fontSize: '0.9rem', margin: '4px 0', lineHeight: '1.3' }}>{formatFullAddress(shippingAddress)}</div>
               <div style={{ fontSize: '0.9rem', fontWeight: '900', marginTop: '6px', background: '#eee', padding: '3px 6px', display: 'inline-block', border: '1px solid #ccc' }}>
                 PINCODE: {shippingAddress?.pincode} | MOBILE: {shippingAddress?.mobileNumber}
               </div>

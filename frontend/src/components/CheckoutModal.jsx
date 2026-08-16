@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MapPin, Plus, CheckCircle2, X, ArrowLeft } from 'lucide-react';
 import CheckoutProgressTracker from './CheckoutProgressTracker';
 import { API_URL } from '../api';
+import { formatFullAddress } from '../utils/addressFormatter';
 
 const COUNTRY_CODES = [
   { code: '+91', country: 'India 🇮🇳' },
@@ -23,6 +24,8 @@ const CheckoutModal = ({ isOpen, onClose, onBackToCart, user, onProceedToPayment
     mobileNumber: user?.phone || '',
     address: '',
     landmark: '',
+    city: '',
+    state: '',
     pincode: ''
   });
 
@@ -77,6 +80,8 @@ const CheckoutModal = ({ isOpen, onClose, onBackToCart, user, onProceedToPayment
     }
 
     if (!addressData.address.trim()) errors.address = 'Full delivery address is required';
+    if (!addressData.city.trim()) errors.city = 'City is required';
+    if (!addressData.state.trim()) errors.state = 'State is required';
 
     if (!addressData.pincode.trim()) {
       errors.pincode = 'Pincode is required';
@@ -190,7 +195,7 @@ const CheckoutModal = ({ isOpen, onClose, onBackToCart, user, onProceedToPayment
                     </span>
                   </div>
                   <p style={{ fontSize: '0.85rem', color: '#334155', lineHeight: '1.4' }}>
-                    {addr.address}{addr.landmark ? `, Landmark: ${addr.landmark}` : ''}, Pincode: <strong>{addr.pincode}</strong>
+                    {formatFullAddress(addr)}
                   </p>
                   {selectedAddressIndex === index && (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '0.4rem', color: '#c026d3', fontSize: '0.8rem', fontWeight: '700', marginTop: '0.5rem' }}>
@@ -275,29 +280,55 @@ const CheckoutModal = ({ isOpen, onClose, onBackToCart, user, onProceedToPayment
                 {fieldErrors.address && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{fieldErrors.address}</span>}
               </div>
 
+              <div className="form-group">
+                <label>Landmark (Optional)</label>
+                <input
+                  type="text"
+                  name="landmark"
+                  placeholder="Near temple/park"
+                  value={addressData.landmark}
+                  onChange={handleInputChange}
+                />
+              </div>
+
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
                 <div className="form-group">
-                  <label>Landmark (Optional)</label>
+                  <label>City *</label>
                   <input
                     type="text"
-                    name="landmark"
-                    placeholder="Near temple/park"
-                    value={addressData.landmark}
+                    name="city"
+                    placeholder="City"
+                    value={addressData.city}
                     onChange={handleInputChange}
+                    style={{ borderColor: fieldErrors.city ? '#ef4444' : '' }}
                   />
+                  {fieldErrors.city && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{fieldErrors.city}</span>}
                 </div>
                 <div className="form-group">
-                  <label>Pincode *</label>
+                  <label>State *</label>
                   <input
                     type="text"
-                    name="pincode"
-                    placeholder="6-digit Pincode"
-                    value={addressData.pincode}
+                    name="state"
+                    placeholder="State"
+                    value={addressData.state}
                     onChange={handleInputChange}
-                    style={{ borderColor: fieldErrors.pincode ? '#ef4444' : '' }}
+                    style={{ borderColor: fieldErrors.state ? '#ef4444' : '' }}
                   />
-                  {fieldErrors.pincode && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{fieldErrors.pincode}</span>}
+                  {fieldErrors.state && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{fieldErrors.state}</span>}
                 </div>
+              </div>
+
+              <div className="form-group">
+                <label>Pincode *</label>
+                <input
+                  type="text"
+                  name="pincode"
+                  placeholder="6-digit Pincode"
+                  value={addressData.pincode}
+                  onChange={handleInputChange}
+                  style={{ borderColor: fieldErrors.pincode ? '#ef4444' : '' }}
+                />
+                {fieldErrors.pincode && <span style={{ color: '#ef4444', fontSize: '0.75rem' }}>{fieldErrors.pincode}</span>}
               </div>
             </div>
           )}
