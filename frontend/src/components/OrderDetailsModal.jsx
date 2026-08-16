@@ -1,3 +1,5 @@
+
+
 // import React, { useState, useEffect } from 'react';
 // import {
 //   X,
@@ -123,10 +125,6 @@
 //   useEffect(() => {
 //     if (!isOpen) return;
 
-//     // Push history state if not already pushed
-//     const stateKey = `order_modal_${initialOrder?.orderId || initialOrder?._id || Date.now()}`;
-//     window.history.pushState({ orderModalOpen: true, key: stateKey }, '');
-
 //     const handlePopState = () => {
 //       onClose();
 //     };
@@ -135,7 +133,7 @@
 //     return () => {
 //       window.removeEventListener('popstate', handlePopState);
 //     };
-//   }, [isOpen, initialOrder, onClose]);
+//   }, [isOpen, onClose]);
 
 //   // Non-blocking lazy background fetch to sync latest deep order state from backend
 //   useEffect(() => {
@@ -203,25 +201,29 @@
 //   const finalTotal = order.totalAmount || itemsSubtotal - couponDiscount;
 
 //   const handleModalClose = () => {
-//     if (window.history.state?.orderModalOpen) {
-//       window.history.back();
-//     } else {
-//       onClose();
-//     }
+//     onClose();
 //   };
+
+//   const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
 
 //   return (
 //     <div
 //       className="modal-overlay"
 //       onClick={handleModalClose}
 //       style={{
-//         zIndex: 1100,
+//         zIndex: 1200,
+//         position: 'fixed',
+//         top: 0,
+//         left: 0,
+//         right: 0,
+//         bottom: 0,
 //         background: 'rgba(15, 23, 42, 0.65)',
 //         backdropFilter: 'blur(4px)',
 //         display: 'flex',
-//         alignItems: 'center',
+//         alignItems: isMobile ? 'flex-end' : 'center',
 //         justifyContent: 'center',
-//         padding: '0.75rem'
+//         padding: isMobile ? '0' : '0.75rem',
+//         overflow: 'hidden'
 //       }}
 //     >
 //       <div
@@ -230,9 +232,10 @@
 //         style={{
 //           width: '100%',
 //           maxWidth: '560px',
-//           maxHeight: '90dvh',
+//           height: isMobile ? '100dvh' : 'auto',
+//           maxHeight: isMobile ? '100dvh' : '90dvh',
 //           background: '#ffffff',
-//           borderRadius: '16px',
+//           borderRadius: isMobile ? '0' : '16px',
 //           overflow: 'hidden',
 //           display: 'flex',
 //           flexDirection: 'column',
@@ -244,6 +247,7 @@
 //           style={{
 //             background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)',
 //             padding: '1rem 1.25rem',
+//             paddingTop: isMobile ? 'calc(0.85rem + env(safe-area-inset-top, 0px))' : '1rem',
 //             color: '#ffffff',
 //             display: 'flex',
 //             alignItems: 'center',
@@ -309,9 +313,11 @@
 //             overflowY: 'auto',
 //             overscrollBehavior: 'contain',
 //             padding: '1.15rem',
+//             paddingBottom: 'calc(2.5rem + env(safe-area-inset-bottom, 20px))',
 //             display: 'flex',
 //             flexDirection: 'column',
-//             gap: '1rem'
+//             gap: '1rem',
+//             WebkitOverflowScrolling: 'touch'
 //           }}
 //         >
 //           {/* HEADER ORDER META & STATUS CARD */}
@@ -509,6 +515,11 @@
 // };
 
 // export default OrderDetailsModal;
+
+
+
+
+
 
 
 
@@ -735,7 +746,7 @@ const OrderDetailsModal = ({
         background: 'rgba(15, 23, 42, 0.65)',
         backdropFilter: 'blur(4px)',
         display: 'flex',
-        alignItems: isMobile ? 'flex-end' : 'center',
+        alignItems: isMobile ? 'flex-start' : 'center',
         justifyContent: 'center',
         padding: isMobile ? '0' : '0.75rem',
         overflow: 'hidden'
@@ -754,21 +765,24 @@ const OrderDetailsModal = ({
           overflow: 'hidden',
           display: 'flex',
           flexDirection: 'column',
-          boxShadow: '0 20px 40px rgba(0,0,0,0.2)'
+          boxShadow: '0 20px 40px rgba(0,0,0,0.2)',
+          position: 'relative'
         }}
       >
-        {/* FIXED TOP HEADER */}
+        {/* FIXED TOP HEADER (Cancel Order Request Modal-er moto safe-area clearance adjusted) */}
         <div
           style={{
             background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)',
-            padding: '1rem 1.25rem',
-            paddingTop: isMobile ? 'calc(0.85rem + env(safe-area-inset-top, 0px))' : '1rem',
+            padding: '0.85rem 1.25rem',
+            paddingTop: isMobile ? 'calc(54px + env(safe-area-inset-top, 0px))' : '1rem',
+            paddingBottom: '0.85rem',
             color: '#ffffff',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             flexShrink: 0,
-            zIndex: 10
+            zIndex: 20,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
@@ -807,13 +821,14 @@ const OrderDetailsModal = ({
               background: 'rgba(255,255,255,0.15)',
               border: 'none',
               color: '#ffffff',
-              width: '32px',
-              height: '32px',
+              width: '34px',
+              height: '34px',
               borderRadius: '50%',
               cursor: 'pointer',
               display: 'flex',
               alignItems: 'center',
-              justifyContent: 'center'
+              justifyContent: 'center',
+              flexShrink: 0
             }}
             title="Close"
           >
@@ -828,7 +843,7 @@ const OrderDetailsModal = ({
             overflowY: 'auto',
             overscrollBehavior: 'contain',
             padding: '1.15rem',
-            paddingBottom: 'calc(2.5rem + env(safe-area-inset-bottom, 20px))',
+            paddingBottom: isMobile ? 'calc(95px + env(safe-area-inset-bottom, 20px))' : '1.5rem',
             display: 'flex',
             flexDirection: 'column',
             gap: '1rem',
