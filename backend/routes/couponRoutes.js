@@ -187,7 +187,9 @@ router.post(['/apply', '/validate'], async (req, res) => {
       return res.status(400).json({
         valid: false,
         success: false,
-        message: `Coupon '${coupon.code}' requires a minimum order of ₹${coupon.minOrderAmount.toLocaleString('en-IN')}. Add ₹${shortfall.toLocaleString('en-IN')} more to avail!`
+        minOrderAmount: coupon.minOrderAmount,
+        remainingAmount: shortfall,
+        message: `Not Eligible: Add ₹${shortfall.toLocaleString('en-IN')} more to your cart to apply ${coupon.code} (Min Order: ₹${coupon.minOrderAmount.toLocaleString('en-IN')}).`
       });
     }
 
@@ -212,6 +214,7 @@ router.post(['/apply', '/validate'], async (req, res) => {
       discountType: coupon.discountType,
       discountValue: coupon.discountAmount,
       discountAmount,
+      minOrderAmount: coupon.minOrderAmount || 0,
       payableAmount,
       message: `🎉 Coupon '${coupon.code}' applied successfully! You saved ₹${discountAmount.toLocaleString('en-IN')}.`
     });

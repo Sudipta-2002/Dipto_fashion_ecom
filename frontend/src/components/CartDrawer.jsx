@@ -33,6 +33,15 @@ const CartDrawer = ({
   const [loadingActiveCoupons, setLoadingActiveCoupons] = useState(false);
   const [expandedTermsCode, setExpandedTermsCode] = useState(null);
 
+  const itemsList = Array.isArray(cartItems) ? cartItems : [];
+  const totalMRP = itemsList.reduce((acc, item) => acc + (item.mrp || item.price) * item.quantity, 0);
+  const totalAmount = itemsList.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  const totalDiscount = totalMRP - totalAmount;
+  const totalItemsCount = itemsList.reduce((acc, item) => acc + item.quantity, 0);
+
+  const couponDiscountAmount = appliedCoupon ? appliedCoupon.discountAmount : 0;
+  const finalPayable = Math.max(0, totalAmount - couponDiscountAmount);
+
   useEffect(() => {
     if (isOpen) {
       fetchActiveCoupons();
@@ -44,6 +53,23 @@ const CartDrawer = ({
       setCouponInput(appliedCoupon.code);
     }
   }, [appliedCoupon]);
+
+  // Requirement 1: Automatic Coupon Invalidation on Cart Updates
+  useEffect(() => {
+    if (!appliedCoupon || !isOpen) return;
+
+    // Check minimum threshold requirement from appliedCoupon or activeCoupons
+    const matchedCoupon = Array.isArray(activeCoupons) && activeCoupons.find((c) => c.code?.toUpperCase() === appliedCoupon.code?.toUpperCase());
+    const minReq = appliedCoupon.minOrderAmount || appliedCoupon.minAmount || (matchedCoupon ? matchedCoupon.minOrderAmount : 0);
+
+    if (minReq > 0 && totalAmount < minReq) {
+      if (setAppliedCoupon) setAppliedCoupon(null);
+      setCouponInput('');
+      setCouponSuccessMsg('');
+      const removeMsg = `Coupon '${appliedCoupon.code}' was removed because your cart total dropped below the required threshold of ₹${minReq.toLocaleString('en-IN')}.`;
+      setCouponError(removeMsg);
+    }
+  }, [cartItems, totalAmount, appliedCoupon, activeCoupons, isOpen]);
 
   const fetchActiveCoupons = async () => {
     try {
@@ -62,14 +88,6 @@ const CartDrawer = ({
 
   if (!isOpen) return null;
 
-  const totalMRP = cartItems.reduce((acc, item) => acc + (item.mrp || item.price) * item.quantity, 0);
-  const totalAmount = cartItems.reduce((acc, item) => acc + item.price * item.quantity, 0);
-  const totalDiscount = totalMRP - totalAmount;
-  const totalItemsCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
-
-  const couponDiscountAmount = appliedCoupon ? appliedCoupon.discountAmount : 0;
-  const finalPayable = Math.max(0, totalAmount - couponDiscountAmount);
-
   // Calculate dynamic delivery date (Today + 7 Days)
   const getEstimatedDeliveryDate = () => {
     const deliveryDate = new Date();
@@ -82,7 +100,7 @@ const CartDrawer = ({
   };
 
   const handleApplyCoupon = async (codeToApply) => {
-    const code = (codeToApply !== undefined ? codeToApply : couponInput).trim();
+    const code = (codeToApply !== undefined ? codeToApply : couponInput).trim().toUpperCase();
     setCouponError('');
     setCouponSuccessMsg('');
 
@@ -94,6 +112,18 @@ const CartDrawer = ({
     if (!user) {
       alert('Sign-in is mandatory to apply coupon codes and receive discounts.');
       onOpenAuth();
+      return;
+    }
+
+    // Requirement 2: Check ineligible coupon minimum requirement before applying
+    const matchedCoupon = Array.isArray(activeCoupons) && activeCoupons.find((c) => c.code?.toUpperCase() === code);
+    const minReq = matchedCoupon ? (matchedCoupon.minOrderAmount || matchedCoupon.minAmount || 0) : 0;
+
+    if (minReq > 0 && totalAmount < minReq) {
+      const remainingAmount = minReq - totalAmount;
+      const alertMsg = `Not Eligible: Add ₹${remainingAmount.toLocaleString('en-IN')} more to your cart to apply ${code} (Min Order: ₹${minReq.toLocaleString('en-IN')}).`;
+      alert(alertMsg);
+      setCouponError(alertMsg);
       return;
     }
 
@@ -111,7 +141,8 @@ const CartDrawer = ({
           code: data.code,
           discountAmount: data.discountAmount,
           discountType: data.discountType,
-          discountValue: data.discountValue
+          discountValue: data.discountValue,
+          minOrderAmount: data.minOrderAmount || minReq
         };
         if (setAppliedCoupon) setAppliedCoupon(newCoupon);
         setCouponInput(data.code);
@@ -119,7 +150,9 @@ const CartDrawer = ({
         setCouponError('');
         setShowCouponsModal(false);
       } else {
-        setCouponError(data.message || `Coupon code '${code}' does not match or is invalid`);
+        const errorMsg = data.message || `Coupon code '${code}' does not match or is invalid`;
+        alert(errorMsg);
+        setCouponError(errorMsg);
         if (setAppliedCoupon) setAppliedCoupon(null);
       }
     } catch (err) {
