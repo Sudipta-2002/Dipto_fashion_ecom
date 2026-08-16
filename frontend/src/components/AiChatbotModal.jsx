@@ -1398,7 +1398,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           style={{
             background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)',
             padding: '1rem 1.15rem',
-            paddingTop: isMobile ? 'calc(2.8rem + env(safe-area-inset-top, 16px))' : '0.85rem',
+            paddingTop: isMobile ? 'calc(3.8rem + env(safe-area-inset-top, 16px))' : '0.85rem',
             minHeight: isMobile ? '76px' : 'auto',
             color: 'white',
             display: 'flex',
