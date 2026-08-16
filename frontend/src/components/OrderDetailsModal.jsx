@@ -769,12 +769,12 @@ const OrderDetailsModal = ({
           position: 'relative'
         }}
       >
-        {/* FIXED TOP HEADER (Cancel Order Request Modal-er moto safe-area clearance adjusted) */}
+        {/* FIXED TOP HEADER (GAP ADJUSTED FOR MOBILE VIEW) */}
         <div
           style={{
             background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)',
             padding: '0.85rem 1.25rem',
-            paddingTop: isMobile ? 'calc(54px + env(safe-area-inset-top, 0px))' : '1rem',
+            paddingTop: isMobile ? 'calc(10px + env(safe-area-inset-top, 0px))' : '0.85rem',
             paddingBottom: '0.85rem',
             color: '#ffffff',
             display: 'flex',
