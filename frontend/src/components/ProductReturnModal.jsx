@@ -1530,7 +1530,7 @@ const ProductReturnModal = ({ isOpen, onClose, order, onReturnSuccess }) => {
           style={{
             background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
             padding: '0.85rem 1rem',
-            paddingTop: isMobile ? 'calc(80px + env(safe-area-inset-top, 0px))' : '0.85rem',
+            paddingTop: isMobile ? 'calc(54px + env(safe-area-inset-top, 0px))' : '0.85rem',
             paddingBottom: '0.85rem',
             borderBottom: '1.5px solid #fed7aa',
             display: 'flex',
