@@ -12,7 +12,24 @@ const ShippingLabel = ({ order, onClose }) => {
   const downloadPDF = async () => {
     if (!docketRef.current) return;
     try {
-      const canvas = await html2canvas(docketRef.current, { scale: 2 });
+      // Ensure all images inside docket are loaded before html2canvas capture
+      const images = docketRef.current.querySelectorAll('img');
+      await Promise.all(
+        Array.from(images).map((img) => {
+          if (img.complete) return Promise.resolve();
+          return new Promise((resolve) => {
+            img.onload = resolve;
+            img.onerror = resolve;
+          });
+        })
+      );
+
+      const canvas = await html2canvas(docketRef.current, {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false
+      });
       const imgData = canvas.toDataURL('image/png');
       const pdf = new jsPDF('p', 'mm', 'a5');
       const imgProps = pdf.getImageProperties(imgData);
@@ -64,7 +81,7 @@ const ShippingLabel = ({ order, onClose }) => {
             {/* Header */}
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '2px solid #000', paddingBottom: '0.65rem', marginBottom: '0.85rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
-                <img src="/logo.jpg" alt="Dipto Fashion" style={{ width: '46px', height: '46px', objectFit: 'cover', borderRadius: '6px' }} onError={(e) => (e.target.style.display = 'none')} />
+                <img src="/logo.jpg" alt="Dipto Fashion" crossOrigin="anonymous" style={{ width: '46px', height: '46px', objectFit: 'cover', borderRadius: '6px' }} onError={(e) => (e.target.style.display = 'none')} />
                 <div>
                   <h2 style={{ fontSize: '1.25rem', fontWeight: '900', textTransform: 'uppercase', letterSpacing: '-0.5px', margin: 0 }}>DIPTO FASHION</h2>
                   <p style={{ fontSize: '0.72rem', color: '#333', margin: 0, fontWeight: 'bold' }}>Premium Ethnic Apparel & Designer Collections</p>
@@ -97,9 +114,20 @@ const ShippingLabel = ({ order, onClose }) => {
               </div>
               {items?.map((item, idx) => {
                 const itemSize = item.selectedSize || (item.name?.toLowerCase().includes('saree') ? 'Free Size' : 'M');
+                const itemImg = item.image || item.imageUrl || (Array.isArray(item.images) && item.images[0]) || item.product?.image || item.product?.imageUrl || (Array.isArray(item.product?.images) && item.product?.images[0]) || 'https://placehold.co/100x100?text=Product';
+
                 return (
                   <div key={idx} style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '8px', borderBottom: idx < items.length - 1 ? '1px solid #ddd' : 'none', background: idx % 2 === 0 ? '#fff' : '#fcfcfc' }}>
-                    <img src={item.image} alt={item.name} style={{ width: '48px', height: '48px', objectFit: 'cover', border: '1px solid #bbb', borderRadius: '4px' }} />
+                    <img
+                      src={itemImg}
+                      alt={item.name}
+                      crossOrigin="anonymous"
+                      style={{ width: '48px', height: '48px', objectFit: 'cover', border: '1px solid #bbb', borderRadius: '4px' }}
+                      onError={(e) => {
+                        e.target.onerror = null;
+                        e.target.src = 'https://placehold.co/100x100?text=Product';
+                      }}
+                    />
                     <div style={{ flex: 1 }}>
                       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '4px' }}>
                         <span style={{ fontSize: '0.88rem', fontWeight: '900', color: '#000' }}>{item.name}</span>

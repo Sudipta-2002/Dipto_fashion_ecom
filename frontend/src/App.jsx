@@ -7232,10 +7232,7 @@ function App() {
       return;
     }
 
-    const sizesList = (product?.availableSizes && product.availableSizes.length > 0)
-      ? product.availableSizes
-      : (product?.category === 'Saree' ? ['Free Size'] : ['S', 'M', 'L', 'XL', 'XXL']);
-
+    // 1. If product.selectedSize is provided (from ProductDetailModal), add to cart & open cart page immediately
     if (product.selectedSize) {
       setCartItems((prevItems) => {
         const existing = prevItems.find((item) => item._id === product._id && item.selectedSize === product.selectedSize);
@@ -7248,32 +7245,13 @@ function App() {
         }
         return [...prevItems, { ...product, quantity: 1 }];
       });
+      setIsDetailOpen(false);
       openCartModal();
       return;
     }
 
-    if (sizesList.length > 1) {
-      handleOpenProductDetail(product);
-      return;
-    }
-
-    const autoSize = sizesList[0] || 'Standard';
-    setCartItems((prevItems) => {
-      const existing = prevItems.find((item) => item._id === product._id && item.selectedSize === autoSize);
-      if (existing) {
-        if (existing.quantity >= remStock) {
-          alert(`Only ${remStock} item(s) available in stock! Cannot add more.`);
-          return prevItems;
-        }
-        return prevItems.map((item) =>
-          (item._id === product._id && item.selectedSize === autoSize)
-            ? { ...item, quantity: item.quantity + 1 }
-            : item
-        );
-      }
-      return [...prevItems, { ...product, quantity: 1, selectedSize: autoSize }];
-    });
-    openCartModal();
+    // 2. If clicked from Storefront / ProductCard without selectedSize, open ProductDetailModal for size review
+    handleOpenProductDetail(product);
   };
 
   const handleUpdateQuantity = (productId, newQty) => {

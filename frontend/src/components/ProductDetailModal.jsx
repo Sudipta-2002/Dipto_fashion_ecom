@@ -2770,7 +2770,6 @@ const ProductDetailModal = ({
       ...product,
       selectedSize: selectedSize || (sizesList[0] || 'Default')
     });
-    onClose();
   };
 
   return (
