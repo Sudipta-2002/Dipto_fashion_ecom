@@ -1669,7 +1669,6 @@
 
 
 
-
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Send, Bot, User, Sparkles } from 'lucide-react';
@@ -1693,8 +1692,8 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
   const [typing, setTyping] = useState(false);
   const [orders, setOrders] = useState(userOrders);
 
-  // রিয়েল-টাইম কীবোর্ড ভিউপোর্ট ডাইমেনশন
-  const [vpStyle, setVpStyle] = useState({
+  // রিয়েল-টাইম ভিউপোর্ট কোঅর্ডিনেট
+  const [viewportDims, setViewportDims] = useState({
     top: 0,
     height: '100dvh'
   });
@@ -1752,38 +1751,29 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
     scrollToBottom();
   }, [messages, typing]);
 
-  // ওভারস্ক্রোল বাউন্স এবং পেজ স্ক্রোল সম্পূর্ণ বন্ধ করার ফুলপ্রুফ লক
+  // মোবাইল কীবোর্ড ও ব্রাউজার অ্যাড্রেস বার স্ক্রোল লক
   useEffect(() => {
     if (!isOpen) return;
 
     const originalOverflow = document.body.style.overflow;
     const originalPosition = document.body.style.position;
     const originalInset = document.body.style.inset;
-    const originalOverscroll = document.body.style.overscrollBehavior;
+    const originalWidth = document.body.style.width;
+    const originalHeight = document.body.style.height;
 
-    // বডি ও এইচটিএমএল সম্পূর্ণরূপে লক করা
     document.body.style.overflow = 'hidden';
     document.body.style.position = 'fixed';
     document.body.style.inset = '0';
     document.body.style.width = '100%';
     document.body.style.height = '100%';
     document.body.style.overscrollBehavior = 'none';
+
     document.documentElement.style.overflow = 'hidden';
     document.documentElement.style.overscrollBehavior = 'none';
 
-    // ব্যাকগ্রাউন্ড টাচ মুভ বন্ধ করা
-    const preventBackgroundScroll = (e) => {
-      if (messagesContainerRef.current && messagesContainerRef.current.contains(e.target)) {
-        return; // চ্যাট মেসেজ স্ক্রোল হতে দেবে
-      }
-      e.preventDefault();
-    };
-
-    document.addEventListener('touchmove', preventBackgroundScroll, { passive: false });
-
-    const updateViewport = () => {
+    const handleViewportChange = () => {
       if (window.visualViewport) {
-        setVpStyle({
+        setViewportDims({
           top: window.visualViewport.offsetTop,
           height: `${window.visualViewport.height}px`
         });
@@ -1793,26 +1783,25 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
     };
 
     if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', updateViewport);
-      window.visualViewport.addEventListener('scroll', updateViewport);
-      updateViewport();
+      window.visualViewport.addEventListener('resize', handleViewportChange);
+      window.visualViewport.addEventListener('scroll', handleViewportChange);
+      handleViewportChange();
     }
 
     return () => {
       document.body.style.overflow = originalOverflow;
       document.body.style.position = originalPosition;
       document.body.style.inset = originalInset;
-      document.body.style.width = '';
-      document.body.style.height = '';
-      document.body.style.overscrollBehavior = originalOverscroll;
+      document.body.style.width = originalWidth;
+      document.body.style.height = originalHeight;
+      document.body.style.overscrollBehavior = '';
+
       document.documentElement.style.overflow = '';
       document.documentElement.style.overscrollBehavior = '';
 
-      document.removeEventListener('touchmove', preventBackgroundScroll);
-
       if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', updateViewport);
-        window.visualViewport.removeEventListener('scroll', updateViewport);
+        window.visualViewport.removeEventListener('resize', handleViewportChange);
+        window.visualViewport.removeEventListener('scroll', handleViewportChange);
       }
     };
   }, [isOpen]);
@@ -1941,21 +1930,19 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
     <div
       className="modal-overlay"
       style={{
-        zIndex: 9999999,
+        zIndex: 99999999,
         position: 'fixed',
-        top: isMobile ? `${vpStyle.top}px` : 0,
+        top: isMobile ? `${viewportDims.top}px` : 0,
         left: 0,
         right: 0,
         bottom: 0,
-        height: isMobile ? vpStyle.height : '100vh',
+        height: isMobile ? viewportDims.height : '100vh',
         width: '100vw',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'rgba(15, 23, 42, 0.85)',
-        backdropFilter: 'blur(6px)',
+        background: '#0f172a',
         overflow: 'hidden',
-        overscrollBehavior: 'none',
         touchAction: 'none'
       }}
       onClick={onClose}
@@ -1966,38 +1953,36 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           maxWidth: '480px',
           width: '100%',
           height: '100%',
-          maxHeight: isMobile ? '100%' : '650px',
           borderRadius: isMobile ? '0px' : '16px',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
           background: '#ffffff',
-          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.25)',
-          position: 'relative',
-          overscrollBehavior: 'none'
+          boxShadow: '0 20px 40px rgba(0, 0, 0, 0.3)',
+          position: 'relative'
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 1. TOP HEADER (SCREEN TOP-E PINNED) */}
+        {/* 1. TOP HEADER WITH SAFE-ZONE CLEARANCE */}
         <div
           style={{
             background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)',
             padding: '0.85rem 1.15rem',
-            paddingTop: isMobile ? 'calc(4.8rem + env(safe-area-inset-top, 0px))' : '0.85rem',
+            paddingTop: isMobile ? 'calc(50px + env(safe-area-inset-top, 0px))' : '0.85rem',
             color: 'white',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             flexShrink: 0,
             zIndex: 30,
-            boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
+            boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
             <div
               style={{
-                width: '36px',
-                height: '36px',
+                width: '38px',
+                height: '38px',
                 borderRadius: '50%',
                 background: 'rgba(255,255,255,0.2)',
                 display: 'flex',
@@ -2019,11 +2004,11 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
             type="button"
             onClick={onClose}
             style={{
-              background: 'rgba(255,255,255,0.15)',
+              background: 'rgba(255,255,255,0.18)',
               border: 'none',
               borderRadius: '50%',
-              width: '34px',
-              height: '34px',
+              width: '36px',
+              height: '36px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -2047,8 +2032,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
             whiteSpace: 'nowrap',
             flexShrink: 0,
             zIndex: 20,
-            WebkitOverflowScrolling: 'touch',
-            overscrollBehavior: 'contain'
+            WebkitOverflowScrolling: 'touch'
           }}
         >
           {QUICK_QUESTIONS.map((q, idx) => (
@@ -2076,7 +2060,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           ))}
         </div>
 
-        {/* 3. ISOLATED MESSAGES SCROLL AREA (ONLY SCROLLABLE ELEMENT) */}
+        {/* 3. ISOLATED MESSAGES SCROLL AREA */}
         <div
           ref={messagesContainerRef}
           style={{
@@ -2191,8 +2175,9 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
             placeholder="Enter Order ID, ask 'last order'..."
             value={inputMsg}
             onFocus={() => {
+              window.scrollTo(0, 0);
               setTimeout(() => {
-                scrollToBottom('smooth');
+                scrollToBottom('auto');
               }, 200);
             }}
             onChange={(e) => setInputMsg(e.target.value)}
