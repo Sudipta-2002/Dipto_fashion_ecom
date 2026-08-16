@@ -2,6 +2,11 @@
 
 
 
+
+
+// //gemini code
+
+
 // // final version - Keyboard Retention & Fixed Navbar Scroll Fix
 
 // import React, { useState, useEffect, useRef } from 'react';
@@ -28,8 +33,7 @@
 //   const [orders, setOrders] = useState(userOrders);
 
 //   // Dynamic visual viewport height for mobile keyboards
-//   const [viewportHeight, setViewportHeight] = useState('100%');
-//   const [viewportTop, setViewportTop] = useState(0);
+//   const [viewportHeight, setViewportHeight] = useState('100dvh');
 
 //   const chatEndRef = useRef(null);
 //   const messagesContainerRef = useRef(null);
@@ -85,18 +89,24 @@
 //     scrollToBottom();
 //   }, [messages, typing]);
 
-//   // Handle Mobile Virtual Keyboard without shaking the Navbar
+//   // Handle Mobile Virtual Keyboard without shaking or scrolling the Navbar
 //   useEffect(() => {
 //     if (!isOpen) return;
 
-//     // Prevent background page scrolling when modal is open
+//     // Prevent background body scrolling when modal is open
 //     const originalOverflow = document.body.style.overflow;
+//     const originalPosition = document.body.style.position;
+//     const originalWidth = document.body.style.width;
+
 //     document.body.style.overflow = 'hidden';
+//     document.body.style.position = 'fixed';
+//     document.body.style.width = '100%';
 
 //     const handleViewportChange = () => {
 //       if (window.visualViewport) {
 //         setViewportHeight(`${window.visualViewport.height}px`);
-//         setViewportTop(window.visualViewport.offsetTop);
+//         // Always keep scroll position pinned to 0,0 to avoid page shift
+//         window.scrollTo(0, 0);
 //         scrollToBottom(true);
 //       }
 //     };
@@ -109,6 +119,8 @@
 
 //     return () => {
 //       document.body.style.overflow = originalOverflow;
+//       document.body.style.position = originalPosition;
+//       document.body.style.width = originalWidth;
 //       if (window.visualViewport) {
 //         window.visualViewport.removeEventListener('resize', handleViewportChange);
 //         window.visualViewport.removeEventListener('scroll', handleViewportChange);
@@ -241,24 +253,26 @@
 //       style={{
 //         zIndex: 999999,
 //         position: 'fixed',
-//         top: `${viewportTop}px`,
+//         top: 0,
 //         left: 0,
 //         right: 0,
+//         bottom: 0,
 //         height: viewportHeight,
+//         maxHeight: viewportHeight,
 //         display: 'flex',
 //         alignItems: 'center',
 //         justifyContent: 'center',
-//         background: window.innerWidth < 640 ? '#ffffff' : 'rgba(15, 23, 42, 0.75)',
-//         backdropFilter: window.innerWidth < 640 ? 'none' : 'blur(4px)',
+//         background: 'rgba(15, 23, 42, 0.75)',
+//         backdropFilter: 'blur(4px)',
 //         overflow: 'hidden',
-//         touchAction: 'none' // Disables parent viewport drag on mobile
+//         touchAction: 'none'
 //       }}
 //       onClick={onClose}
 //     >
 //       <div
 //         className="modal-card"
 //         style={{
-//           maxWidth: '460px',
+//           maxWidth: '480px',
 //           width: '100%',
 //           height: '100%',
 //           maxHeight: '100%',
@@ -272,7 +286,7 @@
 //         }}
 //         onClick={(e) => e.stopPropagation()}
 //       >
-//         {/* FIXED TOP HEADER (Will never scroll away) */}
+//         {/* 1. FIXED TOP HEADER */}
 //         <div
 //           style={{
 //             background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)',
@@ -329,7 +343,7 @@
 //           </button>
 //         </div>
 
-//         {/* FIXED QUICK QUESTION CHIPS */}
+//         {/* 2. FIXED QUICK QUESTION CHIPS */}
 //         <div
 //           style={{
 //             background: '#f8fafc',
@@ -348,7 +362,7 @@
 //             <button
 //               key={idx}
 //               type="button"
-//               onMouseDown={(e) => e.preventDefault()} // Keeps input focused
+//               onMouseDown={(e) => e.preventDefault()}
 //               onTouchStart={(e) => e.preventDefault()}
 //               onClick={() => handleSend(q)}
 //               style={{
@@ -369,7 +383,7 @@
 //           ))}
 //         </div>
 
-//         {/* ISOLATED CHAT MESSAGES CONTAINER (Only this scrolls smoothly) */}
+//         {/* 3. ISOLATED CHAT MESSAGES CONTAINER */}
 //         <div
 //           ref={messagesContainerRef}
 //           style={{
@@ -458,7 +472,7 @@
 //           <div ref={chatEndRef} style={{ height: '4px', flexShrink: 0 }} />
 //         </div>
 
-//         {/* FIXED MESSAGE INPUT BAR (Locks above mobile keyboard & prevents blur on submit) */}
+//         {/* 4. FIXED MESSAGE INPUT BAR */}
 //         <form
 //           onSubmit={(e) => {
 //             e.preventDefault();
@@ -483,6 +497,7 @@
 //             placeholder="Enter Order ID, ask 'last order' or 'return'..."
 //             value={inputMsg}
 //             onFocus={() => {
+//               window.scrollTo(0, 0);
 //               setTimeout(() => {
 //                 scrollToBottom(true);
 //               }, 250);
@@ -502,8 +517,8 @@
 //           <button
 //             type="submit"
 //             className="btn-primary"
-//             onMouseDown={(e) => e.preventDefault()} // Prevents keyboard dismissal on click
-//             onTouchStart={(e) => e.preventDefault()} // Prevents keyboard dismissal on mobile tap
+//             onMouseDown={(e) => e.preventDefault()}
+//             onTouchStart={(e) => e.preventDefault()}
 //             onClick={(e) => {
 //               e.preventDefault();
 //               handleSend();
@@ -543,12 +558,6 @@
 
 
 
-
-//gemini code
-
-
-// final version - Keyboard Retention & Fixed Navbar Scroll Fix
-
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X, Send, Bot, User, Sparkles } from 'lucide-react';
@@ -572,8 +581,8 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
   const [typing, setTyping] = useState(false);
   const [orders, setOrders] = useState(userOrders);
 
-  // Dynamic visual viewport height for mobile keyboards
-  const [viewportHeight, setViewportHeight] = useState('100dvh');
+  // কীবোর্ডের রিয়েল-টাইম হাইট হ্যান্ডলিং
+  const [visualHeight, setVisualHeight] = useState('100dvh');
 
   const chatEndRef = useRef(null);
   const messagesContainerRef = useRef(null);
@@ -613,13 +622,12 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
     }
   };
 
-  // Smooth & Accurate Auto-Scroll to bottom inside the messages container only
-  const scrollToBottom = (instant = false) => {
+  const scrollToBottom = (behavior = 'smooth') => {
     requestAnimationFrame(() => {
       if (messagesContainerRef.current) {
         messagesContainerRef.current.scrollTo({
           top: messagesContainerRef.current.scrollHeight,
-          behavior: instant ? 'auto' : 'smooth'
+          behavior: behavior
         });
       }
     });
@@ -629,25 +637,28 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
     scrollToBottom();
   }, [messages, typing]);
 
-  // Handle Mobile Virtual Keyboard without shaking or scrolling the Navbar
+  // মোবাইল কীবোর্ড ওপেন হলে পেজের মূল ন্যাভবার উঠে আসা বন্ধ করার সম্পূর্ণ লক
   useEffect(() => {
     if (!isOpen) return;
 
-    // Prevent background body scrolling when modal is open
     const originalOverflow = document.body.style.overflow;
     const originalPosition = document.body.style.position;
+    const originalTop = document.body.style.top;
     const originalWidth = document.body.style.width;
+    const scrollY = window.scrollY;
 
     document.body.style.overflow = 'hidden';
     document.body.style.position = 'fixed';
+    document.body.style.top = `-${scrollY}px`;
     document.body.style.width = '100%';
+    document.documentElement.style.overflow = 'hidden';
 
     const handleViewportChange = () => {
       if (window.visualViewport) {
-        setViewportHeight(`${window.visualViewport.height}px`);
-        // Always keep scroll position pinned to 0,0 to avoid page shift
+        setVisualHeight(`${window.visualViewport.height}px`);
+        // ব্রাউজারকে পেজ স্ক্রোল করতে দেবে না
         window.scrollTo(0, 0);
-        scrollToBottom(true);
+        scrollToBottom('auto');
       }
     };
 
@@ -660,7 +671,11 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
     return () => {
       document.body.style.overflow = originalOverflow;
       document.body.style.position = originalPosition;
+      document.body.style.top = originalTop;
       document.body.style.width = originalWidth;
+      document.documentElement.style.overflow = '';
+      window.scrollTo(0, scrollY);
+
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', handleViewportChange);
         window.visualViewport.removeEventListener('scroll', handleViewportChange);
@@ -679,7 +694,6 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
     setInputMsg('');
     setTyping(true);
 
-    // Keep mobile keyboard open & focused after sending
     requestAnimationFrame(() => {
       if (inputRef.current) {
         inputRef.current.focus();
@@ -690,14 +704,14 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
       let botResponse = getAiResponse(query);
       setMessages((prev) => [...prev, { sender: 'bot', text: botResponse }]);
       setTyping(false);
-    }, 500);
+    }, 450);
   };
 
   const getAiResponse = (userQuery) => {
     const q = userQuery.trim();
     const qLower = q.toLowerCase();
 
-    // 1. ORDER ID LOOKUP DETECTOR
+    // 1. ORDER ID LOOKUP
     const orderIdRegex = /(DF-?[A-Z0-9]{5,10})/i;
     const orderIdMatch = q.match(orderIdRegex);
 
@@ -714,21 +728,21 @@ const AiChatbotModal = ({ isOpen, onClose, userName, userOrders = [] }) => {
         return `📦 **Order Details for ${foundOrder.orderId}**:
 • **Status**: ${foundOrder.status}
 • **Order Date**: ${new Date(foundOrder.createdAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
-• **Items**:
+• **Items Ordered**:
 ${itemsListStr}
 • **Total Amount**: ₹${foundOrder.totalAmount?.toLocaleString('en-IN')}
-• **UTR Reference**: ${foundOrder.utrNumber}
-• **Delivery Address**: ${foundOrder.shippingAddress?.userName}, ${foundOrder.shippingAddress?.address} (${foundOrder.shippingAddress?.pincode})
-• **Estimated Delivery / Schedule**: ${foundOrder.status === 'Delivered' ? 'Delivered' : estDeliveryStr}`;
+• **UTR Ref**: ${foundOrder.utrNumber || 'N/A'}
+• **Delivery Address**: ${foundOrder.shippingAddress?.userName || 'Customer'}, ${foundOrder.shippingAddress?.address || ''} (${foundOrder.shippingAddress?.pincode || ''})
+• **Estimated Delivery**: ${foundOrder.status === 'Delivered' ? 'Delivered' : estDeliveryStr}`;
       } else {
         return `🔍 **Order Search Result**:
 Could not find an active order with ID **"${orderIdMatch[0]}"** in your account.
 
-Please verify your Order ID under **Profile -> My Orders** or email support@diptofashion.com for manual lookup!`;
+Please verify your Order ID under **Profile -> My Orders** or email support@diptofashion.in for manual lookup!`;
       }
     }
 
-    // 2. LAST / LATEST ORDER DETAILS LOOKUP
+    // 2. LAST ORDER LOOKUP
     if (qLower.includes('last order') || qLower.includes('latest order') || qLower.includes('recent order') || qLower.includes('my order details')) {
       if (orders && orders.length > 0) {
         const last = orders[0];
@@ -741,14 +755,14 @@ Please verify your Order ID under **Profile -> My Orders** or email support@dipt
 • **Items Ordered**:
 ${itemsListStr}
 • **Total Amount**: ₹${last.totalAmount?.toLocaleString('en-IN')}
-• **UTR Ref**: ${last.utrNumber}
+• **UTR Ref**: ${last.utrNumber || 'N/A'}
 • **Est. Delivery Date**: ${last.status === 'Delivered' ? 'Delivered' : estDeliveryStr}`;
       } else {
-        return `🛍️ You do not have any placed orders yet! Explore our Sarees & Punjabi suits collection on the storefront to place your first order.`;
+        return `🛍️ You do not have any placed orders yet! Explore our Sarees & festive collections on the storefront to place your first order.`;
       }
     }
 
-    // 3. STEP-BY-STEP RETURN PROCESS EXPLANATION
+    // 3. RETURN GUIDE
     if (qLower.includes('return') || qLower.includes('refund') || qLower.includes('exchange') || qLower.includes('how to return')) {
       return `🔄 **Full Step-by-Step Product Return & Refund Guide**:
 
@@ -758,54 +772,55 @@ ${itemsListStr}
 4️⃣ **Pickup & Refund**: Our courier partner will pick up the product from your address within **3 Business Days**, and refund will be transferred directly to your bank account / UPI!`;
     }
 
-    // 4. DELIVERY & SHIPPING TIMELINE
+    // 4. DELIVERY TIMELINE
     if (qLower.includes('delivery') || qLower.includes('time') || qLower.includes('days') || qLower.includes('shipping')) {
       return `🚚 **Express Shipping Timeline**:
-All Dipto Fashion orders are shipped with **Express Free Shipping** and delivered within **7 Business Days** from order date. Live step tracking is updated in real time under **My Orders**!`;
+All Dipto Fashion orders are shipped with **Express Free Shipping** and delivered within **7 Business Days** from order date. Live tracking is available under **My Orders**!`;
     }
 
-    // 5. PAYMENT & UTR SUBMISSION
+    // 5. PAYMENT & UTR
     if (qLower.includes('utr') || qLower.includes('payment') || qLower.includes('qr') || qLower.includes('pay')) {
       return `💳 **Payment & UTR Verification**:
 Scan our store QR code with Google Pay, PhonePe, Paytm, or BHIM UPI. After paying, paste your 12-digit UTR Transaction ID on the checkout page to confirm your order instantly!`;
     }
 
-    // 6. SIZES & FABRIC CARE
+    // 6. SIZES
     if (qLower.includes('size') || qLower.includes('saree') || qLower.includes('punjabi') || qLower.includes('fabric')) {
       return `👗 **Sizes & Garment Specs**:
 • **Sarees**: Standard 5.5 Meters silk/kanjivaram + 0.8m unstitched blouse piece (Free Size).
 • **Punjabi Suits & Kurtas**: Standard S (36"), M (38"), L (40"), XL (42"), XXL (44") chest measurements. View size chart on product page for details.`;
     }
 
-    // 7. GENERAL FALLBACK
+    // 7. FALLBACK
     return `🤖 Thank you for reaching out! For custom requests or queries outside order tracking and returns:
 
-📧 **Customer Support Email**: support@diptofashion.com
+📧 **Customer Support Email**: support@diptofashion.in
 📱 **WhatsApp Helpline**: +91 98765 43210
 🕒 **Working Hours**: Mon - Sun (9:00 AM - 10:00 PM)
 
 Feel free to ask for your **last order**, enter an **Order ID**, or type **"Return"** for return guide!`;
   };
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+
   const modalContent = (
     <div
       className="modal-overlay"
       style={{
-        zIndex: 999999,
+        zIndex: 9999999,
         position: 'fixed',
         top: 0,
         left: 0,
         right: 0,
         bottom: 0,
-        height: viewportHeight,
-        maxHeight: viewportHeight,
+        height: isMobile ? visualHeight : '100vh',
+        width: '100vw',
         display: 'flex',
-        alignItems: 'center',
+        alignItems: isMobile ? 'flex-end' : 'center',
         justifyContent: 'center',
         background: 'rgba(15, 23, 42, 0.75)',
         backdropFilter: 'blur(4px)',
-        overflow: 'hidden',
-        touchAction: 'none'
+        overflow: 'hidden'
       }}
       onClick={onClose}
     >
@@ -816,7 +831,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           width: '100%',
           height: '100%',
           maxHeight: '100%',
-          borderRadius: window.innerWidth < 640 ? '0px' : '16px',
+          borderRadius: isMobile ? '0px' : '16px',
           display: 'flex',
           flexDirection: 'column',
           overflow: 'hidden',
@@ -826,18 +841,18 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 1. FIXED TOP HEADER */}
+        {/* 1. TOP HEADER (SCREEN TOP-E FIXED THAKBE) */}
         <div
           style={{
             background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)',
             padding: '0.85rem 1.15rem',
-            paddingTop: 'calc(0.85rem + env(safe-area-inset-top, 0px))',
+            paddingTop: isMobile ? 'calc(0.75rem + env(safe-area-inset-top, 0px))' : '0.85rem',
             color: 'white',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             flexShrink: 0,
-            zIndex: 10,
+            zIndex: 20,
             boxShadow: '0 2px 8px rgba(0,0,0,0.15)'
           }}
         >
@@ -883,7 +898,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           </button>
         </div>
 
-        {/* 2. FIXED QUICK QUESTION CHIPS */}
+        {/* 2. QUICK QUESTION CHIPS */}
         <div
           style={{
             background: '#f8fafc',
@@ -894,7 +909,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
             overflowX: 'auto',
             whiteSpace: 'nowrap',
             flexShrink: 0,
-            zIndex: 9,
+            zIndex: 10,
             WebkitOverflowScrolling: 'touch'
           }}
         >
@@ -923,11 +938,12 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           ))}
         </div>
 
-        {/* 3. ISOLATED CHAT MESSAGES CONTAINER */}
+        {/* 3. ISOLATED SCROLLABLE MESSAGES AREA */}
         <div
           ref={messagesContainerRef}
           style={{
-            flex: 1,
+            flex: '1 1 auto',
+            minHeight: 0,
             padding: '1rem',
             overflowY: 'auto',
             background: '#ffffff',
@@ -935,8 +951,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
             flexDirection: 'column',
             gap: '0.85rem',
             WebkitOverflowScrolling: 'touch',
-            overscrollBehavior: 'contain',
-            touchAction: 'pan-y'
+            overscrollBehavior: 'contain'
           }}
         >
           {messages.map((m, idx) => (
@@ -969,7 +984,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
               </div>
               <div
                 style={{
-                  maxWidth: '82%',
+                  maxWidth: '85%',
                   background: m.sender === 'user' ? '#c026d3' : '#f8fafc',
                   color: m.sender === 'user' ? 'white' : '#0f172a',
                   padding: '0.75rem 0.95rem',
@@ -1012,7 +1027,7 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           <div ref={chatEndRef} style={{ height: '4px', flexShrink: 0 }} />
         </div>
 
-        {/* 4. FIXED MESSAGE INPUT BAR */}
+        {/* 4. PINNED BOTTOM INPUT BAR (KEYBOARD-ER THIK UPORE THAKBE) */}
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -1020,26 +1035,26 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
           }}
           style={{
             padding: '0.65rem 0.75rem',
-            paddingBottom: 'calc(0.65rem + env(safe-area-inset-bottom, 8px))',
+            paddingBottom: isMobile ? 'calc(0.65rem + env(safe-area-inset-bottom, 8px))' : '0.65rem',
             background: '#ffffff',
             borderTop: '1.5px solid #e2e8f0',
             display: 'flex',
             gap: '0.5rem',
             alignItems: 'center',
             flexShrink: 0,
-            zIndex: 10,
+            zIndex: 20,
             boxShadow: '0 -2px 10px rgba(0,0,0,0.05)'
           }}
         >
           <input
             ref={inputRef}
             type="text"
-            placeholder="Enter Order ID, ask 'last order' or 'return'..."
+            placeholder="Enter Order ID, ask 'last order'..."
             value={inputMsg}
             onFocus={() => {
               window.scrollTo(0, 0);
               setTimeout(() => {
-                scrollToBottom(true);
+                scrollToBottom('auto');
               }, 250);
             }}
             onChange={(e) => setInputMsg(e.target.value)}
