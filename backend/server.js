@@ -2636,7 +2636,7 @@ app.get(['/api/orders', '/orders', '/api/admin/orders', '/admin/orders'], async 
       const [totalCount, orders] = await Promise.all([
         Order.estimatedDocumentCount().maxTimeMS(3000).catch(() => Order.countDocuments()),
         Order.find()
-          .select('orderId userName userEmail shippingAddress items.name items.selectedSize items.quantity items.price totalAmount couponCode couponDiscount utrNumber paymentMethod status cancellationDetails returnDetails createdAt')
+          .select('orderId userName userEmail shippingAddress items.name items.selectedSize items.quantity items.price items.image items.product totalAmount couponCode couponDiscount utrNumber paymentMethod status cancellationDetails returnDetails createdAt')
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit)

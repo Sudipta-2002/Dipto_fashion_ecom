@@ -264,9 +264,8 @@ const PaymentModal = ({
         },
         handler: async function (response) {
           console.log("Razorpay Payment Success Callback Response:", response);
-          // Set step to success IMMEDIATELY so the payment screen vanishes instantly with zero glitch!
+          // Set step to success IMMEDIATELY to show the Flipkart-style Order Confirmation screen!
           setStep('success');
-          if (onOrderSuccess) onOrderSuccess();
 
           try {
             setLoading(true);
@@ -283,12 +282,12 @@ const PaymentModal = ({
                 razorpay_signature: response.razorpay_signature || 'test_signature',
                 customOrderId: fixedOrderId,
                 items: cartItems.map((item) => ({
-                  product: item._id,
+                  product: item._id || item.id,
                   name: item.name,
                   selectedSize: item.selectedSize || 'Free Size',
                   price: item.price,
                   quantity: item.quantity,
-                  image: item.image
+                  image: item.image || item.imageUrl || (Array.isArray(item.images) && item.images[0]) || ''
                 })),
                 totalAmount,
                 couponCode: appliedCoupon?.code || '',
@@ -314,12 +313,12 @@ const PaymentModal = ({
                   body: JSON.stringify({
                     orderId: fixedOrderId,
                     items: cartItems.map((item) => ({
-                      product: item._id,
+                      product: item._id || item.id,
                       name: item.name,
                       selectedSize: item.selectedSize || 'Free Size',
                       price: item.price,
                       quantity: item.quantity,
-                      image: item.image
+                      image: item.image || item.imageUrl || (Array.isArray(item.images) && item.images[0]) || ''
                     })),
                     totalAmount,
                     couponCode: appliedCoupon?.code || '',
