@@ -1022,6 +1022,402 @@
 
 
 
+// import React, { useState } from 'react';
+// import { X, RotateCcw, AlertCircle, CheckCircle2 } from 'lucide-react';
+// import { API_URL, apiFetch, parseResponseSafely } from '../api';
+
+// const RETURN_REASONS = [
+//   'Size / Fit issue',
+//   'Defective / Damaged product received',
+//   'Item not as described or shown in image',
+//   'Received wrong item or color',
+//   'Quality not satisfactory',
+//   'Other reason'
+// ];
+
+// const ProductReturnModal = ({ isOpen, onClose, order, onReturnSuccess }) => {
+//   const [reason, setReason] = useState(RETURN_REASONS[0]);
+//   const [comments, setComments] = useState('');
+//   const [loading, setLoading] = useState(false);
+//   const [error, setError] = useState('');
+
+//   if (!isOpen || !order) return null;
+
+//   const handleReturnSubmit = async (e) => {
+//     e.preventDefault();
+//     setError('');
+//     setLoading(true);
+
+//     try {
+//       const token = localStorage.getItem('df_token');
+//       const res = await apiFetch(`/api/orders/${order._id || order.id}/return-request`, {
+//         method: 'POST',
+//         headers: {
+//           'Content-Type': 'application/json',
+//           ...(token ? { Authorization: `Bearer ${token}` } : {})
+//         },
+//         body: JSON.stringify({
+//           reason,
+//           comments: comments.trim(),
+//           refundMethod: 'original_payment_account',
+//           refundDetails: {
+//             method: 'Original Payment Source',
+//             utrNumber: order.utrNumber || 'N/A'
+//           }
+//         })
+//       });
+
+//       const data = await parseResponseSafely(res);
+
+//       if (res.ok && data.success) {
+//         if (onReturnSuccess) {
+//           onReturnSuccess(data.order || { ...order, status: 'Return Requested' });
+//         }
+//         onClose();
+//       } else {
+//         setError(data.message || 'Failed to submit return request.');
+//       }
+//     } catch (err) {
+//       setError('Network connection error. Please try again.');
+//     } finally {
+//       setLoading(false);
+//     }
+//   };
+
+//   const handleInputFocus = (e) => {
+//     const target = e.target;
+//     setTimeout(() => {
+//       target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+//     }, 250);
+//   };
+
+//   return (
+//     <div
+//       className="modal-overlay fixed inset-0 z-[99999] flex items-start sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
+//       style={{
+//         zIndex: 99999,
+//         position: 'fixed',
+//         top: 0,
+//         left: 0,
+//         right: 0,
+//         bottom: 0,
+//         backgroundColor: 'rgba(15, 23, 42, 0.78)',
+//         backdropFilter: 'blur(6px)',
+//         WebkitBackdropFilter: 'blur(6px)',
+//         display: 'flex',
+//         justifyContent: 'center',
+//         boxSizing: 'border-box'
+//       }}
+//       onClick={onClose}
+//     >
+//       <div
+//         className="modal-card w-full max-w-[460px] bg-white shadow-2xl overflow-hidden flex flex-col relative rounded-none sm:rounded-[20px]"
+//         style={{
+//           maxWidth: '460px',
+//           width: '100%',
+//           height: '100dvh',
+//           maxHeight: '100dvh',
+//           background: '#ffffff',
+//           overflow: 'hidden',
+//           display: 'flex',
+//           flexDirection: 'column',
+//           boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.45)',
+//           position: 'relative'
+//         }}
+//         onClick={(e) => e.stopPropagation()}
+//       >
+//         {/* 1. FIXED TOP HEADER */}
+//         <div
+//           className="modal-header shrink-0 px-4 py-3 border-b border-orange-200 flex items-center justify-between gap-3 sticky top-0 z-20"
+//           style={{
+//             background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
+//             padding: '0.85rem 1rem',
+//             paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.85rem)',
+//             borderBottom: '1.5px solid #fed7aa',
+//             display: 'flex',
+//             alignItems: 'center',
+//             justifyContent: 'space-between',
+//             gap: '0.75rem',
+//             position: 'sticky',
+//             top: 0,
+//             zIndex: 20,
+//             flexShrink: 0
+//           }}
+//         >
+//           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, flex: 1 }}>
+//             <div
+//               style={{
+//                 width: '38px',
+//                 height: '38px',
+//                 borderRadius: '10px',
+//                 background: '#fed7aa',
+//                 border: '1px solid #fdba74',
+//                 display: 'flex',
+//                 alignItems: 'center',
+//                 justifyContent: 'center',
+//                 color: '#ea580c',
+//                 flexShrink: 0
+//               }}
+//             >
+//               <RotateCcw size={20} />
+//             </div>
+//             <div style={{ minWidth: 0, flex: 1 }}>
+//               <h3
+//                 style={{
+//                   fontSize: 'clamp(0.88rem, 3.8vw, 1rem)',
+//                   fontWeight: '800',
+//                   color: '#9a3412',
+//                   margin: 0,
+//                   whiteSpace: 'nowrap',
+//                   overflow: 'hidden',
+//                   textOverflow: 'ellipsis'
+//                 }}
+//               >
+//                 Request Product Return
+//               </h3>
+//               <p
+//                 style={{
+//                   fontSize: '0.75rem',
+//                   color: '#c2410c',
+//                   margin: '2px 0 0 0',
+//                   fontWeight: '600',
+//                   whiteSpace: 'nowrap',
+//                   overflow: 'hidden',
+//                   textOverflow: 'ellipsis'
+//                 }}
+//               >
+//                 Order: <span style={{ color: '#ea580c', fontWeight: '800' }}>{order.orderId}</span> • 7-Day Window Active
+//               </p>
+//             </div>
+//           </div>
+//           <button
+//             type="button"
+//             onClick={onClose}
+//             style={{
+//               background: 'white',
+//               border: '1px solid #fdba74',
+//               borderRadius: '50%',
+//               width: '32px',
+//               height: '32px',
+//               display: 'flex',
+//               alignItems: 'center',
+//               justifyContent: 'center',
+//               color: '#9a3412',
+//               cursor: 'pointer',
+//               flexShrink: 0,
+//               boxShadow: '0 2px 5px rgba(0,0,0,0.05)'
+//             }}
+//             aria-label="Close"
+//           >
+//             <X size={17} />
+//           </button>
+//         </div>
+
+//         {/* 2. ALL CONTENT & BUTTONS INSIDE SCROLLABLE AREA */}
+//         <form
+//           onSubmit={handleReturnSubmit}
+//           className="flex-1 overflow-y-auto overscroll-contain p-4 flex flex-col gap-4"
+//           style={{
+//             flex: 1,
+//             overflowY: 'auto',
+//             WebkitOverflowScrolling: 'touch',
+//             overscrollBehaviorY: 'contain',
+//             padding: '1rem',
+//             /* Bottom navigation bar-er upore jate button uthe ase tai 90px extra padding */
+//             paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 90px)',
+//             display: 'flex',
+//             flexDirection: 'column',
+//             gap: '1rem'
+//           }}
+//         >
+//           {error && (
+//             <div
+//               style={{
+//                 background: '#fef2f2',
+//                 border: '1.5px solid #fca5a5',
+//                 padding: '0.75rem',
+//                 borderRadius: '10px',
+//                 color: '#b91c1c',
+//                 fontSize: '0.82rem',
+//                 fontWeight: '700',
+//                 display: 'flex',
+//                 alignItems: 'center',
+//                 gap: '6px'
+//               }}
+//             >
+//               <AlertCircle size={16} style={{ flexShrink: 0 }} /> {error}
+//             </div>
+//           )}
+
+//           {/* Return Reason */}
+//           <div>
+//             <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.4rem' }}>
+//               Reason for Return *
+//             </label>
+//             <select
+//               value={reason}
+//               onChange={(e) => setReason(e.target.value)}
+//               onFocus={handleInputFocus}
+//               style={{
+//                 width: '100%',
+//                 padding: '0.75rem',
+//                 borderRadius: '10px',
+//                 border: '1.5px solid #cbd5e1',
+//                 background: '#f8fafc',
+//                 fontSize: '0.86rem',
+//                 fontWeight: '600',
+//                 color: '#1e293b',
+//                 outline: 'none'
+//               }}
+//             >
+//               {RETURN_REASONS.map((r, idx) => (
+//                 <option key={idx} value={r}>
+//                   {r}
+//                 </option>
+//               ))}
+//             </select>
+//           </div>
+
+//           {/* Comments */}
+//           <div>
+//             <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.4rem' }}>
+//               Comments / Product Issue <span style={{ color: '#64748b', fontWeight: 'normal' }}>(Optional)</span>
+//             </label>
+//             <textarea
+//               rows="3"
+//               placeholder="Describe the issue with the item..."
+//               value={comments}
+//               onChange={(e) => setComments(e.target.value)}
+//               onFocus={handleInputFocus}
+//               style={{
+//                 width: '100%',
+//                 padding: '0.7rem',
+//                 borderRadius: '10px',
+//                 border: '1.5px solid #cbd5e1',
+//                 background: '#ffffff',
+//                 fontSize: '0.85rem',
+//                 lineHeight: '1.4',
+//                 color: '#1e293b',
+//                 boxSizing: 'border-box',
+//                 outline: 'none'
+//               }}
+//             />
+//           </div>
+
+//           {/* Refund Destination */}
+//           <div>
+//             <label style={{ display: 'block', fontSize: '0.82rem', fontWeight: '800', color: '#0f172a', marginBottom: '0.4rem' }}>
+//               Refund Destination:
+//             </label>
+//             <div
+//               style={{
+//                 display: 'flex',
+//                 alignItems: 'center',
+//                 gap: '0.65rem',
+//                 padding: '0.85rem 1rem',
+//                 borderRadius: '12px',
+//                 border: '1.5px solid #fdba74',
+//                 background: '#fffaf5'
+//               }}
+//             >
+//               <input
+//                 type="radio"
+//                 name="refundMethod"
+//                 id="original_account"
+//                 checked={true}
+//                 readOnly
+//                 style={{
+//                   width: '18px',
+//                   height: '18px',
+//                   accentColor: '#ea580c',
+//                   cursor: 'default',
+//                   flexShrink: 0
+//                 }}
+//               />
+//               <label
+//                 htmlFor="original_account"
+//                 style={{
+//                   fontSize: '0.86rem',
+//                   fontWeight: '700',
+//                   color: '#9a3412',
+//                   margin: 0,
+//                   cursor: 'default',
+//                   display: 'flex',
+//                   alignItems: 'center',
+//                   gap: '6px'
+//                 }}
+//               >
+//                 Money will be refunded to original payment account <CheckCircle2 size={16} color="#ea580c" style={{ flexShrink: 0 }} />
+//               </label>
+//             </div>
+//           </div>
+
+//           {/* Pickup Note */}
+//           <div style={{ background: '#f8fafc', border: '1px solid #e2e8f0', padding: '0.65rem 0.85rem', borderRadius: '8px', fontSize: '0.75rem', color: '#64748b' }}>
+//             🚚 Our courier partner will pick up the item from your delivery address within <strong>3 business days</strong>.
+//           </div>
+
+//           {/* ACTION BUTTONS (Scrolls together inside the form) */}
+//           <div
+//             style={{
+//               display: 'grid',
+//               gridTemplateColumns: '1fr 1.3fr',
+//               gap: '0.65rem',
+//               marginTop: '0.5rem',
+//               paddingTop: '0.5rem'
+//             }}
+//           >
+//             <button
+//               type="button"
+//               onClick={onClose}
+//               style={{
+//                 padding: '0.75rem',
+//                 borderRadius: '10px',
+//                 border: '1.5px solid #cbd5e1',
+//                 background: '#ffffff',
+//                 color: '#475569',
+//                 fontWeight: '700',
+//                 fontSize: '0.88rem',
+//                 cursor: 'pointer'
+//               }}
+//             >
+//               Cancel
+//             </button>
+//             <button
+//               type="submit"
+//               disabled={loading}
+//               style={{
+//                 padding: '0.75rem',
+//                 borderRadius: '10px',
+//                 border: 'none',
+//                 background: 'linear-gradient(135deg, #ea580c 0%, #c2410c 100%)',
+//                 color: '#ffffff',
+//                 fontWeight: '800',
+//                 fontSize: '0.88rem',
+//                 cursor: loading ? 'not-allowed' : 'pointer',
+//                 boxShadow: '0 4px 12px rgba(234, 88, 12, 0.25)'
+//               }}
+//             >
+//               {loading ? 'Submitting...' : 'Confirm Return'}
+//             </button>
+//           </div>
+//         </form>
+//       </div>
+//     </div>
+//   );
+// };
+
+// export default ProductReturnModal;
+
+
+
+
+
+
+
+
+
+
 import React, { useState } from 'react';
 import { X, RotateCcw, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { API_URL, apiFetch, parseResponseSafely } from '../api';
@@ -1091,6 +1487,8 @@ const ProductReturnModal = ({ isOpen, onClose, order, onReturnSuccess }) => {
     }, 250);
   };
 
+  const isMobile = typeof window !== 'undefined' && window.innerWidth < 640;
+
   return (
     <div
       className="modal-overlay fixed inset-0 z-[99999] flex items-start sm:items-center justify-center p-0 sm:p-4 overflow-hidden"
@@ -1115,8 +1513,8 @@ const ProductReturnModal = ({ isOpen, onClose, order, onReturnSuccess }) => {
         style={{
           maxWidth: '460px',
           width: '100%',
-          height: '100dvh',
-          maxHeight: '100dvh',
+          height: isMobile ? '100dvh' : 'auto',
+          maxHeight: isMobile ? '100dvh' : '90vh',
           background: '#ffffff',
           overflow: 'hidden',
           display: 'flex',
@@ -1126,13 +1524,14 @@ const ProductReturnModal = ({ isOpen, onClose, order, onReturnSuccess }) => {
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        {/* 1. FIXED TOP HEADER */}
+        {/* 1. FIXED TOP HEADER WITH SAFE-ZONE CLEARANCE */}
         <div
           className="modal-header shrink-0 px-4 py-3 border-b border-orange-200 flex items-center justify-between gap-3 sticky top-0 z-20"
           style={{
             background: 'linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%)',
             padding: '0.85rem 1rem',
-            paddingTop: 'calc(env(safe-area-inset-top, 0px) + 0.85rem)',
+            paddingTop: isMobile ? 'calc(80px + env(safe-area-inset-top, 0px))' : '0.85rem',
+            paddingBottom: '0.85rem',
             borderBottom: '1.5px solid #fed7aa',
             display: 'flex',
             alignItems: 'center',
@@ -1141,7 +1540,8 @@ const ProductReturnModal = ({ isOpen, onClose, order, onReturnSuccess }) => {
             position: 'sticky',
             top: 0,
             zIndex: 20,
-            flexShrink: 0
+            flexShrink: 0,
+            boxShadow: '0 2px 8px rgba(0,0,0,0.06)'
           }}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', minWidth: 0, flex: 1 }}>
@@ -1197,8 +1597,8 @@ const ProductReturnModal = ({ isOpen, onClose, order, onReturnSuccess }) => {
               background: 'white',
               border: '1px solid #fdba74',
               borderRadius: '50%',
-              width: '32px',
-              height: '32px',
+              width: '34px',
+              height: '34px',
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
@@ -1209,7 +1609,7 @@ const ProductReturnModal = ({ isOpen, onClose, order, onReturnSuccess }) => {
             }}
             aria-label="Close"
           >
-            <X size={17} />
+            <X size={18} />
           </button>
         </div>
 
@@ -1223,7 +1623,6 @@ const ProductReturnModal = ({ isOpen, onClose, order, onReturnSuccess }) => {
             WebkitOverflowScrolling: 'touch',
             overscrollBehaviorY: 'contain',
             padding: '1rem',
-            /* Bottom navigation bar-er upore jate button uthe ase tai 90px extra padding */
             paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 90px)',
             display: 'flex',
             flexDirection: 'column',
@@ -1357,7 +1756,7 @@ const ProductReturnModal = ({ isOpen, onClose, order, onReturnSuccess }) => {
             🚚 Our courier partner will pick up the item from your delivery address within <strong>3 business days</strong>.
           </div>
 
-          {/* ACTION BUTTONS (Scrolls together inside the form) */}
+          {/* ACTION BUTTONS */}
           <div
             style={{
               display: 'grid',

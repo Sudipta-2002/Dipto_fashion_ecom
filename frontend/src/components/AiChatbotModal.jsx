@@ -1954,15 +1954,17 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
         <div
           style={{
             background: 'linear-gradient(135deg, #1e1b4b 0%, #701a75 100%)',
-            padding: '0.85rem 1.15rem',
-            paddingTop: isMobile ? 'calc(54px + env(safe-area-inset-top, 0px))' : '0.85rem',
-            paddingBottom: '0.85rem',
+            padding: '1rem 1.15rem',
+            paddingTop: isMobile ? 'max(64px, calc(1.25rem + env(safe-area-inset-top, 24px)))' : '1rem',
+            paddingBottom: '1rem',
             color: 'white',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             flexShrink: 0,
             zIndex: 30,
+            position: 'sticky',
+            top: 0,
             boxShadow: '0 2px 10px rgba(0,0,0,0.2)'
           }}
         >
@@ -2147,8 +2149,8 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
             handleSend();
           }}
           style={{
-            padding: '0.65rem 0.75rem',
-            paddingBottom: isMobile ? 'calc(14px + env(safe-area-inset-bottom, 0px))' : '0.65rem',
+            padding: '0.75rem 0.85rem',
+            paddingBottom: isMobile ? 'max(24px, calc(0.85rem + env(safe-area-inset-bottom, 16px)))' : '0.75rem',
             background: '#ffffff',
             borderTop: '1.5px solid #e2e8f0',
             display: 'flex',
@@ -2156,6 +2158,8 @@ Feel free to ask for your **last order**, enter an **Order ID**, or type **"Retu
             alignItems: 'center',
             flexShrink: 0,
             zIndex: 30,
+            position: 'sticky',
+            bottom: 0,
             boxShadow: '0 -2px 10px rgba(0,0,0,0.05)'
           }}
         >

@@ -6604,12 +6604,50 @@ function App() {
 
   const [cartItems, setCartItems] = useState(() => {
     try {
+      const savedUser = localStorage.getItem('df_user');
+      let userKey = 'guest';
+      if (savedUser) {
+        try {
+          const u = JSON.parse(savedUser);
+          userKey = u._id || u.id || u.email || 'guest';
+        } catch (e) {}
+      }
+      const savedUserCart = localStorage.getItem(`df_cart_${userKey}`);
+      if (savedUserCart) {
+        const parsed = JSON.parse(savedUserCart);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
       const savedCart = localStorage.getItem('df_cart');
       return savedCart ? JSON.parse(savedCart) : [];
     } catch (e) {
       return [];
     }
   });
+
+  // Sync cartItems to localStorage whenever cartItems or user changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('df_cart', JSON.stringify(cartItems));
+      const userKey = user?._id || user?.id || user?.email || 'guest';
+      localStorage.setItem(`df_cart_${userKey}`, JSON.stringify(cartItems));
+    } catch (e) {}
+  }, [cartItems, user]);
+
+  // Restore user-specific cart when user logs in or user session updates
+  useEffect(() => {
+    if (user) {
+      try {
+        const userKey = user._id || user.id || user.email;
+        const savedUserCart = localStorage.getItem(`df_cart_${userKey}`);
+        if (savedUserCart) {
+          const parsed = JSON.parse(savedUserCart);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            setCartItems(parsed);
+          }
+        }
+      } catch (e) {}
+    }
+  }, [user?._id, user?.id, user?.email]);
 
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
