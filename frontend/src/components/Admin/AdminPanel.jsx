@@ -239,7 +239,7 @@ const AdminPanel = ({ onExitAdmin }) => {
                 <div style={{ position: 'relative' }}>
                   <input
                     type={showAdminPassword ? 'text' : 'password'}
-                    placeholder="••••••••"
+                    placeholder="Password"
                     value={loginPassword}
                     onChange={(e) => setLoginPassword(e.target.value)}
                     required
