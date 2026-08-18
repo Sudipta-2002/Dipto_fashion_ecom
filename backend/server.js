@@ -2625,6 +2625,45 @@ app.post([
 
 
 
+// app.get(['/api/orders', '/orders', '/api/admin/orders', '/admin/orders'], async (req, res) => {
+//   try {
+//     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+//     const limit = Math.max(1, parseInt(req.query.limit, 10) || 15);
+//     const skip = (page - 1) * limit;
+
+//     if (isMongoConnected()) {
+//       // 1. Parallel execution: Count & Fetch একসাথে চলবে (5x faster)
+//       const [totalCount, orders] = await Promise.all([
+//         Order.estimatedDocumentCount().maxTimeMS(3000).catch(() => Order.countDocuments()),
+//         Order.find()
+//           .select('orderId userName userEmail shippingAddress items.name items.selectedSize items.quantity items.price items.image items.product totalAmount couponCode couponDiscount utrNumber paymentMethod status cancellationDetails returnDetails createdAt')
+//           .sort({ createdAt: -1 })
+//           .skip(skip)
+//           .limit(limit)
+//           .lean()
+//           .maxTimeMS(5000)
+//       ]);
+
+//       res.setHeader('X-Total-Count', totalCount || 0);
+//       res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count');
+//       return res.status(200).json(orders || []);
+//     } else {
+//       const memoryList = Array.isArray(memoryOrders) ? memoryOrders : [];
+//       res.setHeader('X-Total-Count', memoryList.length);
+//       res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count');
+//       return res.status(200).json(memoryList.slice(skip, skip + limit));
+//     }
+//   } catch (err) {
+//     console.error("Error fetching admin orders:", err.message);
+//     res.setHeader('X-Total-Count', 0);
+//     return res.status(200).json([]);
+//   }
+// });
+
+
+
+
+// --- FAST GET ORDERS FOR ADMIN (LIGHTWEIGHT PAYLOAD & INSTANT INDEX HIT) ---
 app.get(['/api/orders', '/orders', '/api/admin/orders', '/admin/orders'], async (req, res) => {
   try {
     const page = Math.max(1, parseInt(req.query.page, 10) || 1);
@@ -2632,35 +2671,33 @@ app.get(['/api/orders', '/orders', '/api/admin/orders', '/admin/orders'], async 
     const skip = (page - 1) * limit;
 
     if (isMongoConnected()) {
-      // 1. Parallel execution: Count & Fetch একসাথে চলবে (5x faster)
+      // Parallel execution: Fast Count + Optimized Payload
       const [totalCount, orders] = await Promise.all([
-        Order.estimatedDocumentCount().maxTimeMS(3000).catch(() => Order.countDocuments()),
-        Order.find()
-          .select('orderId userName userEmail shippingAddress items.name items.selectedSize items.quantity items.price items.image items.product totalAmount couponCode couponDiscount utrNumber paymentMethod status cancellationDetails returnDetails createdAt')
+        Order.estimatedDocumentCount().maxTimeMS(2000).catch(() => Order.countDocuments()),
+        Order.find({})
           .sort({ createdAt: -1 })
           .skip(skip)
           .limit(limit)
+          .select('orderId userName userEmail shippingAddress items.name items.selectedSize items.quantity items.price items.image totalAmount couponCode couponDiscount utrNumber paymentMethod status rejectionReason cancellationDetails returnDetails createdAt')
           .lean()
-          .maxTimeMS(5000)
+          .maxTimeMS(3000)
       ]);
 
-      res.setHeader('X-Total-Count', totalCount || 0);
+      res.setHeader('X-Total-Count', (totalCount || 0).toString());
       res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count');
       return res.status(200).json(orders || []);
     } else {
       const memoryList = Array.isArray(memoryOrders) ? memoryOrders : [];
-      res.setHeader('X-Total-Count', memoryList.length);
+      res.setHeader('X-Total-Count', memoryList.length.toString());
       res.setHeader('Access-Control-Expose-Headers', 'X-Total-Count');
       return res.status(200).json(memoryList.slice(skip, skip + limit));
     }
   } catch (err) {
     console.error("Error fetching admin orders:", err.message);
-    res.setHeader('X-Total-Count', 0);
+    res.setHeader('X-Total-Count', '0');
     return res.status(200).json([]);
   }
 });
-
-
 
 
 
