@@ -22,6 +22,7 @@ import Order from './models/Order.js';
 import Notification from './models/Notification.js';
 import LiveSale from './models/LiveSale.js';
 import HeroBanner from './models/HeroBanner.js';
+import FlashSale from './models/FlashSale.js';
 import Coupon from './models/Coupon.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
@@ -2130,6 +2131,118 @@ app.delete(['/api/admin/hero-banners/:id', '/admin/hero-banners/:id'], async (re
       return res.status(200).json({ success: true, message: 'Banner deleted from memory' });
     }
   } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// FLASH SALE MANAGEMENT (PUBLIC & ADMIN)
+// ==========================================
+let memoryFlashSale = {
+  title: 'Flash Sale',
+  isActive: true,
+  endTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+  productIds: []
+};
+
+// GET ACTIVE FLASH SALE FOR STOREFRONT (Populate only essential fields)
+app.get(['/api/flash-sale/active', '/flash-sale/active', '/api/flash-sale', '/flash-sale'], async (req, res) => {
+  try {
+    if (mongoose.connection.readyState === 1 && FlashSale) {
+      let flashSale = await FlashSale.findOne()
+        .populate({
+          path: 'productIds',
+          select: 'name title price mrp category images rating reviewsCount brand quantity remainingStock isBestseller isNewProduct'
+        })
+        .lean()
+        .maxTimeMS(3000);
+
+      if (!flashSale) {
+        // Return default structure
+        return res.status(200).json({
+          title: 'Flash Sale',
+          isActive: true,
+          endTime: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          products: []
+        });
+      }
+
+      return res.status(200).json({
+        _id: flashSale._id,
+        title: flashSale.title || 'Flash Sale',
+        isActive: Boolean(flashSale.isActive),
+        endTime: flashSale.endTime,
+        products: flashSale.productIds || []
+      });
+    } else {
+      return res.status(200).json({
+        ...memoryFlashSale,
+        products: []
+      });
+    }
+  } catch (err) {
+    console.error('Error fetching storefront flash sale:', err.message);
+    return res.status(200).json({
+      title: 'Flash Sale',
+      isActive: false,
+      endTime: new Date().toISOString(),
+      products: []
+    });
+  }
+});
+
+// GET ADMIN FLASH SALE CONFIG
+app.get(['/api/admin/flash-sale', '/admin/flash-sale'], async (req, res) => {
+  try {
+    if (mongoose.connection.readyState === 1 && FlashSale) {
+      const flashSale = await FlashSale.findOne().lean().maxTimeMS(3000);
+      return res.status(200).json(flashSale || memoryFlashSale);
+    } else {
+      return res.status(200).json(memoryFlashSale);
+    }
+  } catch (err) {
+    return res.status(200).json(memoryFlashSale);
+  }
+});
+
+// SAVE / UPDATE ADMIN FLASH SALE CONFIG
+app.post(['/api/admin/flash-sale', '/admin/flash-sale'], async (req, res) => {
+  try {
+    const { title, isActive, endTime, productIds } = req.body;
+
+    const payload = {
+      title: title ? title.trim() : 'Flash Sale',
+      isActive: isActive !== undefined ? Boolean(isActive) : true,
+      endTime: endTime ? new Date(endTime) : new Date(Date.now() + 24 * 60 * 60 * 1000),
+      productIds: Array.isArray(productIds) ? productIds : []
+    };
+
+    if (mongoose.connection.readyState === 1 && FlashSale) {
+      let flashSale = await FlashSale.findOne();
+      if (flashSale) {
+        flashSale.title = payload.title;
+        flashSale.isActive = payload.isActive;
+        flashSale.endTime = payload.endTime;
+        flashSale.productIds = payload.productIds;
+        await flashSale.save();
+      } else {
+        flashSale = new FlashSale(payload);
+        await flashSale.save();
+      }
+
+      const socketServer = typeof io !== 'undefined' ? io : req.app?.get('io');
+      if (socketServer) socketServer.emit('flash_sale_updated');
+
+      return res.status(200).json({ success: true, message: 'Flash sale settings saved successfully!', data: flashSale });
+    } else {
+      memoryFlashSale = {
+        ...payload,
+        endTime: new Date(payload.endTime).toISOString()
+      };
+      return res.status(200).json({ success: true, message: 'Saved to memory (DB offline)', data: memoryFlashSale });
+    }
+  } catch (err) {
+    console.error('Error saving flash sale config:', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });

@@ -6527,7 +6527,8 @@ import UserProfileModal from './components/UserProfileModal';
 import NotificationModal from './components/NotificationModal';
 import LiveSaleBanner from './components/LiveSaleBanner';
 import TopCategoryBar from './components/TopCategoryBar';
-import HeroCarousel from './components/HeroCarousel';
+import HeroCarousel from './components/HeroCarousel.jsx';
+import FlashSaleSection from './components/FlashSaleSection.jsx';
 import AdminPanel from './components/Admin/AdminPanel';
 import MobileBottomNav from './components/MobileBottomNav';
 import ProductGridSkeleton from './components/Skeletons/ProductGridSkeleton';
@@ -7486,6 +7487,14 @@ function App() {
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', width: '100%' }}>
           <HeroCarousel
             onSelectCategory={handleCategorySelect}
+          />
+
+          <FlashSaleSection
+            onSelectProduct={handleOpenProductDetail}
+            onAddToCart={handleAddToCart}
+            onToggleWishlist={handleToggleWishlist}
+            wishlist={wishlist}
+            onViewAllClick={() => handleCategorySelect('All')}
           />
 
           <div className="main-layout" style={{ flex: '1 0 auto' }}>

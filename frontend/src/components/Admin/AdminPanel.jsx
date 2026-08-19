@@ -33,11 +33,12 @@ import AdminLiveSale from './AdminLiveSale';
 import AdminCoupons from './AdminCoupons';
 import AdminReports from './AdminReports';
 import AdminHeroBanners from './AdminHeroBanners';
+import AdminFlashSale from './AdminFlashSale';
 
 const AdminPanel = ({ onExitAdmin }) => {
   const getInitialAdminTab = () => {
     const hash = window.location.hash.replace('#admin-', '').replace('#', '').trim();
-    const validTabs = ['dashboard', 'products', 'categories', 'orders', 'returns', 'billing', 'notifications', 'live-sale', 'hero-banners', 'coupons', 'reports'];
+    const validTabs = ['dashboard', 'products', 'categories', 'orders', 'returns', 'billing', 'notifications', 'live-sale', 'flash-sale', 'hero-banners', 'coupons', 'reports'];
     if (validTabs.includes(hash)) return hash;
     const saved = localStorage.getItem('df_admin_tab');
     if (saved && validTabs.includes(saved)) return saved;
@@ -519,6 +520,19 @@ const AdminPanel = ({ onExitAdmin }) => {
           <span>Live Sale Banner</span>
         </button>
         <button
+          className={`admin-nav-btn btn-outline w-full min-h-[64px] flex items-center justify-center gap-2.5 text-center p-3.5 ${activeTab === 'flash-sale' ? 'active' : ''}`}
+          onClick={() => setActiveTab('flash-sale')}
+          style={{
+            background: activeTab === 'flash-sale' ? '#fff7ed' : '#ffffff',
+            borderColor: activeTab === 'flash-sale' ? '#ea580c' : '#cbd5e1',
+            color: activeTab === 'flash-sale' ? '#ea580c' : '#475569',
+            fontWeight: activeTab === 'flash-sale' ? '800' : '600'
+          }}
+        >
+          <Zap size={18} style={{ flexShrink: 0 }} />
+          <span>Flash Sale</span>
+        </button>
+        <button
           className={`admin-nav-btn btn-outline w-full min-h-[64px] flex items-center justify-center gap-2.5 text-center p-3.5 ${activeTab === 'hero-banners' ? 'active' : ''}`}
           onClick={() => setActiveTab('hero-banners')}
           style={{
@@ -577,6 +591,7 @@ const AdminPanel = ({ onExitAdmin }) => {
       {activeTab === 'billing' && <AdminBilling />}
       {activeTab === 'notifications' && <AdminNotifications />}
       {activeTab === 'live-sale' && <AdminLiveSale />}
+      {activeTab === 'flash-sale' && <AdminFlashSale />}
       {activeTab === 'hero-banners' && <AdminHeroBanners />}
       {activeTab === 'coupons' && <AdminCoupons />}
       {activeTab === 'reports' && <AdminReports />}
