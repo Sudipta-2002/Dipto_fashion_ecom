@@ -144,9 +144,10 @@ const HeroCarousel = ({ onSelectCategory }) => {
                   style={{
                     fontSize: 'clamp(0.65rem, 1.4vw, 0.82rem)',
                     fontWeight: '700',
-                    letterSpacing: '0.08em',
+                    letterSpacing: '0.05em',
                     color: 'rgba(255, 255, 255, 0.9)',
-                    textTransform: 'uppercase',
+                    textTransform: 'none',
+                    whiteSpace: 'pre-line',
                     filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))'
                   }}
                 >
@@ -160,7 +161,7 @@ const HeroCarousel = ({ onSelectCategory }) => {
                     fontSize: 'clamp(1.05rem, 3vw, 2.1rem)',
                     fontWeight: '900',
                     color: '#ffffff',
-                    textTransform: 'uppercase',
+                    textTransform: 'none',
                     letterSpacing: '-0.02em',
                     lineHeight: 1.15,
                     margin: 0,
