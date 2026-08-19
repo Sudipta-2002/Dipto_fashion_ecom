@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const heroBannerSchema = new mongoose.Schema(
   {
     title: { type: String, default: '' },
+    subtitle: { type: String, default: 'SHOP CATEGORY' },
     imageUrl: { type: String, required: true },
     publicId: { type: String, default: '' },
     linkUrl: { type: String, default: '' },

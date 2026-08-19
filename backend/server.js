@@ -2050,11 +2050,13 @@ app.post(['/api/admin/hero-banners/upload', '/admin/hero-banners/upload'], uploa
     }
 
     const title = req.body.title ? req.body.title.trim() : '';
+    const subtitle = req.body.subtitle ? req.body.subtitle.trim() : 'SHOP CATEGORY';
     const linkUrl = req.body.linkUrl ? req.body.linkUrl.trim() : '';
 
     if (mongoose.connection.readyState === 1 && HeroBanner) {
       const newBanner = new HeroBanner({
         title,
+        subtitle,
         imageUrl,
         publicId,
         linkUrl,
@@ -2071,6 +2073,7 @@ app.post(['/api/admin/hero-banners/upload', '/admin/hero-banners/upload'], uploa
       const newMemBanner = {
         _id: `hero_${Date.now()}`,
         title,
+        subtitle,
         imageUrl,
         publicId,
         linkUrl,

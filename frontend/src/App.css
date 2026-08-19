@@ -225,6 +225,23 @@ input, select, textarea {
   border-radius: 10px;
 }
 
+/* HERO CAROUSEL CONTAINER HEIGHT & ASPECT RATIO */
+.hero-carousel-inner {
+  height: 280px;
+}
+
+@media (max-width: 1024px) {
+  .hero-carousel-inner {
+    height: 230px;
+  }
+}
+
+@media (max-width: 640px) {
+  .hero-carousel-inner {
+    height: 175px;
+  }
+}
+
 /* MAIN LAYOUT GRID */
 .main-layout {
   display: block;

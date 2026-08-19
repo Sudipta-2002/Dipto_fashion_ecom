@@ -74,22 +74,20 @@ const HeroCarousel = ({ onSelectCategory }) => {
       style={{
         maxWidth: '1440px',
         width: '100%',
-        margin: '0.85rem auto 0.5rem auto',
+        margin: '0.75rem auto 0.5rem auto',
         padding: '0 1.25rem',
         boxSizing: 'border-box'
       }}
     >
       <div
+        className="hero-carousel-inner"
         style={{
           position: 'relative',
           width: '100%',
-          aspectRatio: '21 / 7',
-          maxHeight: '380px',
-          minHeight: '160px',
           borderRadius: '1rem',
           overflow: 'hidden',
           boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
-          background: '#f8fafc'
+          background: '#0f172a'
         }}
       >
         {banners.map((banner, index) => (
@@ -105,6 +103,7 @@ const HeroCarousel = ({ onSelectCategory }) => {
               cursor: banner.linkUrl ? 'pointer' : 'default'
             }}
           >
+            {/* Banner Image */}
             <img
               src={banner.imageUrl}
               alt={banner.title || 'Sale Hero Banner'}
@@ -115,24 +114,64 @@ const HeroCarousel = ({ onSelectCategory }) => {
                 borderRadius: '1rem'
               }}
             />
-            {banner.title && (
-              <div
-                style={{
-                  position: 'absolute',
-                  bottom: '1.25rem',
-                  left: '1.25rem',
-                  background: 'rgba(15, 23, 42, 0.75)',
-                  backdropFilter: 'blur(6px)',
-                  color: '#ffffff',
-                  padding: '0.5rem 1rem',
-                  borderRadius: '12px',
-                  fontWeight: '800',
-                  fontSize: '0.95rem'
-                }}
-              >
-                {banner.title}
-              </div>
-            )}
+
+            {/* Subtle Dark Bottom Gradient Overlay for High Legibility */}
+            <div
+              style={{
+                position: 'absolute',
+                inset: 0,
+                background: 'linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0.35) 45%, rgba(0,0,0,0) 100%)',
+                pointerEvents: 'none'
+              }}
+            />
+
+            {/* Bottom-Left Corner Text Overlay (Multiline Preserved) */}
+            <div
+              style={{
+                position: 'absolute',
+                left: 'clamp(1rem, 3.5vw, 2rem)',
+                bottom: 'clamp(1rem, 3.5vw, 2rem)',
+                zIndex: 10,
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '0.2rem',
+                maxWidth: '85%',
+                pointerEvents: 'none'
+              }}
+            >
+              {banner.subtitle && (
+                <span
+                  style={{
+                    fontSize: 'clamp(0.65rem, 1.4vw, 0.82rem)',
+                    fontWeight: '700',
+                    letterSpacing: '0.08em',
+                    color: 'rgba(255, 255, 255, 0.9)',
+                    textTransform: 'uppercase',
+                    filter: 'drop-shadow(0 2px 4px rgba(0,0,0,0.6))'
+                  }}
+                >
+                  {banner.subtitle}
+                </span>
+              )}
+
+              {banner.title && (
+                <h2
+                  style={{
+                    fontSize: 'clamp(1.05rem, 3vw, 2.1rem)',
+                    fontWeight: '900',
+                    color: '#ffffff',
+                    textTransform: 'uppercase',
+                    letterSpacing: '-0.02em',
+                    lineHeight: 1.15,
+                    margin: 0,
+                    whiteSpace: 'pre-line',
+                    filter: 'drop-shadow(0 4px 10px rgba(0,0,0,0.75))'
+                  }}
+                >
+                  {banner.title}
+                </h2>
+              )}
+            </div>
           </div>
         ))}
 

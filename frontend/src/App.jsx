@@ -6715,6 +6715,15 @@ function App() {
     } catch (e) {}
   };
 
+  const handleCategorySelect = (catName) => {
+    setSelectedCategory(catName);
+    setPage(1);
+    updateUrlParams(1, catName);
+    if (catalogRef.current) {
+      catalogRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   const closeAllModals = useCallback(() => {
     setIsCartOpen(false);
     setIsProfileOpen(false);
@@ -7458,11 +7467,7 @@ function App() {
         <TopCategoryBar
           categories={categories}
           selectedCategory={selectedCategory}
-          onSelectCategory={(catName) => {
-            setSelectedCategory(catName);
-            setPage(1);
-            updateUrlParams(1, catName);
-          }}
+          onSelectCategory={handleCategorySelect}
         />
       )}
 
@@ -7471,11 +7476,7 @@ function App() {
       ) : (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', width: '100%' }}>
           <HeroCarousel
-            onSelectCategory={(catName) => {
-              setSelectedCategory(catName);
-              setPage(1);
-              updateUrlParams(1, catName);
-            }}
+            onSelectCategory={handleCategorySelect}
           />
 
           <div className="main-layout" style={{ flex: '1 0 auto' }}>

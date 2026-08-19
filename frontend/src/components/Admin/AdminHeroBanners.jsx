@@ -12,6 +12,7 @@ const AdminHeroBanners = () => {
 
   // Form states for new banner
   const [title, setTitle] = useState('');
+  const [subtitle, setSubtitle] = useState('SHOP CATEGORY');
   const [linkUrl, setLinkUrl] = useState('');
   const [selectedFile, setSelectedFile] = useState(null);
   const [previewUrl, setPreviewUrl] = useState('');
@@ -70,6 +71,7 @@ const AdminHeroBanners = () => {
       const formData = new FormData();
       formData.append('image', selectedFile);
       if (title.trim()) formData.append('title', title.trim());
+      if (subtitle.trim()) formData.append('subtitle', subtitle.trim());
       if (linkUrl.trim()) formData.append('linkUrl', linkUrl.trim());
 
       const res = await fetch(`${API_URL}/api/admin/hero-banners/upload`, {
@@ -87,6 +89,7 @@ const AdminHeroBanners = () => {
         setSelectedFile(null);
         setPreviewUrl('');
         setTitle('');
+        setSubtitle('SHOP CATEGORY');
         setLinkUrl('');
         fetchHeroBanners();
       } else {
@@ -184,27 +187,40 @@ const AdminHeroBanners = () => {
         <form onSubmit={handleUploadBanner} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem', background: '#f8fafc', padding: '1.25rem', borderRadius: '14px', border: '1px solid #e2e8f0', marginBottom: '2rem' }}>
           <h4 style={{ fontSize: '1rem', fontWeight: '800', color: '#0f172a', margin: 0 }}>Add New Hero Banner</h4>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '1rem' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '1rem' }}>
             <div>
               <label style={{ fontSize: '0.85rem', fontWeight: '800', color: '#0f172a', display: 'block', marginBottom: '0.4rem' }}>
-                Banner Title (Optional)
+                Banner Subtitle / Tagline
               </label>
               <input
                 type="text"
-                placeholder="e.g. Festival Season Sale 50% Off"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
+                placeholder="e.g. SHOP CATEGORY"
+                value={subtitle}
+                onChange={(e) => setSubtitle(e.target.value)}
                 style={{ width: '100%', padding: '0.75rem 0.9rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.9rem', fontWeight: '600', boxSizing: 'border-box' }}
               />
             </div>
 
             <div>
               <label style={{ fontSize: '0.85rem', fontWeight: '800', color: '#0f172a', display: 'block', marginBottom: '0.4rem' }}>
-                Target Category / Link URL (Optional)
+                Main Title / Collection Name (Multiline) *
+              </label>
+              <textarea
+                rows={3}
+                placeholder={"e.g. SHOP CATEGORY\nKURTA & PANJABI SET\nUp to 50% OFF"}
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                style={{ width: '100%', padding: '0.75rem 0.9rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.9rem', fontWeight: '600', boxSizing: 'border-box', fontFamily: 'inherit', resize: 'vertical' }}
+              />
+            </div>
+
+            <div>
+              <label style={{ fontSize: '0.85rem', fontWeight: '800', color: '#0f172a', display: 'block', marginBottom: '0.4rem' }}>
+                Target Category / Link URL
               </label>
               <input
                 type="text"
-                placeholder="e.g. Saree or https://..."
+                placeholder="e.g. Punjabi or Saree"
                 value={linkUrl}
                 onChange={(e) => setLinkUrl(e.target.value)}
                 style={{ width: '100%', padding: '0.75rem 0.9rem', borderRadius: '8px', border: '1.5px solid #cbd5e1', fontSize: '0.9rem', fontWeight: '600', boxSizing: 'border-box' }}
