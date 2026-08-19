@@ -320,6 +320,7 @@ const Navbar = ({
   categories = [],
   allProducts = [],
   onSelectProduct,
+  onSearchSubmit,
   unreadNotificationCount = 0,
   showNotificationBubble = false,
   latestNotificationTitle = '',
@@ -369,6 +370,7 @@ const Navbar = ({
                     categories={categories}
                     allProducts={allProducts}
                     onSelectProduct={onSelectProduct}
+                    onSearchSubmit={onSearchSubmit}
                     activeFilterCount={activeFilterCount}
                     onOpenFilterModal={onOpenFilterModal}
                     expandedMaxWidth="400px"
@@ -605,6 +607,7 @@ const Navbar = ({
                 categories={categories}
                 allProducts={allProducts}
                 onSelectProduct={onSelectProduct}
+                onSearchSubmit={onSearchSubmit}
                 activeFilterCount={activeFilterCount}
                 onOpenFilterModal={onOpenFilterModal}
                 isMobileFullWidth={true}

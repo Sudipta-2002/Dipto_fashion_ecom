@@ -6717,6 +6717,7 @@ function App() {
 
   const handleCategorySelect = (catName) => {
     setSelectedCategory(catName);
+    setSearchTerm('');
     setPage(1);
     updateUrlParams(1, catName);
     if (catalogRef.current) {
@@ -7455,6 +7456,14 @@ function App() {
         categories={categories}
         allProducts={products}
         onSelectProduct={handleOpenProductDetail}
+        onSearchSubmit={(query) => {
+          setSelectedCategory('All');
+          setPage(1);
+          updateUrlParams(1, 'All');
+          if (catalogRef.current) {
+            catalogRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
+        }}
         unreadNotificationCount={unreadNotificationCount}
         showNotificationBubble={showNotificationBubble}
         latestNotificationTitle={latestNotificationTitle}
