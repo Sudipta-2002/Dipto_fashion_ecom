@@ -6526,6 +6526,8 @@ import PaymentModal from './components/PaymentModal';
 import UserProfileModal from './components/UserProfileModal';
 import NotificationModal from './components/NotificationModal';
 import LiveSaleBanner from './components/LiveSaleBanner';
+import TopCategoryBar from './components/TopCategoryBar';
+import HeroCarousel from './components/HeroCarousel';
 import AdminPanel from './components/Admin/AdminPanel';
 import MobileBottomNav from './components/MobileBottomNav';
 import ProductGridSkeleton from './components/Skeletons/ProductGridSkeleton';
@@ -7452,21 +7454,31 @@ function App() {
         onOpenFilterModal={openFilterModal}
       />
 
+      {currentView === 'shop' && (
+        <TopCategoryBar
+          categories={categories}
+          selectedCategory={selectedCategory}
+          onSelectCategory={(catName) => {
+            setSelectedCategory(catName);
+            setPage(1);
+            updateUrlParams(1, catName);
+          }}
+        />
+      )}
+
       {currentView === 'admin' ? (
         <AdminPanel onExitAdmin={() => setView('shop')} />
       ) : (
         <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column', justifyContent: 'space-between', width: '100%' }}>
-          <div className="main-layout" style={{ flex: '1 0 auto' }}>
-            <CategorySidebar
-              categories={categories}
-              selectedCategory={selectedCategory}
-              onSelectCategory={(catName) => {
-                setSelectedCategory(catName);
-                setPage(1);
-                updateUrlParams(1, catName);
-              }}
-            />
+          <HeroCarousel
+            onSelectCategory={(catName) => {
+              setSelectedCategory(catName);
+              setPage(1);
+              updateUrlParams(1, catName);
+            }}
+          />
 
+          <div className="main-layout" style={{ flex: '1 0 auto' }}>
             <main ref={catalogRef} className="products-section">
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '0.5rem', marginBottom: '1rem' }}>
                 <h2>

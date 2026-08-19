@@ -1,0 +1,236 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { API_URL, apiFetch, parseResponseSafely } from '../api';
+
+const HeroCarousel = ({ onSelectCategory }) => {
+  const [banners, setBanners] = useState([]);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [loading, setLoading] = useState(false);
+  const autoPlayRef = useRef(null);
+
+  useEffect(() => {
+    fetchHeroBanners();
+  }, []);
+
+  const fetchHeroBanners = async () => {
+    try {
+      const res = await apiFetch('/api/hero-banners/active');
+      const data = await parseResponseSafely(res);
+      if (res.ok && Array.isArray(data) && data.length > 0) {
+        setBanners(data);
+      } else {
+        loadLocalStorageFallback();
+      }
+    } catch (e) {
+      loadLocalStorageFallback();
+    }
+  };
+
+  const loadLocalStorageFallback = () => {
+    try {
+      const saved = localStorage.getItem('df_hero_banners');
+      if (saved) {
+        const list = JSON.parse(saved);
+        if (Array.isArray(list) && list.length > 0) {
+          setBanners(list.filter((b) => b.isActive));
+        }
+      }
+    } catch (e) {}
+  };
+
+  // Autoplay carousel if > 1 banner
+  useEffect(() => {
+    if (banners.length <= 1) return;
+
+    autoPlayRef.current = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % banners.length);
+    }, 4500);
+
+    return () => {
+      if (autoPlayRef.current) clearInterval(autoPlayRef.current);
+    };
+  }, [banners.length]);
+
+  const handlePrev = () => {
+    setCurrentIndex((prev) => (prev - 1 + banners.length) % banners.length);
+  };
+
+  const handleNext = () => {
+    setCurrentIndex((prev) => (prev + 1) % banners.length);
+  };
+
+  const handleBannerClick = (banner) => {
+    if (!banner) return;
+    if (banner.linkUrl && onSelectCategory) {
+      onSelectCategory(banner.linkUrl);
+    }
+  };
+
+  if (!banners || banners.length === 0) return null;
+
+  return (
+    <div
+      className="hero-carousel-container"
+      style={{
+        maxWidth: '1440px',
+        width: '100%',
+        margin: '0.85rem auto 0.5rem auto',
+        padding: '0 1.25rem',
+        boxSizing: 'border-box'
+      }}
+    >
+      <div
+        style={{
+          position: 'relative',
+          width: '100%',
+          aspectRatio: '21 / 7',
+          maxHeight: '380px',
+          minHeight: '160px',
+          borderRadius: '1rem',
+          overflow: 'hidden',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.08)',
+          background: '#f8fafc'
+        }}
+      >
+        {banners.map((banner, index) => (
+          <div
+            key={banner._id || index}
+            onClick={() => handleBannerClick(banner)}
+            style={{
+              position: 'absolute',
+              inset: 0,
+              opacity: index === currentIndex ? 1 : 0,
+              transition: 'opacity 0.6s ease-in-out',
+              pointerEvents: index === currentIndex ? 'auto' : 'none',
+              cursor: banner.linkUrl ? 'pointer' : 'default'
+            }}
+          >
+            <img
+              src={banner.imageUrl}
+              alt={banner.title || 'Sale Hero Banner'}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+                borderRadius: '1rem'
+              }}
+            />
+            {banner.title && (
+              <div
+                style={{
+                  position: 'absolute',
+                  bottom: '1.25rem',
+                  left: '1.25rem',
+                  background: 'rgba(15, 23, 42, 0.75)',
+                  backdropFilter: 'blur(6px)',
+                  color: '#ffffff',
+                  padding: '0.5rem 1rem',
+                  borderRadius: '12px',
+                  fontWeight: '800',
+                  fontSize: '0.95rem'
+                }}
+              >
+                {banner.title}
+              </div>
+            )}
+          </div>
+        ))}
+
+        {/* Navigation Arrows */}
+        {banners.length > 1 && (
+          <>
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handlePrev();
+              }}
+              style={{
+                position: 'absolute',
+                left: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'rgba(255, 255, 255, 0.85)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                zIndex: 10
+              }}
+            >
+              <ChevronLeft size={20} color="#0f172a" />
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleNext();
+              }}
+              style={{
+                position: 'absolute',
+                right: '12px',
+                top: '50%',
+                transform: 'translateY(-50%)',
+                background: 'rgba(255, 255, 255, 0.85)',
+                border: 'none',
+                borderRadius: '50%',
+                width: '36px',
+                height: '36px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+                zIndex: 10
+              }}
+            >
+              <ChevronRight size={20} color="#0f172a" />
+            </button>
+
+            {/* Dot Indicators */}
+            <div
+              style={{
+                position: 'absolute',
+                bottom: '10px',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                zIndex: 10
+              }}
+            >
+              {banners.map((_, idx) => (
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setCurrentIndex(idx);
+                  }}
+                  style={{
+                    width: idx === currentIndex ? '22px' : '8px',
+                    height: '8px',
+                    borderRadius: '4px',
+                    background: idx === currentIndex ? '#c026d3' : 'rgba(255, 255, 255, 0.7)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    transition: 'all 0.3s ease'
+                  }}
+                />
+              ))}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+};
+
+export default HeroCarousel;

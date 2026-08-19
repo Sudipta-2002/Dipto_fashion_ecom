@@ -227,13 +227,11 @@ input, select, textarea {
 
 /* MAIN LAYOUT GRID */
 .main-layout {
-  display: grid;
-  grid-template-columns: 190px 1fr;
+  display: block;
   max-width: 1440px;
   width: 100%;
   margin: 0 auto;
   padding: 1rem 1.25rem;
-  gap: 1rem;
   flex: 1;
 }
 
@@ -295,11 +293,11 @@ input, select, textarea {
   justify-content: space-between;
 }
 
-/* EXACT 4-COLUMN PRODUCT GRID */
+/* EXACT 5-COLUMN PRODUCT GRID FOR DESKTOP, 2-COLUMN FOR MOBILE */
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.85rem;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 1.1rem;
 }
 
 /* EXACT 5-COLUMN RELATED PRODUCTS GRID FOR FULL-SCREEN PRODUCT PAGE */
@@ -767,10 +765,10 @@ table.admin-table th {
   flex-shrink: 0;
 }
 
-/* Responsive Rules: Desktop 4-Column Pattern & Mobile 2-Column Pattern (Myntra App Style) */
+/* Responsive Rules: Desktop 5-Column Pattern & Mobile 2-Column Pattern */
 @media (min-width: 1024px) {
   .product-grid {
-    grid-template-columns: repeat(4, 1fr) !important;
+    grid-template-columns: repeat(5, 1fr) !important;
     gap: 1.1rem;
   }
 }
@@ -779,6 +777,13 @@ table.admin-table th {
   .product-grid {
     grid-template-columns: repeat(3, 1fr) !important;
     gap: 1rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .product-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 0.75rem;
   }
 }
 

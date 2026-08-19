@@ -21,6 +21,7 @@ import Product from './models/Product.js';
 import Order from './models/Order.js';
 import Notification from './models/Notification.js';
 import LiveSale from './models/LiveSale.js';
+import HeroBanner from './models/HeroBanner.js';
 import Coupon from './models/Coupon.js';
 import notificationRoutes from './routes/notificationRoutes.js';
 import couponRoutes from './routes/couponRoutes.js';
@@ -1982,6 +1983,150 @@ app.post(['/api/admin/live-sale', '/admin/live-sale', '/api/live-sale', '/live-s
     }
   } catch (err) {
     console.error('Error in live-sale banner update:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ==========================================
+// HERO BANNER CAROUSEL MANAGEMENT (CLOUDINARY)
+// ==========================================
+let memoryHeroBanners = [
+  {
+    _id: 'hero_1',
+    title: 'Festival Season Mega Sale',
+    imageUrl: 'https://images.unsplash.com/photo-1607082348824-0a96f2a4b9da?auto=format&fit=crop&w=1600&q=80',
+    publicId: 'hero_demo_1',
+    linkUrl: 'Saree',
+    isActive: true,
+    order: 1
+  }
+];
+
+// GET ACTIVE HERO BANNERS (STOREFRONT / PUBLIC)
+app.get(['/api/hero-banners/active', '/hero-banners/active', '/api/hero-banners', '/hero-banners'], async (req, res) => {
+  try {
+    if (mongoose.connection.readyState === 1 && HeroBanner) {
+      const banners = await HeroBanner.find({ isActive: true }).sort({ order: 1, createdAt: -1 }).lean().maxTimeMS(3000);
+      return res.status(200).json(banners || []);
+    } else {
+      return res.status(200).json(memoryHeroBanners.filter((b) => b.isActive));
+    }
+  } catch (err) {
+    console.error('Error fetching storefront hero banners:', err.message);
+    return res.status(200).json(memoryHeroBanners.filter((b) => b.isActive));
+  }
+});
+
+// GET ALL HERO BANNERS (ADMIN)
+app.get(['/api/admin/hero-banners', '/admin/hero-banners'], async (req, res) => {
+  try {
+    if (mongoose.connection.readyState === 1 && HeroBanner) {
+      const banners = await HeroBanner.find().sort({ order: 1, createdAt: -1 }).lean().maxTimeMS(3000);
+      return res.status(200).json(banners || []);
+    } else {
+      return res.status(200).json(memoryHeroBanners);
+    }
+  } catch (err) {
+    console.error('Error fetching admin hero banners:', err.message);
+    return res.status(200).json(memoryHeroBanners);
+  }
+});
+
+// UPLOAD NEW HERO BANNER TO CLOUDINARY
+app.post(['/api/admin/hero-banners/upload', '/admin/hero-banners/upload'], upload.single('image'), async (req, res) => {
+  try {
+    let imageUrl = '';
+    let publicId = '';
+
+    if (req.file) {
+      imageUrl = req.file.path || req.file.secure_url;
+      publicId = req.file.filename || req.file.public_id || '';
+    } else if (req.body.imageUrl) {
+      imageUrl = await uploadBase64ToCloudinary(req.body.imageUrl, 'hero_banners');
+    }
+
+    if (!imageUrl) {
+      return res.status(400).json({ success: false, error: 'No image file or URL provided' });
+    }
+
+    const title = req.body.title ? req.body.title.trim() : '';
+    const linkUrl = req.body.linkUrl ? req.body.linkUrl.trim() : '';
+
+    if (mongoose.connection.readyState === 1 && HeroBanner) {
+      const newBanner = new HeroBanner({
+        title,
+        imageUrl,
+        publicId,
+        linkUrl,
+        isActive: true,
+        order: Date.now()
+      });
+      await newBanner.save();
+
+      const socketServer = typeof io !== 'undefined' ? io : req.app?.get('io');
+      if (socketServer) socketServer.emit('hero_banners_updated');
+
+      return res.status(200).json({ success: true, message: 'Hero banner uploaded successfully!', data: newBanner });
+    } else {
+      const newMemBanner = {
+        _id: `hero_${Date.now()}`,
+        title,
+        imageUrl,
+        publicId,
+        linkUrl,
+        isActive: true,
+        order: Date.now()
+      };
+      memoryHeroBanners.unshift(newMemBanner);
+      return res.status(200).json({ success: true, message: 'Hero banner saved to memory', data: newMemBanner });
+    }
+  } catch (err) {
+    console.error('Error uploading hero banner:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// TOGGLE / UPDATE HERO BANNER
+app.put(['/api/admin/hero-banners/:id', '/admin/hero-banners/:id'], async (req, res) => {
+  try {
+    const { id } = req.params;
+    const updateData = req.body;
+
+    if (mongoose.connection.readyState === 1 && HeroBanner) {
+      const updated = await HeroBanner.findByIdAndUpdate(id, updateData, { new: true });
+      return res.status(200).json({ success: true, data: updated });
+    } else {
+      const idx = memoryHeroBanners.findIndex((b) => String(b._id) === String(id));
+      if (idx !== -1) {
+        memoryHeroBanners[idx] = { ...memoryHeroBanners[idx], ...updateData };
+        return res.status(200).json({ success: true, data: memoryHeroBanners[idx] });
+      }
+      return res.status(404).json({ success: false, error: 'Banner not found' });
+    }
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// DELETE HERO BANNER
+app.delete(['/api/admin/hero-banners/:id', '/admin/hero-banners/:id'], async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    if (mongoose.connection.readyState === 1 && HeroBanner) {
+      const banner = await HeroBanner.findById(id);
+      if (banner && banner.publicId) {
+        try {
+          await deleteFromCloudinary(banner.publicId);
+        } catch (e) {}
+      }
+      await HeroBanner.findByIdAndDelete(id);
+      return res.status(200).json({ success: true, message: 'Banner deleted successfully' });
+    } else {
+      memoryHeroBanners = memoryHeroBanners.filter((b) => String(b._id) !== String(id));
+      return res.status(200).json({ success: true, message: 'Banner deleted from memory' });
+    }
+  } catch (err) {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
